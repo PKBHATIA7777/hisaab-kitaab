@@ -59,7 +59,7 @@ async function registerRequestOtp(req, res) {
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Upsert OTP for signup (one row per email+purpose)
+    // upsert OTP for signup
     await db.query(
       `INSERT INTO otps (email, code, purpose, expires_at, used)
        VALUES ($1, $2, 'signup', $3, FALSE)
@@ -70,9 +70,6 @@ async function registerRequestOtp(req, res) {
                      created_at = NOW()`,
       [cleanEmail, code, expiresAt]
     );
-
-    // Store signup data in a separate temp table or encode in code/email if needed.
-    // For simplicity here, assume username + realName are re-sent on verify-otp.
 
     await sendOtpEmail(
       cleanEmail,
@@ -121,7 +118,9 @@ async function registerVerifyOtp(req, res) {
     const otpRow = otpRows[0];
 
     if (!otpRow) {
-      return res.status(400).json({ ok: false, message: "Invalid or expired OTP" });
+      return res
+        .status(400)
+        .json({ ok: false, message: "Invalid or expired OTP" });
     }
 
     const { rows: existingRows } = await db.query(
@@ -412,7 +411,6 @@ async function forgotRequestOtp(req, res) {
     );
     const user = userRows[0] || null;
 
-    // For security, always respond ok, even if user does not exist
     if (!user) {
       return res.json({
         ok: true,
@@ -480,7 +478,9 @@ async function resetPassword(req, res) {
     const otpRow = otpRows[0] || null;
 
     if (!otpRow) {
-      return res.status(400).json({ ok: false, message: "Invalid or expired OTP" });
+      return res
+        .status(400)
+        .json({ ok: false, message: "Invalid or expired OTP" });
     }
 
     const { rows: userRows } = await db.query(

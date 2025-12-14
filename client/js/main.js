@@ -18,9 +18,77 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-// -------------------------------
-// Google sign-in helper
-// -------------------------------
+/* ======================================
+   SIGNUP – REQUEST OTP
+====================================== */
+async function requestSignupOTP() {
+  try {
+    const realName = document.getElementById("realName").value.trim();
+    const username = document.getElementById("username").value.trim();
+    const email = document.getElementById("email").value.trim();
+
+    if (!realName || !username || !email) {
+      alert("All fields are required");
+      return;
+    }
+
+    // store for verify step
+    localStorage.setItem("signupRealName", realName);
+    localStorage.setItem("signupUsername", username);
+    localStorage.setItem("signupEmail", email);
+
+    // ✅ FIX: send all required fields
+    await apiFetch("/auth/register/request-otp", {
+      method: "POST",
+      body: {
+        email,
+        realName,
+        username,
+      },
+    });
+
+    alert("OTP sent to your email");
+  } catch (err) {
+    alert(err.message || "Failed to send OTP");
+  }
+}
+
+/* ======================================
+   SIGNUP – VERIFY OTP
+====================================== */
+async function verifySignupOTP() {
+  try {
+    const otp = document.getElementById("otp").value.trim();
+
+    const realName = localStorage.getItem("signupRealName");
+    const username = localStorage.getItem("signupUsername");
+    const email = localStorage.getItem("signupEmail");
+
+    if (!otp || !realName || !username || !email) {
+      alert("Missing signup data or OTP");
+      return;
+    }
+
+    await apiFetch("/auth/register/verify-otp", {
+      method: "POST",
+      body: { email, otp, realName, username },
+    });
+
+    // cleanup
+    localStorage.removeItem("signupRealName");
+    localStorage.removeItem("signupUsername");
+    localStorage.removeItem("signupEmail");
+
+    alert("Signup successful");
+    window.location.href = "dashboard.html";
+  } catch (err) {
+    alert(err.message || "OTP verification failed");
+  }
+}
+
+/* ======================================
+   GOOGLE SIGN-IN
+====================================== */
 async function handleGoogleCredential(response) {
   try {
     const idToken = response.credential;
@@ -30,18 +98,14 @@ async function handleGoogleCredential(response) {
       body: { idToken },
     });
 
-    // You can remove this alert if you want a smoother experience
     alert("Logged in with Google as " + data.user.username);
-
-    if (data.isNewUser) {
-      window.location.href = "dasboard.html";
-    } else {
-      window.location.href = "dashboard.html";
-    }
+    window.location.href = "dashboard.html";
   } catch (err) {
     alert(err.message || "Google sign-in failed");
   }
 }
 
-// expose globally for Google script
+// expose globally
 window.handleGoogleCredential = handleGoogleCredential;
+window.requestSignupOTP = requestSignupOTP;
+window.verifySignupOTP = verifySignupOTP;
