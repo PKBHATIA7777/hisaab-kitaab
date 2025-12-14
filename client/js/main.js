@@ -1,4 +1,5 @@
-const API_BASE = "http://127.0.0.1:5001/api";
+const API_BASE = "https://hisaab-kitaab-service-app.onrender.com/api";
+
 
 async function apiFetch(path, options = {}) {
   const res = await fetch(API_BASE + path, {
