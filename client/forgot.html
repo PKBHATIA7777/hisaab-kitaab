@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reset password - Hisaab-Kitaab</title>
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <div class="brand-header">
+    <h1>Hisaab-Kitaab</h1>
+    <p>Your way of handling expenses</p>
+  </div>
+
+  <main>
+    <div class="auth-wrapper">
+      <section class="auth-card">
+        <h1 class="auth-title">Reset Password</h1>
+        <p class="auth-subtitle">Enter your email to receive a reset code</p>
+
+        <form id="forgot-form">
+          <label>
+            Email
+            <input type="email" name="email" required autocomplete="email" placeholder="john@example.com">
+          </label>
+
+          <button type="submit" class="btn-primary">
+            Send Reset OTP
+          </button>
+        </form>
+
+        <div id="reset-step" hidden>
+          <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+          <p style="margin-bottom: 15px; color: #666; font-size: 0.9rem;">OTP sent! Check your inbox.</p>
+          
+          <form id="reset-form">
+            <label>
+              OTP
+              <input type="text" name="otp" required placeholder="123456">
+            </label>
+
+            <label>
+              New password
+              <input type="password" name="newPassword" required autocomplete="new-password" placeholder="••••••••">
+            </label>
+
+            <button type="submit" class="btn-primary">
+              Reset Password
+            </button>
+          </form>
+        </div>
+
+        <p style="margin-top: 20px; font-size: 0.9rem; color: #666;">
+          Remembered it? <a href="login.html">Back to login</a>
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/main.js"></script>
+
+  <script>
+    const forgotForm = document.getElementById("forgot-form");
+    const resetStep = document.getElementById("reset-step");
+    const resetForm = document.getElementById("reset-form");
+  
+    let resetEmail = "";
+  
+    if (forgotForm) {
+      forgotForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(forgotForm);
+        const email = formData.get("email");
+        resetEmail = email;
+  
+        try {
+          await apiFetch("/auth/forgot/request-otp", {
+            method: "POST",
+            body: { email },
+          });
+          alert("If this email exists, OTP is sent (check server console).");
+          // Hide the first form to make it cleaner, or just show the second step
+          forgotForm.style.display = 'none'; 
+          document.querySelector('.auth-subtitle').textContent = "Create a new password"; // Update UI text
+          resetStep.hidden = false;
+        } catch (err) {
+          alert(err.message || "Failed to send reset OTP");
+        }
+      });
+    }
+  
+    if (resetForm) {
+      resetForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(resetForm);
+        const otp = formData.get("otp");
+        const newPassword = formData.get("newPassword");
+  
+        try {
+          await apiFetch("/auth/forgot/reset", {
+            method: "POST",
+            body: { email: resetEmail, otp, newPassword },
+          });
+          alert("Password reset. Please log in with new password.");
+          window.location.href = "login.html";
+        } catch (err) {
+          alert(err.message || "Failed to reset password");
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>

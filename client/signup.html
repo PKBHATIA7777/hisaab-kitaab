@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign up - Hisaab-Kitaab</title>
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="google-signin-client_id"
+        content="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <div class="brand-header">
+    <h1>Hisaab-Kitaab</h1>
+    <p>Your way of handling expenses</p>
+  </div>
+
+  <main>
+    <div class="auth-wrapper">
+      <section class="auth-card">
+        <h1 class="auth-title">Create Account</h1>
+
+        <!-- STEP 1: only name, username, email -->
+        <form id="signup-form">
+          <label>Real name
+            <input type="text" name="realName" required autocomplete="name" placeholder="John Doe">
+          </label>
+          <label>Username
+            <input type="text" name="username" required autocomplete="username" placeholder="johndoe123">
+          </label>
+          <label>Email
+            <input type="email" name="email" required autocomplete="email" placeholder="john@example.com">
+          </label>
+          <button type="submit" class="btn-primary">Send OTP</button>
+        </form>
+
+        <!-- STEP 2: OTP for email verification -->
+        <div id="signup-otp-step" hidden>
+          <p style="margin-bottom:15px; color:#666;">Enter the 6-digit code sent to your email.</p>
+          <form id="signup-otp-form">
+            <label>OTP
+              <input type="text" name="otp" required placeholder="123456">
+            </label>
+            <button type="submit" class="btn-primary">Verify email</button>
+          </form>
+          <button type="button" id="signup-resend-otp" class="btn-secondary">Resend code</button>
+        </div>
+
+        <p style="margin-top:20px; font-size:0.9rem; color:#666;">
+          Already have an account? <a href="login.html">Log in</a>
+        </p>
+
+        <div id="g_id_onload"
+             data-client_id="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com"
+             data-context="signup"
+             data-callback="handleGoogleCredential"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="outline"
+             data-text="continue_with"
+             data-shape="pill"
+             data-logo_alignment="left">
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/main.js"></script>
+  <script>
+    const signupForm = document.getElementById("signup-form");
+    const otpStep = document.getElementById("signup-otp-step");
+    const otpForm = document.getElementById("signup-otp-form");
+    const resendBtn = document.getElementById("signup-resend-otp");
+    let signupEmail = "";
+    let signupRealName = "";
+    let signupUsername = "";
+
+    // STEP 1: request OTP for email verification
+    if (signupForm) {
+      signupForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(signupForm);
+
+        const body = {
+          realName: formData.get("realName"),
+          username: formData.get("username"),
+          email: formData.get("email"),
+        };
+
+        signupRealName = body.realName;
+        signupUsername = body.username;
+        signupEmail = body.email;
+
+        try {
+          await apiFetch("/auth/register/request-otp", {
+            method: "POST",
+            body,
+          });
+
+          signupForm.style.display = "none";
+          otpStep.hidden = false;
+          alert("OTP sent to " + signupEmail);
+        } catch (err) {
+          alert(err.message || "Signup failed");
+        }
+      });
+    }
+
+    // STEP 2: verify OTP -> backend creates user with needsPassword=true
+    if (otpForm) {
+      otpForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(otpForm);
+        const otp = formData.get("otp");
+
+        try {
+          await apiFetch("/auth/register/verify-otp", {
+            method: "POST",
+            body: { email: signupEmail, otp },
+          });
+
+          alert("Email verified! Now set your password.");
+          window.location.href = "set-password.html";
+        } catch (err) {
+          alert(err.message || "OTP verification failed");
+        }
+      });
+    }
+
+    // Resend OTP (optional)
+    if (resendBtn) {
+      resendBtn.addEventListener("click", async () => {
+        if (!signupEmail || !signupRealName || !signupUsername) {
+          alert("Please fill the form again.");
+          otpStep.hidden = true;
+          signupForm.style.display = "block";
+          return;
+        }
+
+        try {
+          await apiFetch("/auth/register/request-otp", {
+            method: "POST",
+            body: {
+              realName: signupRealName,
+              username: signupUsername,
+              email: signupEmail,
+            },
+          });
+          alert("OTP resent to " + signupEmail);
+        } catch (err) {
+          alert(err.message || "Failed to resend OTP");
+        }
+      });
+    }
+  </script>
+</body>
+</html>

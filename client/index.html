@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hisaab-Kitaab</title>
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="google-signin-client_id"
+        content="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <div class="brand-header">
+    <h1>Hisaab-Kitaab</h1>
+    <p>Your way of handling expenses</p>
+  </div>
+
+  <main>
+    <div class="auth-wrapper">
+      <section class="auth-card">
+        <h1 class="auth-title">Split your bills</h1>
+        <p class="auth-subtitle">
+          Track who paid what and settle group expenses without fights.
+        </p>
+
+        <div style="display: flex; gap: 10px; flex-direction: column;">
+          <button type="button" class="btn-primary" onclick="window.location.href='signup.html'">
+            Sign up
+          </button>
+          
+          <button type="button" class="btn-secondary" onclick="window.location.href='login.html'">
+            Log in
+          </button>
+        </div>
+
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="outline"
+             data-text="continue_with"
+             data-shape="pill"
+             data-logo_alignment="center">
+        </div>
+        
+        <footer style="margin-top:30px; font-size: 0.8rem; color:#888;">
+          &copy; 2025 Hisaab-Kitaab
+        </footer>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/main.js"></script>
+  <script>
+    (async function () {
+      try {
+        await apiFetch("/auth/me");
+        window.location.href = "dashboard.html";
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>

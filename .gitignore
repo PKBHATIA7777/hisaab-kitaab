@@ -1,0 +1,10 @@
+# Node
+server/node_modules/
+server/package-lock.json
+
+# Env
+server/.env
+
+# OS / editor
+.DS_Store
+.vscode/

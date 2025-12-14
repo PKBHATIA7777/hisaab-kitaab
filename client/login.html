@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Log in - Hisaab-Kitaab</title>
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="google-signin-client_id"
+        content="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <div class="brand-header">
+    <h1>Hisaab-Kitaab</h1>
+    <p>Your way of handling expenses</p>
+  </div>
+
+  <main>
+    <div class="auth-wrapper">
+      <section class="auth-card">
+        <h1 class="auth-title">Welcome Back</h1>
+        <p class="auth-subtitle">Please enter your details to sign in</p>
+
+        <form id="login-form">
+          <label>
+            Email or username
+            <input type="text" name="identifier" required autocomplete="username" placeholder="john@example.com">
+          </label>
+
+          <label>
+            Password
+            <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+          </label>
+
+          <button type="submit" class="btn-primary">Log in</button>
+        </form>
+
+        <p style="margin-top: 15px; font-size: 0.9rem;">
+          <a href="forgot.html">Forgot password?</a>
+        </p>
+
+        <div id="g_id_onload"
+             data-client_id="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com"
+             data-context="signin"
+             data-callback="handleGoogleCredential"
+             data-auto_prompt="false">
+        </div>
+
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="outline"
+             data-text="continue_with"
+             data-shape="pill"
+             data-logo_alignment="left">
+        </div>
+
+        <p style="margin-top: 20px; font-size: 0.9rem; color:#666;">
+          New here? <a href="signup.html">Create an account</a>
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/main.js"></script>
+  <script>
+    // Existing Login Logic
+    const loginForm = document.getElementById("login-form");
+    if (loginForm) {
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(loginForm);
+        const identifier = formData.get("identifier");
+        const password = formData.get("password");
+
+        try {
+          const data = await apiFetch("/auth/login", {
+            method: "POST",
+            body: { identifier, password },
+          });
+          window.location.href = "dashboard.html";
+        } catch (err) {
+          alert(err.message || "Login failed");
+        }
+      });
+    }
+  </script>
+</body>
+</html>
