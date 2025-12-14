@@ -1,21 +1,20 @@
-const mongoose = require("mongoose");
+// server/config/db.js
+const { Pool } = require("pg");
 
-async function connectDB() {
-  try {
-    const mongoUri = process.env.MONGO_URI;
-    if (!mongoUri) {
-      throw new Error("MONGO_URI is not defined in .env");
-    }
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  // Render Postgres usually requires SSL:
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
-    await mongoose.connect(mongoUri, {
-      // options are optional in latest mongoose, but safe to keep basic ones
-    });
-
-    console.log("✅ MongoDB connected");
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err.message);
-    process.exit(1);
-  }
+// Simple helper to run queries: db.query(text, params)
+async function query(text, params) {
+  const result = await pool.query(text, params);
+  return result;
 }
 
-module.exports = connectDB;
+module.exports = {
+  query,
+};
