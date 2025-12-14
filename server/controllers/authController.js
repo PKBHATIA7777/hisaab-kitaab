@@ -3,14 +3,31 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const { sendOtpEmail } = require("../utils/email");
 const bcrypt = require("bcrypt");
-const User = require("../models/User");
-const Otp = require("../models/Otp");
+const db = require("../config/db");
 const { createToken, sendAuthCookie } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
 
 // helper: generate 6-digit OTP
 function generateOtpCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// helper: find user by id
+async function findUserById(id) {
+  const { rows } = await db.query(
+    "SELECT * FROM users WHERE id = $1 LIMIT 1",
+    [id]
+  );
+  return rows[0] || null;
+}
+
+// helper: find user by email or username
+async function findUserByIdentifier(identifier) {
+  const { rows } = await db.query(
+    "SELECT * FROM users WHERE email = $1 OR username = $1 LIMIT 1",
+    [identifier]
+  );
+  return rows[0] || null;
 }
 
 // POST /api/auth/register/request-otp
@@ -27,9 +44,11 @@ async function registerRequestOtp(req, res) {
     const cleanUsername = username.trim().toLowerCase();
     const cleanEmail = email.trim().toLowerCase();
 
-    const existingUser = await User.findOne({
-      $or: [{ email: cleanEmail }, { username: cleanUsername }],
-    });
+    const { rows: existingRows } = await db.query(
+      "SELECT * FROM users WHERE email = $1 OR username = $2 LIMIT 1",
+      [cleanEmail, cleanUsername]
+    );
+    const existingUser = existingRows[0];
 
     if (existingUser) {
       return res
@@ -40,21 +59,20 @@ async function registerRequestOtp(req, res) {
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await Otp.findOneAndUpdate(
-      { email: cleanEmail, purpose: "signup" },
-      {
-        email: cleanEmail,
-        code,
-        purpose: "signup",
-        expiresAt,
-        consumed: false,
-        signupData: {
-          realName,
-          username: cleanUsername,
-        },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+    // Upsert OTP for signup (one row per email+purpose)
+    await db.query(
+      `INSERT INTO otps (email, code, purpose, expires_at, used)
+       VALUES ($1, $2, 'signup', $3, FALSE)
+       ON CONFLICT (email, purpose)
+       DO UPDATE SET code = EXCLUDED.code,
+                     expires_at = EXCLUDED.expires_at,
+                     used = FALSE,
+                     created_at = NOW()`,
+      [cleanEmail, code, expiresAt]
     );
+
+    // Store signup data in a separate temp table or encode in code/email if needed.
+    // For simplicity here, assume username + realName are re-sent on verify-otp.
 
     await sendOtpEmail(
       cleanEmail,
@@ -77,41 +95,40 @@ async function registerRequestOtp(req, res) {
 // POST /api/auth/register/verify-otp
 async function registerVerifyOtp(req, res) {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, realName, username } = req.body;
 
-    if (!email || !otp) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Email and OTP are required" });
+    if (!email || !otp || !realName || !username) {
+      return res.status(400).json({
+        ok: false,
+        message: "Email, OTP, realName, and username are required",
+      });
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase();
 
-    const otpDoc = await Otp.findOne({
-      email: cleanEmail,
-      purpose: "signup",
-      code: otp,
-      consumed: false,
-    });
+    const { rows: otpRows } = await db.query(
+      `SELECT * FROM otps
+       WHERE email = $1
+         AND purpose = 'signup'
+         AND code = $2
+         AND used = FALSE
+         AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [cleanEmail, otp]
+    );
+    const otpRow = otpRows[0];
 
-    if (!otpDoc) {
-      return res.status(400).json({ ok: false, message: "Invalid OTP" });
+    if (!otpRow) {
+      return res.status(400).json({ ok: false, message: "Invalid or expired OTP" });
     }
 
-    if (otpDoc.expiresAt < new Date()) {
-      return res.status(400).json({ ok: false, message: "OTP expired" });
-    }
-
-    const signupData = otpDoc.signupData;
-    if (!signupData) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "No signup data stored for this OTP" });
-    }
-
-    const existingUser = await User.findOne({
-      $or: [{ email: cleanEmail }, { username: signupData.username }],
-    });
+    const { rows: existingRows } = await db.query(
+      "SELECT * FROM users WHERE email = $1 OR username = $2 LIMIT 1",
+      [cleanEmail, cleanUsername]
+    );
+    const existingUser = existingRows[0];
 
     if (existingUser) {
       return res
@@ -119,29 +136,29 @@ async function registerVerifyOtp(req, res) {
         .json({ ok: false, message: "User already exists" });
     }
 
-    const user = await User.create({
-      realName: signupData.realName,
-      username: signupData.username,
-      email: cleanEmail,
-      passwordHash: null,
-      provider: "local",
-      needsPassword: true,
-      lastLoginAt: new Date(),
-      logins: [{ method: "local" }],
-    });
+    const now = new Date();
 
-    otpDoc.consumed = true;
-    await otpDoc.save();
+    const { rows: userRows } = await db.query(
+      `INSERT INTO users
+        (real_name, username, email, password_hash, provider,
+         google_id, needs_password, last_login_at)
+       VALUES ($1, $2, $3, NULL, 'local', NULL, TRUE, $4)
+       RETURNING *`,
+      [realName, cleanUsername, cleanEmail, now]
+    );
+    const user = userRows[0];
 
-    const token = createToken({ userId: user._id.toString() });
+    await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
+
+    const token = createToken({ userId: user.id.toString() });
     sendAuthCookie(res, token);
 
     return res.json({
       ok: true,
       message: "Signup complete",
       user: {
-        id: user._id,
-        realName: user.realName,
+        id: user.id,
+        realName: user.real_name,
         username: user.username,
         email: user.email,
       },
@@ -167,9 +184,7 @@ async function login(req, res) {
 
     const cleanIdentifier = identifier.trim().toLowerCase();
 
-    const user = await User.findOne({
-      $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }],
-    });
+    const user = await findUserByIdentifier(cleanIdentifier);
 
     if (!user) {
       return res
@@ -177,39 +192,41 @@ async function login(req, res) {
         .json({ ok: false, message: "Invalid credentials" });
     }
 
-    if (user.needsPassword) {
+    if (user.needs_password) {
       return res.status(400).json({
         ok: false,
         message: "Please set your password first.",
       });
     }
 
-    if (!user.passwordHash) {
+    if (!user.password_hash) {
       return res
         .status(400)
         .json({ ok: false, message: "Invalid credentials" });
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
       return res
         .status(400)
         .json({ ok: false, message: "Invalid credentials" });
     }
 
-    user.lastLoginAt = new Date();
-    user.logins.push({ method: "local" });
-    await user.save();
+    const now = new Date();
+    await db.query(
+      "UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2",
+      [now, user.id]
+    );
 
-    const token = createToken({ userId: user._id.toString() });
+    const token = createToken({ userId: user.id.toString() });
     sendAuthCookie(res, token);
 
     return res.json({
       ok: true,
       message: "Login successful",
       user: {
-        id: user._id,
-        realName: user.realName,
+        id: user.id,
+        realName: user.real_name,
         username: user.username,
         email: user.email,
       },
@@ -249,9 +266,11 @@ async function googleLogin(req, res) {
         .json({ ok: false, message: "Email not available from Google" });
     }
 
-    let user = await User.findOne({
-      $or: [{ googleId }, { email }],
-    });
+    const { rows: existingRows } = await db.query(
+      "SELECT * FROM users WHERE google_id = $1 OR email = $2 LIMIT 1",
+      [googleId, email]
+    );
+    let user = existingRows[0] || null;
 
     let isNewUser = false;
 
@@ -262,27 +281,36 @@ async function googleLogin(req, res) {
       let username = baseUsername;
       let counter = 1;
 
-      while (await User.findOne({ username })) {
+      // ensure username is unique
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { rows: uRows } = await db.query(
+          "SELECT 1 FROM users WHERE username = $1 LIMIT 1",
+          [username]
+        );
+        if (uRows.length === 0) break;
         username = `${baseUsername}${counter++}`;
       }
 
-      user = await User.create({
-        realName,
-        username,
-        email,
-        provider: "google",
-        googleId,
-        needsPassword: false,
-        lastLoginAt: new Date(),
-        logins: [{ method: "google" }],
-      });
+      const now = new Date();
+      const { rows: newUserRows } = await db.query(
+        `INSERT INTO users
+          (real_name, username, email, password_hash, provider,
+           google_id, needs_password, last_login_at)
+         VALUES ($1, $2, $3, NULL, 'google', $4, FALSE, $5)
+         RETURNING *`,
+        [realName, username, email, googleId, now]
+      );
+      user = newUserRows[0];
     } else {
-      user.lastLoginAt = new Date();
-      user.logins.push({ method: "google" });
-      await user.save();
+      const now = new Date();
+      await db.query(
+        "UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2",
+        [now, user.id]
+      );
     }
 
-    const token = createToken({ userId: user._id.toString() });
+    const token = createToken({ userId: user.id.toString() });
     sendAuthCookie(res, token);
 
     return res.json({
@@ -290,8 +318,8 @@ async function googleLogin(req, res) {
       message: "Google login successful",
       isNewUser,
       user: {
-        id: user._id,
-        realName: user.realName,
+        id: user.id,
+        realName: user.real_name,
         username: user.username,
         email: user.email,
       },
@@ -326,7 +354,7 @@ async function setPassword(req, res) {
         .json({ ok: false, message: "newPassword is required" });
     }
 
-    const user = await User.findById(payload.userId);
+    const user = await findUserById(payload.userId);
     if (!user) {
       return res.status(404).json({ ok: false, message: "User not found" });
     }
@@ -338,16 +366,23 @@ async function setPassword(req, res) {
       });
     }
 
-    if (!user.needsPassword && user.passwordHash) {
+    if (!user.needs_password && user.password_hash) {
       return res.status(400).json({
         ok: false,
         message: "Password is already set",
       });
     }
 
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    user.needsPassword = false;
-    await user.save();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await db.query(
+      `UPDATE users
+       SET password_hash = $1,
+           needs_password = FALSE,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [passwordHash, user.id]
+    );
 
     return res.json({ ok: true, message: "Password set successfully" });
   } catch (err) {
@@ -371,7 +406,13 @@ async function forgotRequestOtp(req, res) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    const user = await User.findOne({ email: cleanEmail });
+    const { rows: userRows } = await db.query(
+      "SELECT * FROM users WHERE email = $1 LIMIT 1",
+      [cleanEmail]
+    );
+    const user = userRows[0] || null;
+
+    // For security, always respond ok, even if user does not exist
     if (!user) {
       return res.json({
         ok: true,
@@ -382,16 +423,15 @@ async function forgotRequestOtp(req, res) {
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await Otp.findOneAndUpdate(
-      { email: cleanEmail, purpose: "reset" },
-      {
-        email: cleanEmail,
-        code,
-        purpose: "reset",
-        expiresAt,
-        consumed: false,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+    await db.query(
+      `INSERT INTO otps (email, code, purpose, expires_at, used)
+       VALUES ($1, $2, 'reset', $3, FALSE)
+       ON CONFLICT (email, purpose)
+       DO UPDATE SET code = EXCLUDED.code,
+                     expires_at = EXCLUDED.expires_at,
+                     used = FALSE,
+                     created_at = NOW()`,
+      [cleanEmail, code, expiresAt]
     );
 
     await sendOtpEmail(
@@ -426,34 +466,47 @@ async function resetPassword(req, res) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    const otpDoc = await Otp.findOne({
-      email: cleanEmail,
-      purpose: "reset",
-      code: otp,
-      consumed: false,
-    });
+    const { rows: otpRows } = await db.query(
+      `SELECT * FROM otps
+       WHERE email = $1
+         AND purpose = 'reset'
+         AND code = $2
+         AND used = FALSE
+         AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [cleanEmail, otp]
+    );
+    const otpRow = otpRows[0] || null;
 
-    if (!otpDoc) {
-      return res.status(400).json({ ok: false, message: "Invalid OTP" });
+    if (!otpRow) {
+      return res.status(400).json({ ok: false, message: "Invalid or expired OTP" });
     }
 
-    if (otpDoc.expiresAt < new Date()) {
-      return res.status(400).json({ ok: false, message: "OTP expired" });
-    }
+    const { rows: userRows } = await db.query(
+      "SELECT * FROM users WHERE email = $1 LIMIT 1",
+      [cleanEmail]
+    );
+    const user = userRows[0] || null;
 
-    const user = await User.findOne({ email: cleanEmail });
     if (!user) {
       return res
         .status(400)
         .json({ ok: false, message: "User not found for this email" });
     }
 
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    user.needsPassword = false;
-    await user.save();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    otpDoc.consumed = true;
-    await otpDoc.save();
+    await db.query(
+      `UPDATE users
+       SET password_hash = $1,
+           needs_password = FALSE,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [passwordHash, user.id]
+    );
+
+    await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
 
     return res.json({
       ok: true,
@@ -482,9 +535,7 @@ async function me(req, res) {
       return res.status(401).json({ ok: false, message: "Invalid token" });
     }
 
-    const user = await User.findById(payload.userId).select(
-      "realName username email lastLoginAt needsPassword"
-    );
+    const user = await findUserById(payload.userId);
 
     if (!user) {
       return res.status(401).json({ ok: false, message: "User not found" });
@@ -493,12 +544,12 @@ async function me(req, res) {
     return res.json({
       ok: true,
       user: {
-        id: user._id,
-        realName: user.realName,
+        id: user.id,
+        realName: user.real_name,
         username: user.username,
         email: user.email,
-        lastLoginAt: user.lastLoginAt,
-        needsPassword: user.needsPassword,
+        lastLoginAt: user.last_login_at,
+        needsPassword: user.needs_password,
       },
     });
   } catch (err) {
