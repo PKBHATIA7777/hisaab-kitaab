@@ -5,23 +5,20 @@ let transporter;
 function getTransporter() {
   if (transporter) return transporter;
 
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
 
-  if (!user || !pass) {
-    throw new Error("EMAIL_USER or EMAIL_PASS not set in .env");
+  if (!host || !user || !pass) {
+    throw new Error("SMTP_HOST / SMTP_USER / SMTP_PASS not set in env");
   }
 
   transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user,
-      pass,
-    },
-    // ✅ FORCE IPv4: This fixes the timeout on Render
-    family: 4, 
+    host,
+    port,
+    secure: port === 465, // true for 465, false for 587
+    auth: { user, pass },
   });
 
   return transporter;
@@ -34,7 +31,7 @@ async function sendOtpEmail(to, subject, text) {
 
   try {
     await t.sendMail({
-      from: `"Hisaab-Kitaab" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM || "no-reply@example.com",
       to,
       subject,
       text,
