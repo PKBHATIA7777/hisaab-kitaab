@@ -1,44 +1,24 @@
-const nodemailer = require("nodemailer");
+const sgMail = require("@sendgrid/mail");
 
-let transporter;
-
-function getTransporter() {
-  if (transporter) return transporter;
-
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (!host || !user || !pass) {
-    throw new Error("SMTP_HOST / SMTP_USER / SMTP_PASS not set in env");
-  }
-
-  transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // true for 465, false for 587
-    auth: { user, pass },
-  });
-
-  return transporter;
+const apiKey = process.env.SENDGRID_API_KEY;
+if (!apiKey) {
+  throw new Error("SENDGRID_API_KEY not set in env");
 }
+sgMail.setApiKey(apiKey);
 
 async function sendOtpEmail(to, subject, text) {
-  const t = getTransporter();
-
-  console.log(`Sending email to ${to}...`);
+  const msg = {
+    to,
+    from: process.env.EMAIL_FROM, // must be a verified sender
+    subject,
+    text,
+  };
 
   try {
-    await t.sendMail({
-      from: process.env.EMAIL_FROM || "no-reply@example.com",
-      to,
-      subject,
-      text,
-    });
+    await sgMail.send(msg);
     console.log(`Email sent successfully to ${to}`);
   } catch (err) {
-    console.error("Nodemailer Error:", err);
+    console.error("SendGrid Error:", err);
     throw err;
   }
 }
