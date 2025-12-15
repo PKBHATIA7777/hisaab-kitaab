@@ -12,16 +12,16 @@ function getTransporter() {
     throw new Error("EMAIL_USER or EMAIL_PASS not set in .env");
   }
 
-  // UPDATED CONFIGURATION:
-  // Using port 465 with secure: true fixes the ETIMEDOUT error on Render.
   transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
-    secure: true, 
+    secure: true,
     auth: {
       user,
       pass,
     },
+    // ✅ FORCE IPv4: This fixes the timeout on Render
+    family: 4, 
   });
 
   return transporter;
@@ -30,7 +30,7 @@ function getTransporter() {
 async function sendOtpEmail(to, subject, text) {
   const t = getTransporter();
 
-  console.log(`Sending email to ${to}...`); // Log start
+  console.log(`Sending email to ${to}...`);
 
   try {
     await t.sendMail({
@@ -39,9 +39,9 @@ async function sendOtpEmail(to, subject, text) {
       subject,
       text,
     });
-    console.log(`Email sent successfully to ${to}`); // Log success
+    console.log(`Email sent successfully to ${to}`);
   } catch (err) {
-    console.error("Nodemailer Error:", err); // Log exact error
+    console.error("Nodemailer Error:", err);
     throw err;
   }
 }
