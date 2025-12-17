@@ -1,5 +1,3 @@
-
-
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -8,6 +6,26 @@ const bcrypt = require("bcrypt");
 const db = require("../config/db");
 const { createToken, sendAuthCookie } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
+const { z } = require("zod");
+
+// =========================================
+// VALIDATION SCHEMAS
+// =========================================
+
+const registerRequestSchema = z.object({
+  email: z.string().email("Invalid email address").trim().toLowerCase(),
+});
+
+const registerCompleteSchema = z.object({
+  realName: z.string().min(2, "Name must be at least 2 characters").trim(),
+  username: z.string().min(3, "Username must be 3+ chars").regex(/^[a-z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+const loginSchema = z.object({
+  identifier: z.string().min(1, "Email or username is required").trim().toLowerCase(),
+  password: z.string().min(1, "Password is required"),
+});
 
 // helper: generate 6-digit OTP
 function generateOtpCode() {
@@ -32,50 +50,46 @@ async function findUserByIdentifier(identifier) {
   return rows[0] || null;
 }
 
-// ✅ UPDATED: POST /api/auth/register/request-otp
-// Now only requires email
+// POST /api/auth/register/request-otp
 async function registerRequestOtp(req, res) {
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Email is required" });
+    // 1. Validate Input using Zod
+    const result = registerRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
+    const { email } = result.data;
 
-    const cleanEmail = email.trim().toLowerCase();
-
-    // Check if email already exists
+    // 2. Check if email already exists
     const { rows: existingRows } = await db.query(
       "SELECT * FROM users WHERE email = $1 LIMIT 1",
-      [cleanEmail]
+      [email]
     );
-    const existingUser = existingRows[0];
 
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Email already in use" });
+    if (existingRows[0]) {
+      // ✅ We explicitly tell the user that the account exists
+      return res.status(400).json({ ok: false, message: "Email already in use" });
     }
 
+    // 3. Generate and Send OTP
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Upsert OTP for signup
+    // Insert/Update OTP (Including the new 'attempts' column from Step 2)
     await db.query(
-      `INSERT INTO otps (email, code, purpose, expires_at, used)
-       VALUES ($1, $2, 'signup', $3, FALSE)
+      `INSERT INTO otps (email, code, purpose, expires_at, used, attempts)
+       VALUES ($1, $2, 'signup', $3, FALSE, 0)
        ON CONFLICT (email, purpose)
        DO UPDATE SET code = EXCLUDED.code,
                      expires_at = EXCLUDED.expires_at,
                      used = FALSE,
+                     attempts = 0,
                      created_at = NOW()`,
-      [cleanEmail, code, expiresAt]
+      [email, code, expiresAt]
     );
 
     await sendOtpEmail(
-      cleanEmail,
+      email,
       "Your Hisaab-Kitaab verification code",
       `Your verification code is ${code}. It will expire in 10 minutes.`
     );
@@ -84,11 +98,10 @@ async function registerRequestOtp(req, res) {
       ok: true,
       message: "OTP sent to your email address",
     });
+
   } catch (err) {
     console.error("registerRequestOtp error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in request-otp" });
+    return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
 
@@ -157,15 +170,13 @@ async function registerVerifyOtp(req, res) {
 // Completes registration with name, username, password
 async function registerComplete(req, res) {
   try {
-    const { realName, username, password } = req.body;
-
-    if (!realName || !username || !password) {
-      return res.status(400).json({
-        ok: false,
-        message: "Real name, username, and password are required",
-      });
+    // 1. Validate Input
+    const result = registerCompleteSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
-
+    const { realName, username, password } = result.data;
+    
     // Verify signup token
     const signupToken = req.cookies.signup_token;
     if (!signupToken) {
@@ -265,13 +276,11 @@ async function registerComplete(req, res) {
 // POST /api/auth/login
 async function login(req, res) {
   try {
-    const { identifier, password } = req.body;
-
-    if (!identifier || !password) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Identifier and password are required" });
+    const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
+    const { identifier, password } = result.data;
 
     const cleanIdentifier = identifier.trim().toLowerCase();
 
@@ -682,6 +691,7 @@ module.exports = {
   me,
   logout,
 };
+
 
 // const { OAuth2Client } = require("google-auth-library");
 // const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
