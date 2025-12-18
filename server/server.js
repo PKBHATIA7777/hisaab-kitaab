@@ -18,7 +18,19 @@ const authRoutes = require("./routes/authRoutes");
 const app = express();
 
 // =========================================
-// 1. SECURITY MIDDLEWARES (The Shield)
+// 1. CORS (MUST BE FIRST)
+// =========================================
+// configure CORS so frontend can talk to backend
+// We put this FIRST so even error responses (like 429) get the correct headers
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL, // frontend origin
+    credentials: true,              // allow cookies
+  })
+);
+
+// =========================================
+// 2. SECURITY MIDDLEWARES (The Shield)
 // =========================================
 
 // Helmet sets security headers to hide server details
@@ -32,14 +44,15 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// Strict Auth Limiter: Only 5 attempts per 15 minutes for login/OTP
+// Strict Auth Limiter: RELAXED FOR DEVELOPMENT
+// was: 5 attempts per 15 mins -> now: 100 attempts, 1 min wait
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
+  windowMs: 1 * 60 * 1000, // 1 minute wait time (if blocked)
+  max: 100,                // 100 attempts allowed
   message: "Too many login/OTP attempts, please try again later.",
 });
 
-// Apply strict limits ONLY to sensitive routes
+// Apply limits to sensitive routes
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register/request-otp", authLimiter);
 app.use("/api/auth/register/verify-otp", authLimiter);
@@ -52,14 +65,6 @@ app.use("/api/auth/forgot/request-otp", authLimiter);
 // standard middlewares
 app.use(express.json());
 app.use(cookieParser());
-
-// configure CORS so frontend can talk to backend
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL, // frontend origin
-    credentials: true,              // allow cookies
-  })
-);
 
 // routes
 app.use("/api/auth", authRoutes);
@@ -95,7 +100,6 @@ const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
 
 
 
