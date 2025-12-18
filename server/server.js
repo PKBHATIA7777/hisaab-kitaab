@@ -13,7 +13,9 @@ const rateLimit = require("express-rate-limit");
 // DB (connection / pool)
 const db = require("./config/db");
 
+// ROUTES
 const authRoutes = require("./routes/authRoutes");
+const chapterRoutes = require("./routes/chapterRoutes"); // <-- Line A added
 
 const app = express();
 
@@ -68,6 +70,7 @@ app.use(cookieParser());
 
 // routes
 app.use("/api/auth", authRoutes);
+app.use("/api/chapters", chapterRoutes); // <-- Line B added
 
 // simple health route to test server
 app.get("/api/health", (req, res) => {

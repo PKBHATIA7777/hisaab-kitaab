@@ -222,3 +222,378 @@
    /* Animations */
    @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+
+
+
+
+
+
+   /* for real dashboard  */
+
+/* =========================
+   6. DASHBOARD GRID & CARDS
+   ========================= */
+   .dashboard-container {
+    width: 100%;
+    max-width: 1000px;
+    padding: 20px;
+    z-index: 1;
+    text-align: center;
+  }
+  
+  .section-title {
+    color: #fff;
+    margin-bottom: 30px;
+    font-weight: 600;
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+  }
+  
+  .chapters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 25px;
+    justify-content: center;
+  }
+  
+  /* Common Card Style */
+  .chapter-card {
+    background: #ffffff;
+    border-radius: 20px;
+    height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none; /* For links */
+  }
+  
+  .chapter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+  }
+  
+  /* The "Add New" Card */
+  .card-add {
+    border: 3px dashed #ddd;
+    background: rgba(255,255,255,0.9);
+  }
+  
+  .plus-icon {
+    width: 60px;
+    height: 60px;
+    background: #eee;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #888;
+    transition: all 0.3s;
+  }
+  
+  .card-add:hover .plus-icon {
+    background: #ddd;
+    color: #555;
+    transform: scale(1.1);
+  }
+  
+  /* The "Content" Card */
+  .card-content {
+    padding: 20px;
+  }
+  
+  .chapter-initials {
+    width: 70px;
+    height: 70px;
+    background: #ffcc00; /* The Yellow Background */
+    color: #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    box-shadow: 0 5px 15px rgba(255, 204, 0, 0.4);
+  }
+  
+  .chapter-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #333;
+    margin: 0;
+    line-height: 1.3;
+    text-align: center;
+    /* Limit to 2 lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* =========================
+     7. MODAL (Glassmorphism)
+     ========================= */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s;
+  }
+  
+  .modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .modal-box {
+    background: #ffffff;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 25px;
+    padding: 30px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    transform: scale(0.9);
+    transition: transform 0.3s;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modal-overlay.active .modal-box {
+    transform: scale(1);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    background: linear-gradient(to right, #000, #d000ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .close-modal {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #888;
+  }
+  
+  /* Dynamic Member List */
+  .member-list {
+    margin-bottom: 15px;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 10px;
+    background: #f9f9f9;
+  }
+  
+  .member-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  
+  .member-item input {
+    margin-bottom: 0; /* Override default input margin */
+  }
+  
+  .btn-small {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    margin-top: 5px;
+    cursor: pointer;
+    background: #eee;
+    border: none;
+    border-radius: 5px;
+  }
+
+
+
+
+
+  /* =========================
+   8. CHAPTER DETAILS PAGE
+   ========================= */
+
+/* Top Navigation Bar */
+/* Top Navigation Bar - FIXED */
+.chapter-nav {
+  position: absolute; /* Snaps it to the top of the browser window */
+  top: 0;
+  left: 0;
+  width: 100%;        /* Forces it to stretch across the full screen */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 25px 40px; /* More breathing room */
+  z-index: 10;
+}
+
+/* Back Link - UPGRADED TO BUTTON LOOK */
+.back-link {
+  color: #fff;
+  font-size: 0.9rem;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.15); /* Glass effect */
+  padding: 8px 20px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between arrow and text */
+}
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateX(-3px); /* Subtle slide effect */
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* Member Toggle Button */
+.btn-member-toggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: background 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-main);
+}
+.btn-member-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Member Dropdown (The "Expandable" part) */
+.member-dropdown {
+  position: absolute;
+  top: 60px;
+  right: 30px;
+  width: 280px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.member-dropdown.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Member Item Row */
+.dropdown-member-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.dropdown-member-item:last-child { border-bottom: none; }
+
+.small-avatar {
+  width: 35px;
+  height: 35px;
+  background: #d000ff; /* Purple for users */
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.member-name-text {
+  font-size: 0.95rem;
+  color: #333;
+}
+
+/* Header Card Style */
+.chapter-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  text-align: center;
+  z-index: 1;
+}
+
+.chapter-header-card {
+  margin-top: 20px;
+  color: #fff;
+  animation: fadeInDown 0.8s ease-out;
+}
+
+.chapter-icon-large {
+  width: 100px;
+  height: 100px;
+  background: #ffcc00;
+  color: #000;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
+}
+
+#chapter-title {
+  font-size: 2.5rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+#chapter-desc {
+  font-size: 1.1rem;
+  margin-top: 10px;
+  opacity: 0.8;
+  font-weight: 300;
+}
+
+.empty-state-placeholder {
+  margin-top: 50px;
+  padding: 40px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 20px;
+  color: #fff;
+  border: 1px dashed rgba(255,255,255,0.3);
+}

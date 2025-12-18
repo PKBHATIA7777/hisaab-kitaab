@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter Details - Hisaab-Kitaab</title>
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <nav class="chapter-nav">
+    <a href="dashboard.html" class="back-link">← Back to Dashboard</a>
+    
+    <div class="member-menu-container">
+      <button id="member-toggle-btn" class="btn-member-toggle">
+        <span class="icon-users">👥</span> Members
+      </button>
+      
+      <div id="member-dropdown" class="member-dropdown">
+        <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
+        <div id="member-list-content">
+          </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="chapter-wrapper">
+    <div class="chapter-header-card">
+      <div class="chapter-icon-large" id="chapter-icon-display">?</div>
+      <h1 id="chapter-title">Loading...</h1>
+      <p id="chapter-desc">Please wait</p>
+    </div>
+
+    <div class="empty-state-placeholder">
+      <p>No expenses recorded yet. (Functionality coming soon)</p>
+    </div>
+  </main>
+
+  <script src="js/main.js"></script>
+  <script src="js/chapter.js"></script>
+</body>
+</html>

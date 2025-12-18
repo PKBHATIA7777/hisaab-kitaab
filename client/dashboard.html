@@ -15,6 +15,89 @@
 
   <div class="brand-header">
     <h1>Hisaab-Kitaab</h1>
+    <div style="position: absolute; top: 20px; right: 20px;">
+      <button class="btn-secondary" id="logout-btn" style="padding: 8px 15px; font-size: 0.85rem;">Logout</button>
+    </div>
+  </div>
+
+  <div class="dashboard-container">
+    <h2 class="section-title">Create your expense chapter</h2>
+    
+    <div class="chapters-grid" id="chapters-grid">
+      </div>
+  </div>
+
+  <div class="modal-overlay" id="create-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>New Chapter</h2>
+        <button class="close-modal" onclick="closeModal()">×</button>
+      </div>
+      
+      <form id="create-chapter-form">
+        <label>Chapter Name <span style="color:red">*</span>
+          <input type="text" name="name" required placeholder="e.g. Goa Trip 2025" maxlength="100">
+        </label>
+
+        <label>Description (Optional)
+          <input type="text" name="description" placeholder="Short tagline (max 50 chars)" maxlength="50">
+        </label>
+
+        <label>Members <span style="color:red">*</span></label>
+        <div class="member-list" id="member-list-container">
+          </div>
+        <button type="button" class="btn-small" onclick="addMemberInput()">+ Add another person</button>
+
+        <div style="margin-top: 25px;">
+          <button type="submit" class="btn-primary">Create Chapter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/main.js"></script>
+  <script src="js/dashboard.js"></script> 
+
+  <script>
+    // Simple logout check
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      try { await apiFetch("/auth/logout", { method: "POST" }); } catch(e){}
+      window.location.href = "login.html";
+    });
+
+    // Check auth immediately
+    (async function(){
+      try { await apiFetch("/auth/me"); } 
+      catch(e) { window.location.href = "login.html"; }
+    })();
+  </script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Hisaab-Kitaab</title>
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <div class="brand-header">
+    <h1>Hisaab-Kitaab</h1>
     <p>Your way of handling expenses</p>
   </div>
 
@@ -67,4 +150,4 @@
     }
   </script>
 </body>
-</html>
+</html> -->
