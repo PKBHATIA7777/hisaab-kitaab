@@ -1,28 +1,30 @@
+/* server/utils/jwt.js */
 const jwt = require("jsonwebtoken");
 
-function createToken(payload) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET not set in .env");
-  }
+// Default: 1 day. Remember Me: 30 days.
+const SHORT_AGE = "1d";
+const LONG_AGE = "30d";
 
-  // ✅ SECURITY UPDATE: Token now expires in 1 day (was 5 days)
-  return jwt.sign(payload, secret, { expiresIn: "1d" });
+const SHORT_MS = 24 * 60 * 60 * 1000;
+const LONG_MS = 30 * 24 * 60 * 60 * 1000;
+
+function createToken(payload, remember = false) {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET not set");
+
+  return jwt.sign(payload, secret, { 
+    expiresIn: remember ? LONG_AGE : SHORT_AGE 
+  });
 }
 
-function sendAuthCookie(res, token) {
-  // ✅ SECURITY UPDATE: Max age matches token (1 day in milliseconds)
-  const maxAgeMs = 24 * 60 * 60 * 1000;
-
-  // CHECK: Are we in production?
-  // Render sets NODE_ENV to 'production' automatically.
+function sendAuthCookie(res, token, remember = false) {
+  const maxAgeMs = remember ? LONG_MS : SHORT_MS;
   const isProduction = process.env.NODE_ENV === "production";
 
   res.cookie("auth_token", token, {
-    httpOnly: true, // Prevents JavaScript from reading the cookie (XSS protection)
-    // VITAL for Vercel->Render communication:
-    secure: isProduction, // Must be TRUE on HTTPS (Production)
-    sameSite: isProduction ? "none" : "lax", // Must be NONE for Cross-Site
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     maxAge: maxAgeMs,
   });
 }
@@ -30,4 +32,6 @@ function sendAuthCookie(res, token) {
 module.exports = {
   createToken,
   sendAuthCookie,
+  SHORT_MS, // Exported for use in controller
+  LONG_MS
 };

@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <title>Log in - Hisaab-Kitaab</title>
   <link rel="stylesheet" href="css/base.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
   <meta name="google-signin-client_id"
         content="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com">
@@ -39,6 +42,10 @@
             <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
           </label>
 
+          <div style="display:flex; align-items:center; margin-bottom:20px;">
+            <input type="checkbox" name="rememberMe" id="rememberMe" style="width:auto; margin:0 8px 0 0; min-height:20px;">
+            <label for="rememberMe" style="margin:0; font-weight:400; cursor:pointer;">Remember me for 30 days</label>
+          </div>
           <button type="submit" class="btn-primary">Log in</button>
         </form>
 
@@ -71,23 +78,36 @@
 
   <script src="js/main.js"></script>
   <script>
-    // Existing Login Logic
+    // Existing Login Logic - UPDATED with loading states and session storage
     const loginForm = document.getElementById("login-form");
     if (loginForm) {
       loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const btn = loginForm.querySelector("button"); // Get button
+        
         const formData = new FormData(loginForm);
         const identifier = formData.get("identifier");
         const password = formData.get("password");
+        const rememberMe = formData.get("rememberMe") === "on"; // Get checkbox
 
         try {
+          setBtnLoading(btn, true); // Use our helper!
+
           const data = await apiFetch("/auth/login", {
             method: "POST",
-            body: { identifier, password },
+            body: { identifier, password, rememberMe },
           });
+          
+          // STORE EXPIRY
+          if (data.sessionExpiresAt) {
+            localStorage.setItem("sessionExpiresAt", data.sessionExpiresAt);
+          }
+          
           window.location.href = "dashboard.html";
         } catch (err) {
-          alert(err.message || "Login failed");
+          showToast(err.message || "Login failed", "error"); // Use Toast!
+        } finally {
+          setBtnLoading(btn, false);
         }
       });
     }

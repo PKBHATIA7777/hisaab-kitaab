@@ -1,3 +1,4 @@
+// ✅ COMPLETE server/middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
 
 function requireAuth(req, res, next) {
@@ -9,7 +10,7 @@ function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload; // Attaches { userId: '...' } to the request
+    req.user = payload; // Attaches user info to the request
     next();
   } catch (err) {
     return res.status(401).json({ ok: false, message: "Invalid or expired token" });

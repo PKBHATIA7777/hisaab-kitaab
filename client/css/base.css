@@ -1,7 +1,7 @@
 /* =========================
    1. FONTS & RESET
    ========================= */
-   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+   /* @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap'); */
 
    :root {
      --font-main: 'Poppins', sans-serif;
@@ -16,56 +16,92 @@
      box-sizing: border-box;
    }
    
-   body {
-     margin: 0;
-     min-height: 100vh;
-     font-family: var(--font-main);
-     /* The Deep Black-Purple Gradient */
-     background: linear-gradient(180deg, #000000 10%, #1a0029 100%);
-     color: #333;
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     justify-content: center;
-     overflow: hidden; /* For bubbles */
-     position: relative;
-   }
-   
+/* client/css/base.css */
+
+body {
+  margin: 0;
+  
+  /* CHANGED: Use dvh (Dynamic Viewport Height) for mobile stability */
+  min-height: 100vh; /* Fallback for old browsers */
+  min-height: 100dvh; 
+  
+  font-family: var(--font-main);
+  background: linear-gradient(180deg, #000000 10%, #1a0029 100%);
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  position: relative;
+}
    /* =========================
-      2. BACKGROUND BUBBLES
-      ========================= */
-   .bubble-container {
-     position: absolute;
-     top: 0;
-     left: 0;
-     width: 100%;
-     height: 100%;
-     z-index: -1; /* Behind everything */
-     overflow: hidden;
-     pointer-events: none;
-   }
-   
-   .bubble {
-     position: absolute;
-     bottom: -100px;
-     border-radius: 50%;
-     background: transparent;
-     opacity: 0.9; 
-     animation: floatUp linear infinite;
-   }
-   
-   @keyframes floatUp {
-     0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
-     100% { transform: translateY(-120vh) scale(1.5) rotate(360deg); opacity: 0; }
-   }
-   
-   /* Individual Bubble Styles */
-   .bubble:nth-child(1) { left: 10%; width: 40px; height: 40px; border: 2px solid #ff00cc; box-shadow: 0 0 20px #ff00cc, inset 0 0 10px #ff00cc; animation-duration: 12s; }
-   .bubble:nth-child(2) { left: 30%; width: 80px; height: 80px; border: 3px solid #00e5ff; box-shadow: 0 0 30px #00e5ff, inset 0 0 15px #00e5ff; animation-duration: 9s; animation-delay: 2s; }
-   .bubble:nth-child(3) { left: 70%; width: 25px; height: 25px; border: 2px solid #ffd700; box-shadow: 0 0 15px #ffd700, inset 0 0 5px #ffd700; animation-duration: 15s; animation-delay: 4s; }
-   .bubble:nth-child(4) { left: 50%; width: 60px; height: 60px; border: 2px solid #00ff40; box-shadow: 0 0 25px #00ff40, inset 0 0 10px #00ff40; animation-duration: 11s; animation-delay: 1s; }
-   .bubble:nth-child(5) { left: 85%; width: 55px; height: 55px; border: 2px solid #ff3300; box-shadow: 0 0 30px #ff3300, inset 0 0 10px #ff3300; animation-duration: 13s; animation-delay: 5s; }
-   .bubble:nth-child(6) { left: 15%; width: 35px; height: 35px; border: 2px solid #d000ff; box-shadow: 0 0 20px #d000ff, inset 0 0 10px #d000ff; animation-duration: 16s; animation-delay: 3s; }
+   2. BACKGROUND BUBBLES (OPTIMIZED STEP 13)
+   ========================= */
+.bubble-container {
+  position: fixed; /* Changed from absolute to fixed to prevent scroll issues */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1; 
+  overflow: hidden;
+  pointer-events: none;
+  
+  /* Performance hint */
+  transform: translateZ(0); 
+}
+
+.bubble {
+  position: absolute;
+  bottom: -100px;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0.8; /* Slightly reduced opacity for performance */
+  
+  /* GPU Acceleration */
+  will-change: transform;
+  transform: translate3d(0, 0, 0); 
+  animation: floatUp linear infinite;
+}
+
+/* Use translate3d to force GPU usage */
+@keyframes floatUp {
+  0% { 
+    transform: translate3d(0, 0, 0) scale(0.8) rotate(0deg); 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translate3d(0, -120vh, 0) scale(1.2) rotate(360deg); 
+    opacity: 0; 
+  }
+}
+
+/* --- MOBILE OPTIMIZATION: Hide heavy bubbles --- */
+@media (max-width: 768px) {
+  /* Only show 3 bubbles on mobile to save battery */
+  .bubble:nth-child(4),
+  .bubble:nth-child(5),
+  .bubble:nth-child(6) {
+    display: none; 
+  }
+}
+
+/* --- ACCESSIBILITY: Disable if user prefers reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+    display: none;
+  }
+}
+
+/* Individual Bubble Styles (Unchanged but ensuring valid syntax) */
+.bubble:nth-child(1) { left: 10%; width: 40px; height: 40px; border: 2px solid #ff00cc; box-shadow: 0 0 10px #ff00cc; animation-duration: 12s; }
+.bubble:nth-child(2) { left: 30%; width: 80px; height: 80px; border: 3px solid #00e5ff; box-shadow: 0 0 15px #00e5ff; animation-duration: 9s; animation-delay: 2s; }
+.bubble:nth-child(3) { left: 70%; width: 25px; height: 25px; border: 2px solid #ffd700; box-shadow: 0 0 10px #ffd700; animation-duration: 15s; animation-delay: 4s; }
+.bubble:nth-child(4) { left: 50%; width: 60px; height: 60px; border: 2px solid #00ff40; box-shadow: 0 0 15px #00ff40; animation-duration: 11s; animation-delay: 1s; }
+.bubble:nth-child(5) { left: 85%; width: 55px; height: 55px; border: 2px solid #ff3300; box-shadow: 0 0 15px #ff3300; animation-duration: 13s; animation-delay: 5s; }
+.bubble:nth-child(6) { left: 15%; width: 35px; height: 35px; border: 2px solid #d000ff; box-shadow: 0 0 10px #d000ff; animation-duration: 16s; animation-delay: 3s; }
    
    /* =========================
       3. BRAND HEADER (Title above box)
@@ -222,378 +258,688 @@
    /* Animations */
    @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-
-
-
-
-
-
+   
    /* for real dashboard  */
+   
+   /* =========================
+      6. DASHBOARD GRID & CARDS (UPDATED STEP 9)
+      ========================= */
+   .dashboard-container {
+     width: 100%;
+     max-width: 1000px;
+     padding: 20px;
+     /* Add padding-top to account for the fixed/sticky header if needed, 
+        but for now standard padding is safe */
+     margin: 0 auto; 
+     z-index: 1;
+     text-align: center;
+   }
+   
+   .section-title {
+     color: #fff;
+     margin-bottom: 25px;
+     font-weight: 600;
+     font-size: 1.5rem;
+     letter-spacing: 1px;
+   }
+   
+   /* --- MOBILE FIRST GRID --- */
+   .chapters-grid {
+     display: grid;
+     /* Default: 1 column for mobile (Stacked cards) */
+     grid-template-columns: 1fr; 
+     gap: 20px;
+     width: 100%;
+   }
+   
+   /* --- TABLET & DESKTOP OVERRIDE --- */
+   @media (min-width: 768px) {
+     .chapters-grid {
+       /* On larger screens, fit as many 220px cards as possible */
+       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+       gap: 30px;
+     }
+   }
+   
+   /* Common Card Style */
+   .chapter-card {
+     background: #ffffff;
+     border-radius: 20px;
+     height: 220px;
+     display: flex;
+     flex-direction: column;
+     align-items: center;
+     justify-content: center;
+     cursor: pointer;
+     transition: transform 0.3s, box-shadow 0.3s;
+     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+     position: relative;
+     overflow: hidden;
+     text-decoration: none; /* For links */
+   }
+   
+   .chapter-card:hover {
+     transform: translateY(-5px);
+     box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+   }
+   
+   /* The "Add New" Card */
+   .card-add {
+     border: 3px dashed #ddd;
+     background: rgba(255,255,255,0.9);
+   }
+   
+   .plus-icon {
+     width: 60px;
+     height: 60px;
+     background: #eee;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     font-size: 2rem;
+     color: #888;
+     transition: all 0.3s;
+   }
+   
+   .card-add:hover .plus-icon {
+     background: #ddd;
+     color: #555;
+     transform: scale(1.1);
+   }
+   
+   /* The "Content" Card */
+   .card-content {
+     padding: 20px;
+   }
+   
+   .chapter-initials {
+     width: 70px;
+     height: 70px;
+     background: #ffcc00; /* The Yellow Background */
+     color: #000;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     font-size: 1.5rem;
+     font-weight: 700;
+     margin-bottom: 15px;
+     box-shadow: 0 5px 15px rgba(255, 204, 0, 0.4);
+   }
+   
+   .chapter-name {
+     font-size: 1.1rem;
+     font-weight: 700;
+     color: #333;
+     margin: 0;
+     line-height: 1.3;
+     text-align: center;
+     /* Limit to 2 lines */
+     display: -webkit-box;
+     -webkit-line-clamp: 2;
+     -webkit-box-orient: vertical;
+     overflow: hidden;
+   }
+   
+   /* =========================
+      7. MODAL (Glassmorphism)
+      ========================= */
+      .modal-overlay {
+        position: fixed;
+        top: 0; 
+        left: 0;
+        width: 100%; 
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px); /* Stronger blur for focus */
+        z-index: 2000; /* Higher than everything */
+        
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
+        /* Hidden State */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+      }
+      
+      .modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+      }
+      
+      .modal-box {
+        background: #ffffff;
+        width: 90%;
+        max-width: 500px;
+        border-radius: 25px;
+        padding: 30px;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+        
+        /* Hidden State (Zoomed out slightly) */
+        transform: scale(0.9) translateY(10px);
+        opacity: 0;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+        
+        max-height: 90dvh; /* Use dynamic viewport height */
+        overflow-y: auto;
+      }
+      
+      /* Active State (Pop in) */
+      .modal-overlay.active .modal-box {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+   
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      
+      .modal-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        background: linear-gradient(to right, #000, #d000ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+   
+   .close-modal {
+     background: none;
+     border: none;
+     font-size: 1.5rem;
+     cursor: pointer;
+     color: #888;
+   }
+   
+   /* Dynamic Member List */
+   .member-list {
+     margin-bottom: 15px;
+     max-height: 150px;
+     overflow-y: auto;
+     border: 1px solid #eee;
+     border-radius: 12px;
+     padding: 10px;
+     background: #f9f9f9;
+   }
+   
+   .member-item {
+     display: flex;
+     gap: 10px;
+     margin-bottom: 8px;
+   }
+   
+   .member-item input {
+     margin-bottom: 0; /* Override default input margin */
+   }
+   
+   .btn-small {
+     padding: 5px 10px;
+     font-size: 0.8rem;
+     margin-top: 5px;
+     cursor: pointer;
+     background: #eee;
+     border: none;
+     border-radius: 5px;
+   }
+   
+   /* =========================
+      8. CHAPTER DETAILS PAGE (UPDATED STEP 11)
+      ========================= */
+   
+   /* Top Navigation Bar - SAFE AREA AWARE */
+   .chapter-nav {
+     /* CHANGED: Sticky ensures it stays visible but respects layout */
+     position: -webkit-sticky; /* Safari support */
+     position: sticky;
+     top: 0;
+     left: 0;
+     width: 100%;
+     
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     
+     /* CHANGED: Dynamic padding for Notches */
+     /* Uses the larger of 20px OR the device's safe area */
+     padding: 20px; 
+     padding-top: max(20px, env(safe-area-inset-top));
+     padding-left: max(20px, env(safe-area-inset-left));
+     padding-right: max(20px, env(safe-area-inset-right));
+     
+     z-index: 100; /* Ensure it stays above scrolling content */
+     
+     /* Added Glass Background (Essential for sticky headers) */
+     background: rgba(0, 0, 0, 0.2); 
+     backdrop-filter: blur(10px);
+     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+   }
+   
+   /* Back Link - UPGRADED TO BUTTON LOOK */
+   .back-link {
+     color: #fff;
+     font-size: 0.9rem;
+     text-decoration: none;
+     background: rgba(255, 255, 255, 0.15); /* Glass effect */
+     padding: 8px 20px;
+     border-radius: 30px;
+     border: 1px solid rgba(255, 255, 255, 0.1);
+     backdrop-filter: blur(5px);
+     transition: all 0.3s ease;
+     font-weight: 500;
+     display: flex;
+     align-items: center;
+     gap: 8px; /* Space between arrow and text */
+   }
+   
+   .back-link:hover {
+     background: rgba(255, 255, 255, 0.3);
+     transform: translateX(-3px); /* Subtle slide effect */
+     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+   }
+   
+   /* Member Toggle Button */
+   .btn-member-toggle {
+     background: rgba(255, 255, 255, 0.2);
+     border: 1px solid rgba(255, 255, 255, 0.3);
+     color: #fff;
+     padding: 8px 16px;
+     border-radius: 20px;
+     cursor: pointer;
+     backdrop-filter: blur(5px);
+     transition: background 0.3s;
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     font-family: var(--font-main);
+   }
+   .btn-member-toggle:hover {
+     background: rgba(255, 255, 255, 0.3);
+   }
+   
+   /* Member Dropdown (The "Expandable" part) */
+   .member-dropdown {
+     position: absolute;
+     top: 60px;
+     right: 30px;
+     width: 280px;
+     background: #ffffff;
+     border-radius: 16px;
+     padding: 20px;
+     box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+     opacity: 0;
+     visibility: hidden;
+     transform: translateY(-10px);
+     transition: all 0.3s ease;
+   }
+   
+   .member-dropdown.active {
+     opacity: 1;
+     visibility: visible;
+     transform: translateY(0);
+   }
+   
+   /* Member Item Row */
+   .dropdown-member-item {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+     padding: 8px 0;
+     border-bottom: 1px solid #f0f0f0;
+   }
+   .dropdown-member-item:last-child { border-bottom: none; }
+   
+   .small-avatar {
+     width: 35px;
+     height: 35px;
+     background: #d000ff; /* Purple for users */
+     color: #fff;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     font-size: 0.85rem;
+     font-weight: 600;
+   }
+   
+   .member-name-text {
+     font-size: 0.95rem;
+     color: #333;
+   }
+   
+   /* Header Card Style */
+   .chapter-wrapper {
+     max-width: 800px;
+     margin: 0 auto;
+     padding: 20px;
+     text-align: center;
+     z-index: 1;
+   }
+   
+   .chapter-header-card {
+     margin-top: 20px;
+     color: #fff;
+     animation: fadeInDown 0.8s ease-out;
+   }
+   
+   .chapter-icon-large {
+     width: 100px;
+     height: 100px;
+     background: #ffcc00;
+     color: #000;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     font-size: 2.5rem;
+     font-weight: 700;
+     margin: 0 auto 20px auto;
+     box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
+   }
+   
+   #chapter-title {
+     font-size: 2.5rem;
+     margin: 0;
+     font-weight: 700;
+   }
+   
+   #chapter-desc {
+     font-size: 1.1rem;
+     margin-top: 10px;
+     opacity: 0.8;
+     font-weight: 300;
+   }
+   
+   .empty-state-placeholder {
+     margin-top: 50px;
+     padding: 40px;
+     background: rgba(255,255,255,0.1);
+     border-radius: 20px;
+     color: #fff;
+     border: 1px dashed rgba(255,255,255,0.3);
+   }
+   
+
+
+   /* =========================
+   9. SKELETON LOADING (NEW STEP 16)
+   ========================= */
+.skeleton {
+  background: #f0f0f0;
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* The shimmering light effect */
+.skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.5s infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Specific shape for a Chapter Card Skeleton */
+.skeleton-card {
+  height: 220px; /* Match real card height */
+  width: 100%;
+  box-shadow: none; /* Flat look for skeletons */
+  border: 1px solid #eee;
+}
+
+
 
 /* =========================
-   6. DASHBOARD GRID & CARDS
+   10. TOAST NOTIFICATIONS (NEW STEP 17)
    ========================= */
-   .dashboard-container {
-    width: 100%;
-    max-width: 1000px;
-    padding: 20px;
-    z-index: 1;
-    text-align: center;
+   .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none; /* Allow clicking through the container */
   }
   
-  .section-title {
+  .toast {
+    background: rgba(25, 25, 25, 0.95);
     color: #fff;
-    margin-bottom: 30px;
-    font-weight: 600;
-    font-size: 1.5rem;
-    letter-spacing: 1px;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 260px;
+    max-width: 350px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    pointer-events: auto; /* Make the toast itself interactive if needed */
   }
   
-  .chapters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 25px;
-    justify-content: center;
+  /* Variants */
+  .toast.success { border-left: 4px solid #00e676; }
+  .toast.error   { border-left: 4px solid #ff1744; }
+  .toast.info    { border-left: 4px solid #2979ff; }
+  
+  /* Hiding Animation */
+  .toast.hiding {
+    animation: fadeOut 0.3s ease-in forwards;
   }
   
-  /* Common Card Style */
-  .chapter-card {
-    background: #ffffff;
-    border-radius: 20px;
-    height: 220px;
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  
+  @keyframes fadeOut {
+    to { opacity: 0; transform: translateY(10px) scale(0.95); }
+  }
+
+
+  /* =========================
+   11. BUTTON LOADING STATES (NEW STEP 20)
+   ========================= */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* When this class is added, text becomes invisible but keeps width */
+.btn-loading {
+  position: relative;
+  color: transparent !important; 
+  pointer-events: none; /* Prevent double clicks */
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* The Spinner Centered */
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  /* Center exactly */
+  margin-top: -10px;
+  margin-left: -10px;
+  
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff; /* White spinner */
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Dark spinner for secondary (white) buttons */
+.btn-secondary.btn-loading::after {
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #333;
+}
+
+
+
+/* =========================
+   12. EMPTY STATE (NEW STEP 21)
+   ========================= */
+   .empty-state-container {
+    grid-column: 1 / -1; /* Span full width of grid */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: transform 0.3s, box-shadow 0.3s;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    position: relative;
-    overflow: hidden;
-    text-decoration: none; /* For links */
+    padding: 40px 20px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05); /* Subtle glass background */
+    border-radius: 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    margin-top: 20px;
+    animation: fadeInDown 0.5s ease-out;
   }
   
-  .chapter-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 15px;
+    filter: drop-shadow(0 0 20px rgba(255, 204, 0, 0.4));
+    animation: floatIcon 3s ease-in-out infinite;
   }
   
-  /* The "Add New" Card */
-  .card-add {
-    border: 3px dashed #ddd;
-    background: rgba(255,255,255,0.9);
-  }
-  
-  .plus-icon {
-    width: 60px;
-    height: 60px;
-    background: #eee;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    color: #888;
-    transition: all 0.3s;
-  }
-  
-  .card-add:hover .plus-icon {
-    background: #ddd;
-    color: #555;
-    transform: scale(1.1);
-  }
-  
-  /* The "Content" Card */
-  .card-content {
-    padding: 20px;
-  }
-  
-  .chapter-initials {
-    width: 70px;
-    height: 70px;
-    background: #ffcc00; /* The Yellow Background */
-    color: #000;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .empty-title {
     font-size: 1.5rem;
     font-weight: 700;
-    margin-bottom: 15px;
-    box-shadow: 0 5px 15px rgba(255, 204, 0, 0.4);
+    color: #fff;
+    margin-bottom: 10px;
   }
   
-  .chapter-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #333;
-    margin: 0;
-    line-height: 1.3;
-    text-align: center;
-    /* Limit to 2 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  .empty-subtitle {
+    color: #ccc;
+    font-size: 1rem;
+    max-width: 400px;
+    margin-bottom: 25px;
+    line-height: 1.5;
   }
   
+  @keyframes floatIcon {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+
+
   /* =========================
-     7. MODAL (Glassmorphism)
-     ========================= */
-  .modal-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(5px);
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s;
-  }
-  
-  .modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-  }
-  
-  .modal-box {
-    background: #ffffff;
-    width: 90%;
-    max-width: 500px;
-    border-radius: 25px;
-    padding: 30px;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
-    transform: scale(0.9);
-    transition: transform 0.3s;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  
-  .modal-overlay.active .modal-box {
-    transform: scale(1);
-  }
-  
-  .modal-header {
+   13. INLINE VALIDATION (NEW STEP 23)
+   ========================= */
+.input-invalid {
+  border-color: #ff1744 !important;
+  background-color: rgba(255, 23, 68, 0.05) !important;
+  box-shadow: 0 0 0 4px rgba(255, 23, 68, 0.1) !important;
+}
+
+.input-valid {
+  border-color: #00e676 !important;
+}
+
+.input-error-msg {
+  color: #ff1744;
+  font-size: 0.8rem;
+  margin-top: -15px; /* Pull it up into the input's bottom margin */
+  margin-bottom: 15px;
+  margin-left: 5px;
+  display: none; /* Hidden by default */
+  font-weight: 500;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+
+/* =========================
+   14. CARD MENU ACTIONS (NEW STEP 25)
+   ========================= */
+   .card-header-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+    align-items: flex-start;
+    width: 100%;
   }
   
-  .modal-header h2 {
-    margin: 0;
+  .menu-btn {
+    background: transparent;
+    border: none;
     font-size: 1.5rem;
-    background: linear-gradient(to right, #000, #d000ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    line-height: 1;
+    color: #888;
+    cursor: pointer;
+    padding: 0 10px;
+    margin-right: -10px; /* Align with edge */
+    margin-top: -5px;
   }
   
-  .close-modal {
+  .menu-btn:hover { color: #000; }
+  
+  /* The dropdown container (hidden by default) */
+  .menu-dropdown {
+    position: absolute;
+    top: 40px;
+    right: 15px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    width: 120px;
+    overflow: hidden;
+    z-index: 10;
+    display: none; /* JS toggles this */
+    border: 1px solid #eee;
+    animation: popIn 0.2s ease-out;
+  }
+  
+  .menu-dropdown.active { display: block; }
+  
+  .menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 0.9rem;
     background: none;
     border: none;
-    font-size: 1.5rem;
     cursor: pointer;
-    color: #888;
+    color: #333;
+    transition: background 0.2s;
   }
   
-  /* Dynamic Member List */
-  .member-list {
-    margin-bottom: 15px;
-    max-height: 150px;
-    overflow-y: auto;
-    border: 1px solid #eee;
-    border-radius: 12px;
-    padding: 10px;
-    background: #f9f9f9;
-  }
+  .menu-item:hover { background: #f5f5f5; }
+  .menu-item.delete { color: #ff1744; }
+  .menu-item.delete:hover { background: #fff0f3; }
   
-  .member-item {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 8px;
+  @keyframes popIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
   }
-  
-  .member-item input {
-    margin-bottom: 0; /* Override default input margin */
-  }
-  
-  .btn-small {
-    padding: 5px 10px;
-    font-size: 0.8rem;
-    margin-top: 5px;
-    cursor: pointer;
-    background: #eee;
-    border: none;
-    border-radius: 5px;
-  }
-
-
-
-
-
-  /* =========================
-   8. CHAPTER DETAILS PAGE
-   ========================= */
-
-/* Top Navigation Bar */
-/* Top Navigation Bar - FIXED */
-.chapter-nav {
-  position: absolute; /* Snaps it to the top of the browser window */
-  top: 0;
-  left: 0;
-  width: 100%;        /* Forces it to stretch across the full screen */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 25px 40px; /* More breathing room */
-  z-index: 10;
-}
-
-/* Back Link - UPGRADED TO BUTTON LOOK */
-.back-link {
-  color: #fff;
-  font-size: 0.9rem;
-  text-decoration: none;
-  background: rgba(255, 255, 255, 0.15); /* Glass effect */
-  padding: 8px 20px;
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(5px);
-  transition: all 0.3s ease;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px; /* Space between arrow and text */
-}
-
-.back-link:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateX(-3px); /* Subtle slide effect */
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-
-/* Member Toggle Button */
-.btn-member-toggle {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-  backdrop-filter: blur(5px);
-  transition: background 0.3s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-main);
-}
-.btn-member-toggle:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Member Dropdown (The "Expandable" part) */
-.member-dropdown {
-  position: absolute;
-  top: 60px;
-  right: 30px;
-  width: 280px;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.3s ease;
-}
-
-.member-dropdown.active {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-/* Member Item Row */
-.dropdown-member-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-.dropdown-member-item:last-child { border-bottom: none; }
-
-.small-avatar {
-  width: 35px;
-  height: 35px;
-  background: #d000ff; /* Purple for users */
-  color: #fff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.member-name-text {
-  font-size: 0.95rem;
-  color: #333;
-}
-
-/* Header Card Style */
-.chapter-wrapper {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-  text-align: center;
-  z-index: 1;
-}
-
-.chapter-header-card {
-  margin-top: 20px;
-  color: #fff;
-  animation: fadeInDown 0.8s ease-out;
-}
-
-.chapter-icon-large {
-  width: 100px;
-  height: 100px;
-  background: #ffcc00;
-  color: #000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin: 0 auto 20px auto;
-  box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
-}
-
-#chapter-title {
-  font-size: 2.5rem;
-  margin: 0;
-  font-weight: 700;
-}
-
-#chapter-desc {
-  font-size: 1.1rem;
-  margin-top: 10px;
-  opacity: 0.8;
-  font-weight: 300;
-}
-
-.empty-state-placeholder {
-  margin-top: 50px;
-  padding: 40px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 20px;
-  color: #fff;
-  border: 1px dashed rgba(255,255,255,0.3);
-}

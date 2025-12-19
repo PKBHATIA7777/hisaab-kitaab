@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <title>Dashboard - Hisaab-Kitaab</title>
   <link rel="stylesheet" href="css/base.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -24,7 +27,7 @@
     <h2 class="section-title">Create your expense chapter</h2>
     
     <div class="chapters-grid" id="chapters-grid">
-      </div>
+    </div>
   </div>
 
   <div class="modal-overlay" id="create-modal">
@@ -45,7 +48,7 @@
 
         <label>Members <span style="color:red">*</span></label>
         <div class="member-list" id="member-list-container">
-          </div>
+        </div>
         <button type="button" class="btn-small" onclick="addMemberInput()">+ Add another person</button>
 
         <div style="margin-top: 25px;">
@@ -57,97 +60,5 @@
 
   <script src="js/main.js"></script>
   <script src="js/dashboard.js"></script> 
-
-  <script>
-    // Simple logout check
-    document.getElementById("logout-btn").addEventListener("click", async () => {
-      try { await apiFetch("/auth/logout", { method: "POST" }); } catch(e){}
-      window.location.href = "login.html";
-    });
-
-    // Check auth immediately
-    (async function(){
-      try { await apiFetch("/auth/me"); } 
-      catch(e) { window.location.href = "login.html"; }
-    })();
-  </script>
-
 </body>
 </html>
-
-
-
-
-
-
-
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Dashboard - Hisaab-Kitaab</title>
-  <link rel="stylesheet" href="css/base.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-
-  <div class="bubble-container">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-  </div>
-
-  <div class="brand-header">
-    <h1>Hisaab-Kitaab</h1>
-    <p>Your way of handling expenses</p>
-  </div>
-
-  <main>
-    <div class="auth-wrapper">
-      <section class="auth-card">
-        <h1 class="auth-title" id="dashboard-title">Welcome back</h1>
-        <p class="auth-subtitle" id="dashboard-subtitle">
-          Loading your details...
-        </p>
-
-        <div style="background: #f5f5f7; border-radius: 12px; padding: 20px; margin: 25px 0; color: #555; font-size: 0.9rem; line-height: 1.5;">
-          <strong>Note:</strong> Wait for a week time — development is currently in progress.
-        </div>
-
-        <button type="button" class="btn-secondary" id="logout-btn">
-          Log out
-        </button>
-      </section>
-    </div>
-  </main>
-
-  <script src="js/main.js"></script>
-  <script>
-    (async function () {
-      try {
-        const data = await apiFetch("/auth/me");
-        const user = data.user;
-
-        const title = document.getElementById("dashboard-title");
-        const subtitle = document.getElementById("dashboard-subtitle");
-
-        title.textContent = "You are logged in successfully";
-        subtitle.textContent =
-          "Hello " + user.realName + " (" + user.username + "), glad to see you here.";
-      } catch (e) {
-        // If not logged in, redirect to login
-        window.location.href = "login.html";
-      }
-    })();
-
-    const logoutBtn = document.getElementById("logout-btn");
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async () => {
-        try {
-          await apiFetch("/auth/logout", { method: "POST" });
-        } catch (e) {}
-        window.location.href = "login.html";
-      });
-    }
-  </script>
-</body>
-</html> -->

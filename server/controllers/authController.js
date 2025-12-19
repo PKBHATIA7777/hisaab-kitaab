@@ -4,7 +4,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const { sendOtpEmail } = require("../utils/email");
 const bcrypt = require("bcrypt");
 const db = require("../config/db");
-const { createToken, sendAuthCookie } = require("../utils/jwt");
+const { createToken, sendAuthCookie, SHORT_MS, LONG_MS } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 
@@ -273,7 +273,7 @@ async function registerComplete(req, res) {
   }
 }
 
-// POST /api/auth/login
+// POST /api/auth/login - ✅ UPDATED WITH REMEMBER ME
 async function login(req, res) {
   try {
     const result = loginSchema.safeParse(req.body);
@@ -281,6 +281,9 @@ async function login(req, res) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
     const { identifier, password } = result.data;
+
+    // Extract rememberMe (it's not in the Zod schema, so we get it from req.body directly)
+    const rememberMe = !!req.body.rememberMe; 
 
     const cleanIdentifier = identifier.trim().toLowerCase();
 
@@ -318,8 +321,11 @@ async function login(req, res) {
       [now, user.id]
     );
 
-    const token = createToken({ userId: user.id.toString() });
-    sendAuthCookie(res, token);
+    const token = createToken({ userId: user.id.toString() }, rememberMe);
+    sendAuthCookie(res, token, rememberMe);
+
+    // Calculate expiry for the frontend
+    const sessionDuration = rememberMe ? LONG_MS : SHORT_MS;
 
     return res.json({
       ok: true,
@@ -330,6 +336,8 @@ async function login(req, res) {
         username: user.username,
         email: user.email,
       },
+      // Send this to client so it knows when to warn
+      sessionExpiresAt: Date.now() + sessionDuration 
     });
   } catch (err) {
     console.error("login error:", err);
@@ -691,6 +699,7 @@ module.exports = {
   me,
   logout,
 };
+
 
 
 // const { OAuth2Client } = require("google-auth-library");

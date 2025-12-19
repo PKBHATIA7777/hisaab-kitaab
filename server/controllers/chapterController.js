@@ -1,25 +1,50 @@
 const db = require("../config/db");
 const { z } = require("zod");
 
-// Validation Schema
+// =========================================
+// 1. UPDATED VALIDATION SCHEMA (Security Fix)
+// =========================================
+// We use regex /^[^<>]*$/ to forbid < and > characters, preventing XSS.
 const createChapterSchema = z.object({
-  name: z.string().min(1, "Chapter name is required").trim(),
-  description: z.string().max(50, "Description cannot exceed 50 characters").optional().or(z.literal("")),
-  members: z.array(z.string().min(1)).min(1, "At least one member is required"),
+  name: z.string()
+    .min(1, "Chapter name is required")
+    .max(100, "Name too long")
+    .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed") // <--- SECURITY FIX
+    .trim(),
+
+  description: z.string()
+    .max(50, "Description cannot exceed 50 characters")
+    .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed") // <--- SECURITY FIX
+    .optional()
+    .or(z.literal("")),
+
+  members: z.array(
+    z.string()
+      .min(1)
+      .max(50, "Member name too long")
+      .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed") // <--- SECURITY FIX
+      .trim()
+  ).min(1, "At least one member is required"),
 });
 
-// 1. Create a new Chapter
+// =========================================
+// 2. Create a new Chapter
+// =========================================
 async function createChapter(req, res) {
   try {
+    // 1. Validate Input (Now checks for malicious chars)
     const result = createChapterSchema.safeParse(req.body);
     if (!result.success) {
-      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+      // Send the specific error message (e.g., "HTML tags are not allowed")
+      return res
+        .status(400)
+        .json({ ok: false, message: result.error.issues[0].message });
     }
 
     const { name, description, members } = result.data;
     const userId = req.user.userId;
 
-    // Start Transaction (So if members fail, chapter isn't created)
+    // Start Transaction
     await db.query("BEGIN");
 
     try {
@@ -48,27 +73,38 @@ async function createChapter(req, res) {
         message: "Chapter created successfully",
         chapter,
       });
-
     } catch (err) {
       await db.query("ROLLBACK");
       throw err;
     }
-
   } catch (err) {
     console.error("createChapter error:", err);
-    return res.status(500).json({ ok: false, message: "Failed to create chapter" });
+    return res
+      .status(500)
+      .json({ ok: false, message: "Failed to create chapter" });
   }
 }
 
-// 2. Get All Chapters for Dashboard
+// =========================================
+// 3. Get All Chapters for Dashboard (Optimized: 1 Query)
+// =========================================
 async function getMyChapters(req, res) {
   try {
     const userId = req.user.userId;
 
+    // OPTIMIZATION: Fetch chapters AND members in a single query using LEFT JOIN and JSON_AGG
     const { rows } = await db.query(
-      `SELECT * FROM chapters 
-       WHERE created_by = $1 
-       ORDER BY created_at DESC`,
+      `SELECT 
+         c.id, 
+         c.name, 
+         c.description, 
+         c.created_at,
+         COUNT(cm.id) as member_count
+       FROM chapters c
+       LEFT JOIN chapter_members cm ON c.id = cm.chapter_id
+       WHERE c.created_by = $1
+       GROUP BY c.id
+       ORDER BY c.created_at DESC`,
       [userId]
     );
 
@@ -79,7 +115,9 @@ async function getMyChapters(req, res) {
   }
 }
 
-// 3. Get Single Chapter Details (for later usage)
+// =========================================
+// 4. Get Single Chapter Details (for later usage)
+// =========================================
 async function getChapterDetails(req, res) {
   try {
     const { id } = req.params;
@@ -112,8 +150,78 @@ async function getChapterDetails(req, res) {
   }
 }
 
+// =========================================
+// 5. Update Chapter (Rename)
+// =========================================
+async function updateChapter(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const { name, description } = req.body; // We only allow renaming for now
+
+    // Simple validation
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ ok: false, message: "Name is required" });
+    }
+
+    const { rowCount } = await db.query(
+      `UPDATE chapters 
+       SET name = $1, description = $2 
+       WHERE id = $3 AND created_by = $4`,
+      [name.trim(), description || "", id, userId]
+    );
+
+    if (rowCount === 0) {
+      return res.status(404).json({ ok: false, message: "Chapter not found or unauthorized" });
+    }
+
+    res.json({ ok: true, message: "Chapter updated" });
+  } catch (err) {
+    console.error("updateChapter error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// =========================================
+// 6. Delete Chapter
+// =========================================
+async function deleteChapter(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    // Use a transaction to clean up members first (just in case CASCADE isn't set)
+    await db.query("BEGIN");
+    
+    // 1. Check ownership
+    const { rows } = await db.query(
+      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
+      [id, userId]
+    );
+    if (rows.length === 0) {
+      await db.query("ROLLBACK");
+      return res.status(404).json({ ok: false, message: "Chapter not found" });
+    }
+
+    // 2. Delete Members
+    await db.query("DELETE FROM chapter_members WHERE chapter_id = $1", [id]);
+    
+    // 3. Delete Chapter
+    await db.query("DELETE FROM chapters WHERE id = $1", [id]);
+
+    await db.query("COMMIT");
+    res.json({ ok: true, message: "Chapter deleted successfully" });
+  } catch (err) {
+    await db.query("ROLLBACK");
+    console.error("deleteChapter error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
 module.exports = {
   createChapter,
   getMyChapters,
-  getChapterDetails
+  getChapterDetails,
+  updateChapter, // <--- ADD THIS
+  deleteChapter  // <--- ADD THIS
 };

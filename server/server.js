@@ -4,6 +4,8 @@ require("dotenv").config();
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+const compression = require("compression");
+const csrfProtection = require("./middleware/csrfMiddleware"); // <--- ADDED
 
 // --- SECURITY IMPORTS ---
 const helmet = require("helmet");
@@ -20,44 +22,74 @@ const chapterRoutes = require("./routes/chapterRoutes"); // <-- Line A added
 const app = express();
 
 // =========================================
-// 1. CORS (MUST BE FIRST)
+// 0. PROXY TRUST (CRITICAL FOR RENDER/HEROKU)
+// =========================================
+// This ensures cookies are set with 'Secure' flag and Rate Limiter gets real user IPs
+app.set("trust proxy", 1); // <--- ADDED
+
+// =========================================
+/** 1. CORS (MUST BE FIRST) */
 // =========================================
 // configure CORS so frontend can talk to backend
 // We put this FIRST so even error responses (like 429) get the correct headers
 app.use(
   cors({
-    origin: process.env.CLIENT_URL, // frontend origin
+    origin: process.env.CLIENT_URL, // Ensure this matches your frontend URL exactly (no trailing slash)
     credentials: true,              // allow cookies
   })
 );
 
 // =========================================
-// 2. SECURITY MIDDLEWARES (The Shield)
+// 2. SECURITY & PERFORMANCE MIDDLEWARES
 // =========================================
 
-// Helmet sets security headers to hide server details
-app.use(helmet());
+app.use(compression());
 
-// Global Rate Limiter: Allows 100 requests per 15 minutes per IP
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "https://accounts.google.com", "https://g.notify.usercontent.com"],
+        frameSrc: ["'self'", "https://accounts.google.com"],
+        connectSrc: ["'self'", "https://accounts.google.com"],
+        imgSrc: ["'self'", "data:", "https://lh3.googleusercontent.com"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+      },
+    },
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  })
+);
+
+// --- NEW RATE LIMITER CONFIGURATION ---
+
+const isProduction = process.env.NODE_ENV === "production";
+
+// 1. Global Limiter (General API use)
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: "Too many requests from this IP, please try again later.",
+  max: isProduction ? 100 : 1000, // Strict in Prod (100), Relaxed in Dev (1000)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, message: "Too many requests, please try again later." },
 });
 app.use(globalLimiter);
 
-// Strict Auth Limiter: RELAXED FOR DEVELOPMENT
-// was: 5 attempts per 15 mins -> now: 100 attempts, 1 min wait
+// 2. Strict Auth Limiter (Login/Register/OTP)
+// Prevents brute-force attacks
 const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute wait time (if blocked)
-  max: 100,                // 100 attempts allowed
-  message: "Too many login/OTP attempts, please try again later.",
+  windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000, // 15 mins in Prod, 1 min in Dev
+  max: isProduction ? 5 : 50, // 5 attempts in Prod, 50 in Dev
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, message: "Too many login attempts. Please try again in 15 minutes." },
 });
 
-// Apply limits to sensitive routes
+// Apply strict limits to sensitive routes
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register/request-otp", authLimiter);
 app.use("/api/auth/register/verify-otp", authLimiter);
+app.use("/api/auth/register/complete", authLimiter); // Added this one too
 app.use("/api/auth/forgot/request-otp", authLimiter);
 
 // =========================================
@@ -67,6 +99,9 @@ app.use("/api/auth/forgot/request-otp", authLimiter);
 // standard middlewares
 app.use(express.json());
 app.use(cookieParser());
+
+// CSRF protection (must be after cookieParser, before routes)
+app.use(csrfProtection);
 
 // routes
 app.use("/api/auth", authRoutes);
@@ -103,6 +138,8 @@ const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+
 
 
 
