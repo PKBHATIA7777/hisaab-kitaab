@@ -1,20 +1,8 @@
 // client/js/main.js
 
-// 1. FORCE LOCALHOST: This fixes the Cookie/Security block.
-// The browser will now accept the cookie because it's not strictly HTTPS.
-const API_BASE = "http://localhost:5001/api";
-
-// 2. Initialize CSRF (Standard way)
-(async function initCSRF() {
-  if (!document.cookie.includes("csrf_token")) {
-    try {
-      await fetch(API_BASE + "/csrf-token"); 
-      console.log("CSRF initialized");
-    } catch (e) {
-      console.error("CSRF init failed", e);
-    }
-  }
-})();
+/* ======================================
+   1. CORE CONFIGURATION & NETWORK
+   ====================================== */
 
 // HELPER: Debounce (prevents functions from firing too often)
 function debounce(func, wait) {
@@ -25,40 +13,68 @@ function debounce(func, wait) {
   };
 }
 
-// Helper to read cookies
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(";").shift();
-  return "";
-}
+// AUTOMATIC ENVIRONMENT SWITCHING
+// Uses Localhost backend when you are developing, and Render backend when on Vercel/Web.
+const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:5001/api"
+  : "https://hisaab-kitaab-service-app.onrender.com/api";
 
-// 2. Shared Fetch Wrapper (Updated with CSRF)
+// GLOBAL CSRF TOKEN STORAGE
+// We store the token here because Vercel (Frontend) cannot read cookies set by Render (Backend).
+let globalCsrfToken = "";
+
+// INITIALIZE CSRF ON LOAD
+(async function initCSRF() {
+  try {
+    // We hit this endpoint which does two things:
+    // 1. Sets the 'Secure' cookie in the browser (for the backend to verify later).
+    // 2. Returns the token in the JSON body (so we can send it in headers).
+    const res = await fetch(API_BASE + "/csrf-token", { credentials: "include" });
+    const data = await res.json();
+    
+    if (data.csrfToken) {
+      globalCsrfToken = data.csrfToken;
+      console.log("CSRF Token initialized via API");
+    }
+  } catch (e) {
+    console.error("CSRF Init Error", e);
+  }
+})();
+
+// SHARED FETCH WRAPPER (ROBUST VERSION)
 async function apiFetch(path, options = {}) {
-  // Get token from cookie
-  const csrfToken = getCookie("csrf_token");
+  // Simple guard: If the token hasn't arrived yet, wait 500ms.
+  // This prevents race conditions on immediate page loads.
+  if (!globalCsrfToken) {
+    await new Promise(r => setTimeout(r, 500)); 
+  }
 
   const res = await fetch(API_BASE + path, {
     method: options.method || "GET",
     headers: {
       "Content-Type": "application/json",
-      "X-CSRF-Token": csrfToken, // <--- Send token in header
+      // CRITICAL: Send the token from our variable, not document.cookie
+      "X-CSRF-Token": globalCsrfToken, 
       ...(options.headers || {}),
     },
-    credentials: "include", // Essential for cookies
+    credentials: "include", // Essential: Sends the HTTP-only cookie along with the request
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
   const data = await res.json().catch(() => ({}));
+  
   if (!res.ok) {
-    throw data;
+    const error = new Error(data.message || "Request failed");
+    error.status = res.status;
+    throw error;
   }
+  
   return data;
 }
 
 /* ======================================
-   GOOGLE SIGN-IN (Shared across pages)
-====================================== */
+   2. GOOGLE SIGN-IN
+   ====================================== */
 async function handleGoogleCredential(response) {
   try {
     const idToken = response.credential;
@@ -68,7 +84,6 @@ async function handleGoogleCredential(response) {
       body: { idToken },
     });
 
-    // REPLACED ALERT WITH TOAST
     showToast("Logged in as " + data.user.username, "success");
     
     // Slight delay so user sees the toast before redirect
@@ -77,7 +92,6 @@ async function handleGoogleCredential(response) {
     }, 1000);
     
   } catch (err) {
-    // REPLACED ALERT WITH TOAST
     showToast(err.message || "Google sign-in failed", "error");
   }
 }
@@ -87,7 +101,7 @@ window.handleGoogleCredential = handleGoogleCredential;
 window.apiFetch = apiFetch;
 
 /* ======================================
-   MOBILE KEYBOARD & ROTATION HELPER (OPTIMIZED STEP 14)
+   3. MOBILE KEYBOARD & ROTATION HELPER
    ====================================== */
 
 let isMobileMode = false;
@@ -129,9 +143,9 @@ window.addEventListener('resize', debounce(() => {
   initMobileTweaks();
 }, 250));
 
-// ======================================
-// TOAST NOTIFICATIONS SYSTEM
-// ======================================
+/* ======================================
+   4. TOAST NOTIFICATIONS SYSTEM
+   ====================================== */
 window.showToast = function(message, type = 'info') {
   let container = document.querySelector('.toast-container');
   if (!container) {
@@ -159,9 +173,9 @@ window.showToast = function(message, type = 'info') {
   }, 3500);
 };
 
-// ======================================
-// BUTTON LOADING HELPER
-// ======================================
+/* ======================================
+   5. BUTTON LOADING HELPER
+   ====================================== */
 window.setBtnLoading = function(btn, isLoading) {
   if (!btn) return;
 
@@ -174,9 +188,9 @@ window.setBtnLoading = function(btn, isLoading) {
   }
 };
 
-// ======================================
-// SESSION MONITOR (STEP 22)
-// ======================================
+/* ======================================
+   6. SESSION MONITOR
+   ====================================== */
 function initSessionMonitor() {
   setInterval(() => {
     const expiresAt = localStorage.getItem("sessionExpiresAt");
@@ -198,9 +212,9 @@ function initSessionMonitor() {
 
 initSessionMonitor();
 
-// ======================================
-// INLINE VALIDATION HELPER
-// ======================================
+/* ======================================
+   7. INLINE VALIDATION HELPER
+   ====================================== */
 /**
  * @param {HTMLInputElement} input - The input element to validate
  * @param {Function} validateFn - Returns error string if invalid, null if valid
