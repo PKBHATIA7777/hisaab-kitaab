@@ -1,18 +1,14 @@
 // client/js/main.js
 
-// 1. Automatic Environment Switching
-// If running on localhost or 127.0.0.1, use local backend. Otherwise, use Render.
-const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? "http://localhost:5001/api"
-  : "https://hisaab-kitaab-service-app.onrender.com/api";
+// 1. FORCE LOCALHOST: This fixes the Cookie/Security block.
+// The browser will now accept the cookie because it's not strictly HTTPS.
+const API_BASE = "http://localhost:5001/api";
 
-// ✅ ADD THIS AT THE TOP: Fetch CSRF token if missing
+// 2. Initialize CSRF (Standard way)
 (async function initCSRF() {
   if (!document.cookie.includes("csrf_token")) {
     try {
-      await fetch(API_BASE + "/csrf-token", {
-        credentials: "include",
-      }); // Just hits the endpoint to set the cookie
+      await fetch(API_BASE + "/csrf-token"); 
       console.log("CSRF initialized");
     } catch (e) {
       console.error("CSRF init failed", e);
