@@ -6,15 +6,14 @@ const createForm = document.getElementById("create-chapter-form");
 const memberListContainer = document.getElementById("member-list-container");
 const logoutBtn = document.getElementById("logout-btn");
 
+// ✅ Updated skeleton loader: centered spinner
 function renderSkeletons() {
-  chaptersGrid.innerHTML = "";
-  
-  // Render 4 skeleton cards to simulate content
-  for (let i = 0; i < 4; i++) {
-    const div = document.createElement("div");
-    div.className = "chapter-card skeleton skeleton-card";
-    chaptersGrid.appendChild(div);
-  }
+  const grid = document.getElementById("chapters-grid");
+  grid.innerHTML = `
+    <div class="loader-container">
+      <div class="spinner"></div>
+    </div>
+  `;
 }
 
 // 1. OPTIMIZED INIT: Fetch Auth & Data in Parallel

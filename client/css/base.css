@@ -943,3 +943,28 @@ body {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+
+
+
+  /* client/css/base.css */
+
+.loader-container {
+  grid-column: 1 / -1; /* Centers it across the whole grid */
+  display: flex;
+  justify-content: center;
+  padding: 50px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #d000ff; /* Your Purple Brand Color */
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
