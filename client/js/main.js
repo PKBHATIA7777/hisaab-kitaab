@@ -9,6 +9,13 @@ function debounce(func, wait) {
   };
 }
 
+// ✅ CSRF TOKEN INITIALIZATION (ADDED as per Step B)
+if (!getCookie("csrf_token")) {
+  apiFetch("/csrf-token")
+    .then(() => console.log("CSRF token initialized"))
+    .catch(err => console.error("Failed to init CSRF", err));
+}
+
 // 1. Automatic Environment Switching
 // If running on localhost or 127.0.0.1, use local backend. Otherwise, use Render.
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"

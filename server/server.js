@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const compression = require("compression");
 const csrfProtection = require("./middleware/csrfMiddleware"); // <--- ADDED
+const path = require("path"); // ✅ ADDED for static file serving
 
 // --- SECURITY IMPORTS ---
 const helmet = require("helmet");
@@ -103,6 +104,11 @@ app.use(cookieParser());
 // CSRF protection (must be after cookieParser, before routes)
 app.use(csrfProtection);
 
+// ✅ endpoint to force-set the CSRF cookie (ADDED as per Step A)
+app.get("/api/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.cookies.csrf_token });
+});
+
 // routes
 app.use("/api/auth", authRoutes);
 app.use("/api/chapters", chapterRoutes); // <-- Line B added
@@ -113,6 +119,21 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     message: "Hisaab-Kitaab backend is running",
   });
+});
+
+// =========================================
+// ✅ STATIC FILE SERVING (ADDED for Render deployment)
+// =========================================
+// Serve static files from the 'client' directory
+app.use(express.static(path.join(__dirname, "../client"))); 
+
+// Handle SPA / Fallback (for direct links like /dashboard.html)
+// ✅ Fix for Express 5: Use (.*) instead of *
+// ✅ Correct wildcard for Express 5
+app.get(/(.*)/, (req, res) => {
+  // Ensure we are using the path module
+  const path = require("path");
+  res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 
 // =========================================
@@ -138,50 +159,3 @@ const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
-
-
-
-
-// // load environment variables first
-// require("dotenv").config();
-
-// const express = require("express");
-// const cookieParser = require("cookie-parser");
-// const cors = require("cors");
-
-// // just ensure DB module is loaded (connection/pool created inside it)
-// require("./config/db");
-
-// const authRoutes = require("./routes/authRoutes");
-
-// const app = express();
-
-// // middlewares
-// app.use(express.json());
-// app.use(cookieParser());
-
-// // configure CORS so frontend can talk to backend
-// app.use(
-//   cors({
-//     origin: process.env.CLIENT_URL, // frontend origin
-//     credentials: true,              // allow cookies
-//   })
-// );
-
-// // routes
-// app.use("/api/auth", authRoutes);
-
-// // simple health route to test server
-// app.get("/api/health", (req, res) => {
-//   res.json({
-//     status: "ok",
-//     message: "Hisaab-Kitaab backend is running",
-//   });
-// });
-
-// const PORT = process.env.PORT || 5001;
-
-// app.listen(PORT, () => {
-//   console.log(`🚀 Server running on port ${PORT}`);
-// });
