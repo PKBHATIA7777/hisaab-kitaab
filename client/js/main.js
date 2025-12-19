@@ -1,5 +1,25 @@
 // client/js/main.js
 
+// 1. Automatic Environment Switching
+// If running on localhost or 127.0.0.1, use local backend. Otherwise, use Render.
+const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:5001/api"
+  : "https://hisaab-kitaab-service-app.onrender.com/api";
+
+// ✅ ADD THIS AT THE TOP: Fetch CSRF token if missing
+(async function initCSRF() {
+  if (!document.cookie.includes("csrf_token")) {
+    try {
+      await fetch(API_BASE + "/csrf-token", {
+        credentials: "include",
+      }); // Just hits the endpoint to set the cookie
+      console.log("CSRF initialized");
+    } catch (e) {
+      console.error("CSRF init failed", e);
+    }
+  }
+})();
+
 // HELPER: Debounce (prevents functions from firing too often)
 function debounce(func, wait) {
   let timeout;
@@ -8,19 +28,6 @@ function debounce(func, wait) {
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
 }
-
-// ✅ CSRF TOKEN INITIALIZATION (ADDED as per Step B)
-if (!getCookie("csrf_token")) {
-  apiFetch("/csrf-token")
-    .then(() => console.log("CSRF token initialized"))
-    .catch(err => console.error("Failed to init CSRF", err));
-}
-
-// 1. Automatic Environment Switching
-// If running on localhost or 127.0.0.1, use local backend. Otherwise, use Render.
-const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? "http://localhost:5001/api"
-  : "https://hisaab-kitaab-service-app.onrender.com/api";
 
 // Helper to read cookies
 function getCookie(name) {

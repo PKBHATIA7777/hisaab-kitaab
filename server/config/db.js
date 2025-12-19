@@ -11,9 +11,29 @@ const pool = new Pool({
   ssl: (connectionString && !connectionString.includes("localhost")) ? sslConfig : false,
 });
 
+// ✅ Retry-enabled query function (up to 3 attempts)
 async function query(text, params) {
-  const result = await pool.query(text, params);
-  return result;
+  // Retry up to 3 times
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const result = await pool.query(text, params);
+      return result;
+    } catch (err) {
+      // If it's a connection error (timeout/refused), wait 1s and retry
+      const isConnectionError =
+        err.code === "ECONNREFUSED" ||
+        err.code === "57P01" ||
+        (typeof err.message === "string" && err.message.includes("timeout"));
+
+      if (attempt === 3 || !isConnectionError) {
+        console.error("Database failed:", err);
+        throw err; // Give up after 3 tries or non-connection error
+      }
+
+      console.log(`Database waking up (Attempt ${attempt})...`);
+      await new Promise((res) => setTimeout(res, 1000)); // Wait 1 second
+    }
+  }
 }
 
 module.exports = {
