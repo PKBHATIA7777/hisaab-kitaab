@@ -6,6 +6,12 @@ const createForm = document.getElementById("create-chapter-form");
 const memberListContainer = document.getElementById("member-list-container");
 const logoutBtn = document.getElementById("logout-btn");
 
+// ==========================================
+// ✅ STATE MANAGEMENT
+// ==========================================
+let isEditMode = false;
+let editChapterId = null;
+
 // ✅ Updated skeleton loader: centered spinner
 function renderSkeletons() {
   const grid = document.getElementById("chapters-grid");
@@ -16,34 +22,81 @@ function renderSkeletons() {
   `;
 }
 
-// 1. OPTIMIZED INIT: Fetch Auth & Data in Parallel
 document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons(); // Show placeholders immediately
 
+  // ==========================================
+  // ✅ FIX 1: Client-Side Search
+  // ==========================================
+  // Inject Search Bar HTML dynamically above the grid
+  const searchHtml = `
+    <div style="margin-bottom: 25px; position: relative; max-width: 400px; width: 100%;">
+      <input type="text" id="chapter-search" placeholder="🔍 Find a chapter..." 
+      style="
+        width: 100%;
+        padding: 12px 15px 12px 40px; 
+        border-radius: 12px; 
+        border: 2px solid #eee; 
+        font-family: var(--font-main);
+        font-size: 0.95rem;
+        background: #fff;
+        transition: border-color 0.2s;
+      ">
+      <span style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: 0.5;"></span>
+    </div>
+  `;
+  
+  // Insert before the grid container
+  chaptersGrid.insertAdjacentHTML('beforebegin', searchHtml);
+  
+  // Attach Search Logic
+  const searchInput = document.getElementById('chapter-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      const cards = document.querySelectorAll('.chapter-card.card-content');
+      
+      cards.forEach(card => {
+        const name = card.querySelector('.chapter-name').textContent.toLowerCase();
+        // Simple filter: Show if name contains term, else hide
+        card.style.display = name.includes(term) ? 'flex' : 'none';
+      });
+    });
+  }
+
+  // ==========================================
+  // ✅ FIX 2: Cold Start Feedback
+  // ==========================================
+  // If data hasn't loaded in 2.5 seconds, tell the user the server is waking up
+  const slowNetworkTimeout = setTimeout(() => {
+    showToast("Server is waking up... please wait about 20s", "info");
+  }, 2500);
+
   // SETUP VALIDATION FOR CREATE MODAL
   const nameInput = createForm.querySelector('input[name="name"]');
-  
-  // Define rules
   window.setupInlineValidation(nameInput, (value) => {
     if (!value.trim()) return "Chapter name is required.";
     if (value.length > 50) return "Name is too long (max 50 chars).";
     if (/[<>]/.test(value)) return "HTML characters (< >) are not allowed.";
-    return null; // Valid
+    return null; 
   });
 
   try {
-    // Fire both requests at the same time
+    // Fire both requests
     const [authData, chaptersData] = await Promise.all([
       apiFetch("/auth/me"),
       apiFetch("/chapters")
     ]);
 
-    // If we get here, Auth is good.
+    // Data loaded! Cancel the "Slow Network" warning
+    clearTimeout(slowNetworkTimeout);
+
     renderGrid(chaptersData.chapters);
 
   } catch (err) {
+    clearTimeout(slowNetworkTimeout); // Cancel warning on error too
     console.error("Init failed", err);
-    // If auth failed, redirect. If chapters failed, show error.
+    
     if (err.status === 401 || err.status === 403) {
       window.location.href = "login.html";
     } else {
@@ -64,6 +117,56 @@ if (logoutBtn) {
     }
   });
 }
+
+// ==========================================
+// ✅ UNIFIED FORM SUBMISSION HANDLER
+// ==========================================
+createForm.onsubmit = async (e) => {
+  e.preventDefault();
+  
+  // 1. GET BUTTON & DATA
+  const submitBtn = createForm.querySelector('button[type="submit"]');
+  const formData = new FormData(createForm);
+  const name = formData.get("name");
+  const description = formData.get("description");
+  
+  try {
+    setBtnLoading(submitBtn, true);
+
+    if (isEditMode) {
+      // --- UPDATE EXISTING ---
+      await apiFetch(`/chapters/${editChapterId}`, {
+        method: "PUT",
+        body: { name, description }
+      });
+      showToast("Chapter updated successfully", "success");
+    } else {
+      // --- CREATE NEW ---
+      const members = [];
+      document.querySelectorAll('input[name="members[]"]').forEach(input => {
+        if(input.value.trim()) members.push(input.value.trim());
+      });
+
+      if(members.length === 0) {
+        throw new Error("Please add at least one member.");
+      }
+
+      await apiFetch("/chapters", {
+        method: "POST",
+        body: { name, description, members }
+      });
+      showToast("Chapter created successfully!", "success");
+    }
+    
+    closeModal();
+    await reloadChaptersGrid(); 
+
+  } catch (err) {
+    showToast(err.message || "Operation failed", "error");
+  } finally {
+    setBtnLoading(submitBtn, false);
+  }
+};
 
 // Helper to reload just the grid (used after creating a chapter)
 async function reloadChaptersGrid() {
@@ -163,12 +266,54 @@ function renderGrid(chapters) {
   });
 }
 
-function openModal() {
-  createModal.classList.add("active");
+// ==========================================
+// ✅ UPDATED MODAL FUNCTIONS
+// ==========================================
+
+// 1. Open for CREATING (Reset everything)
+window.openModal = function() {
+  isEditMode = false;
+  editChapterId = null;
+
   createForm.reset();
+  
+  // Show members section
+  document.getElementById("member-list-container").style.display = "block";
+  document.querySelector("button[type='button']").style.display = "inline-block";
+  
+  // Reset UI Text
+  createModal.querySelector(".modal-header h2").textContent = "New Chapter";
+  createForm.querySelector("button[type='submit']").textContent = "Create Chapter";
+  
+  // Reset member inputs to default (1 empty input)
   memberListContainer.innerHTML = "";
   addMemberInput();
-}
+
+  createModal.classList.add("active");
+  // Focus for accessibility
+  setTimeout(() => createModal.querySelector(".modal-box").focus(), 100);
+};
+
+// 2. Open for EDITING
+window.openEditModal = function(id, currentName, currentDesc) {
+  isEditMode = true;
+  editChapterId = id;
+
+  // Populate form
+  createForm.name.value = currentName;
+  // Handle null/undefined description
+  createForm.description.value = (currentDesc && currentDesc !== 'null') ? currentDesc : '';
+  
+  // Hide members section (Rename only)
+  document.getElementById("member-list-container").style.display = "none";
+  document.querySelector("button[type='button']").style.display = "none"; 
+  
+  // Update UI Text
+  createModal.querySelector(".modal-header h2").textContent = "Edit Chapter";
+  createForm.querySelector("button[type='submit']").textContent = "Save Changes";
+  
+  createModal.classList.add("active");
+};
 
 function closeModal() {
   createModal.classList.remove("active");
@@ -184,51 +329,8 @@ function addMemberInput() {
   memberListContainer.appendChild(div);
 }
 
-// 6. Handle Create Submission
-createForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  
-  // 1. GET BUTTON
-  const submitBtn = createForm.querySelector('button[type="submit"]');
-
-  const formData = new FormData(createForm);
-  const name = formData.get("name");
-  const description = formData.get("description");
-  
-  const members = [];
-  document.querySelectorAll('input[name="members[]"]').forEach(input => {
-    if(input.value.trim()) members.push(input.value.trim());
-  });
-
-  if(members.length === 0) {
-    showToast("Please add at least one member.", "error");
-    return;
-  }
-
-  try {
-    // 2. START LOADING (Replaces manual text change)
-    setBtnLoading(submitBtn, true);
-
-    await apiFetch("/chapters", {
-      method: "POST",
-      body: { name, description, members }
-    });
-    
-    closeModal();
-    // Use the reload helper from Step 18
-    await reloadChaptersGrid(); 
-    showToast("Chapter created successfully!", "success");
-
-  } catch (err) {
-    showToast(err.message || "Failed to create chapter", "error");
-  } finally {
-    // 3. STOP LOADING
-    setBtnLoading(submitBtn, false);
-  }
-});
-
 /* ======================================
-   MODAL ACCESSIBILITY (STEP 19)
+   MODAL ACCESSIBILITY 
    ====================================== */
 
 // 1. Close on Escape Key
@@ -278,62 +380,4 @@ window.confirmDelete = async function(id) {
       showToast("Failed to delete", "error");
     }
   }
-};
-
-// 3. EDIT Logic (Re-uses the Create Modal)
-window.openEditModal = function(id, currentName, currentDesc) {
-  // Populate the form
-  const form = document.getElementById("create-chapter-form");
-  form.name.value = currentName;
-  form.description.value = currentDesc;
-  
-  // Hide members input (Simpler to just allow renaming for now)
-  document.getElementById("member-list-container").style.display = "none";
-  document.querySelector("button[type='button']").style.display = "none"; // Hide "Add Member" btn
-  
-  // Change Button Text
-  const btn = form.querySelector("button[type='submit']");
-  btn.textContent = "Save Changes";
-  
-  // Hijack the submit event
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setBtnLoading(btn, true);
-      await apiFetch(`/chapters/${id}`, {
-        method: "PUT",
-        body: { 
-          name: form.name.value, 
-          description: form.description.value 
-        }
-      });
-      closeModal();
-      showToast("Chapter updated", "success");
-      reloadChaptersGrid();
-    } catch (err) {
-      showToast(err.message, "error");
-    } finally {
-      setBtnLoading(btn, false);
-    }
-  };
-  
-  openModal();
-};
-
-// Reset Modal logic when closing (so "Create New" works again)
-const originalOpenModal = window.openModal;
-window.openModal = function() {
-  // Reset form to "Create Mode"
-  const form = document.getElementById("create-chapter-form");
-  form.reset();
-  form.onsubmit = null; // Remove hijack (will revert to default listener)
-  
-  // Show members again
-  document.getElementById("member-list-container").style.display = "block";
-  document.querySelector("button[type='button']").style.display = "inline-block";
-  form.querySelector("button[type='submit']").textContent = "Create Chapter";
-  
-  // Call original logic (show overlay)
-  createModal.classList.add("active");
-  setTimeout(() => createModal.querySelector(".modal-box").focus(), 100);
 };

@@ -4,17 +4,16 @@ const { z } = require("zod");
 // =========================================
 // 1. UPDATED VALIDATION SCHEMA (Security Fix)
 // =========================================
-// We use regex /^[^<>]*$/ to forbid < and > characters, preventing XSS.
 const createChapterSchema = z.object({
   name: z.string()
     .min(1, "Chapter name is required")
     .max(100, "Name too long")
-    .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed") // <--- SECURITY FIX
+    .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed")
     .trim(),
 
   description: z.string()
     .max(50, "Description cannot exceed 50 characters")
-    .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed") // <--- SECURITY FIX
+    .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed")
     .optional()
     .or(z.literal("")),
 
@@ -22,20 +21,19 @@ const createChapterSchema = z.object({
     z.string()
       .min(1)
       .max(50, "Member name too long")
-      .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed") // <--- SECURITY FIX
+      .regex(/^[^<>]*$/, "HTML tags (< >) are not allowed")
       .trim()
   ).min(1, "At least one member is required"),
 });
 
 // =========================================
-// 2. Create a new Chapter
+// 2. Create a new Chapter (✅ DUPLICATE PREVENTION)
 // =========================================
 async function createChapter(req, res) {
   try {
-    // 1. Validate Input (Now checks for malicious chars)
+    // 1. Validate Input
     const result = createChapterSchema.safeParse(req.body);
     if (!result.success) {
-      // Send the specific error message (e.g., "HTML tags are not allowed")
       return res
         .status(400)
         .json({ ok: false, message: result.error.issues[0].message });
@@ -43,6 +41,22 @@ async function createChapter(req, res) {
 
     const { name, description, members } = result.data;
     const userId = req.user.userId;
+
+    // =========================================================
+    // ✅ NEW CHECK: Prevent Duplicate Chapter Names
+    // =========================================================
+    const { rows: existing } = await db.query(
+      "SELECT id FROM chapters WHERE name = $1 AND created_by = $2",
+      [name, userId]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ 
+        ok: false, 
+        message: "You already have a chapter with this name." 
+      });
+    }
+    // =========================================================
 
     // Start Transaction
     await db.query("BEGIN");
@@ -116,7 +130,7 @@ async function getMyChapters(req, res) {
 }
 
 // =========================================
-// 4. Get Single Chapter Details (for later usage)
+// 4. Get Single Chapter Details
 // =========================================
 async function getChapterDetails(req, res) {
   try {
@@ -157,7 +171,7 @@ async function updateChapter(req, res) {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
-    const { name, description } = req.body; // We only allow renaming for now
+    const { name, description } = req.body;
 
     // Simple validation
     if (!name || name.trim().length === 0) {
@@ -190,7 +204,7 @@ async function deleteChapter(req, res) {
     const { id } = req.params;
     const userId = req.user.userId;
 
-    // Use a transaction to clean up members first (just in case CASCADE isn't set)
+    // Use a transaction to clean up members first
     await db.query("BEGIN");
     
     // 1. Check ownership
@@ -222,6 +236,6 @@ module.exports = {
   createChapter,
   getMyChapters,
   getChapterDetails,
-  updateChapter, // <--- ADD THIS
-  deleteChapter  // <--- ADD THIS
+  updateChapter,
+  deleteChapter
 };

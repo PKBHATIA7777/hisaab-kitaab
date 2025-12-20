@@ -5,8 +5,8 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const compression = require("compression");
-const csrfProtection = require("./middleware/csrfMiddleware"); // <--- ADDED
-const path = require("path"); // ✅ for static file serving
+const csrfProtection = require("./middleware/csrfMiddleware");
+const path = require("path");
 
 // --- SECURITY IMPORTS ---
 const helmet = require("helmet");
@@ -18,32 +18,28 @@ const db = require("./config/db");
 
 // ROUTES
 const authRoutes = require("./routes/authRoutes");
-const chapterRoutes = require("./routes/chapterRoutes"); // <-- Line A added
+const chapterRoutes = require("./routes/chapterRoutes");
 
 const app = express();
 
 // =========================================
 // 0. PROXY TRUST (CRITICAL FOR RENDER/HEROKU)
 // =========================================
-// This ensures cookies are set with 'Secure' flag and Rate Limiter gets real user IPs
-app.set("trust proxy", 1); // <--- ADDED
+app.set("trust proxy", 1);
 
 // =========================================
 /** 1. CORS (MUST BE FIRST) */
 // =========================================
-// configure CORS so frontend can talk to backend
-// We put this FIRST so even error responses (like 429) get the correct headers
 app.use(
   cors({
-    origin: process.env.CLIENT_URL, // Ensure this matches your frontend URL exactly (no trailing slash)
-    credentials: true,              // allow cookies
+    origin: process.env.CLIENT_URL,
+    credentials: true,
   })
 );
 
 // =========================================
 // 2. SECURITY & PERFORMANCE MIDDLEWARES
 // =========================================
-
 app.use(compression());
 
 app.use(
@@ -62,25 +58,23 @@ app.use(
   })
 );
 
-// --- NEW RATE LIMITER CONFIGURATION ---
-
+// --- RATE LIMITER CONFIGURATION ---
 const isProduction = process.env.NODE_ENV === "production";
 
-// 1. Global Limiter (General API use)
+// 1. Global Limiter
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 100 : 1000, // Strict in Prod (100), Relaxed in Dev (1000)
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 100 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, message: "Too many requests, please try again later." },
 });
 app.use(globalLimiter);
 
-// 2. Strict Auth Limiter (Login/Register/OTP)
-// Prevents brute-force attacks
+// 2. Strict Auth Limiter
 const authLimiter = rateLimit({
-  windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000, // 15 mins in Prod, 1 min in Dev
-  max: isProduction ? 5 : 50, // 5 attempts in Prod, 50 in Dev
+  windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000,
+  max: isProduction ? 5 : 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, message: "Too many login attempts. Please try again in 15 minutes." },
@@ -90,7 +84,7 @@ const authLimiter = rateLimit({
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register/request-otp", authLimiter);
 app.use("/api/auth/register/verify-otp", authLimiter);
-app.use("/api/auth/register/complete", authLimiter); // Added this one too
+app.use("/api/auth/register/complete", authLimiter);
 app.use("/api/auth/forgot/request-otp", authLimiter);
 
 // =========================================
@@ -101,17 +95,17 @@ app.use("/api/auth/forgot/request-otp", authLimiter);
 app.use(express.json());
 app.use(cookieParser());
 
-// CSRF protection (must be after cookieParser, before routes)
+// CSRF protection
 app.use(csrfProtection);
 
-// ✅ Endpoint to give the frontend a fresh CSRF token (as per Step A)
+// CSRF token endpoint
 app.get("/api/csrf-token", (req, res) => {
   res.json({ csrfToken: req.cookies.csrf_token });
 });
 
 // routes
 app.use("/api/auth", authRoutes);
-app.use("/api/chapters", chapterRoutes); // <-- Line B added
+app.use("/api/chapters", chapterRoutes);
 
 // simple health route to test server
 app.get("/api/health", (req, res) => {
@@ -124,12 +118,14 @@ app.get("/api/health", (req, res) => {
 // =========================================
 // ✅ STATIC FILE SERVING (for Render deployment)
 // =========================================
-// Serve static files from the 'client' directory
+
+// 1. Serve static files from the 'client' directory
 app.use(express.static(path.join(__dirname, "../client")));
 
-// Handle SPA / Fallback (for direct links like /dashboard.html)
-// Using Express 5-safe wildcard
-app.get(/(.*)/, (req, res) => {
+// 2. Handle SPA / Fallback (FIXED)
+// We use a Regex to match everything EXCEPT paths starting with /api
+// This ensures API 404s stay as 404s, and don't return index.html
+app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 

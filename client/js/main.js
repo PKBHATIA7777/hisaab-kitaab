@@ -261,3 +261,59 @@ window.setupInlineValidation = function(input, validateFn) {
   
   return check; // Return function so form can call it on submit
 };
+
+/* ======================================
+   8. PASSWORD UX HELPERS
+   ====================================== */
+
+// 1. Toggle Visibility
+function initPasswordToggles() {
+  document.querySelectorAll('.btn-toggle-pass').forEach(btn => {
+    // Remove old listener to be safe (if re-initialized)
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    newBtn.addEventListener('click', (e) => {
+      e.preventDefault(); // Prevent form submit
+      const input = newBtn.previousElementSibling;
+      if (input.type === 'password') {
+        input.type = 'text';
+        newBtn.textContent = '🙈'; // Closed eye / Hide
+      } else {
+        input.type = 'password';
+        newBtn.textContent = '👁️'; // Open eye / Show
+      }
+    });
+  });
+}
+
+// 2. Live Validation (Length Check)
+function initPasswordValidation() {
+  document.querySelectorAll('input[type="password"]').forEach(input => {
+    // Look for the hint text immediately after the wrapper
+    const wrapper = input.closest('.password-wrapper');
+    if (!wrapper) return;
+    
+    const hint = wrapper.nextElementSibling;
+    if (hint && hint.classList.contains('password-hint')) {
+      input.addEventListener('input', () => {
+        const isValid = input.value.length >= 8;
+        if (isValid) {
+          hint.classList.remove('invalid');
+          hint.classList.add('valid');
+          hint.textContent = "✓ Password is 8 characters or more";
+        } else {
+          hint.classList.remove('valid');
+          hint.classList.add('invalid');
+          hint.textContent = "Password must be at least 8 characters long";
+        }
+      });
+    }
+  });
+}
+
+// Auto-run on page load
+document.addEventListener("DOMContentLoaded", () => {
+  initPasswordToggles();
+  initPasswordValidation();
+});

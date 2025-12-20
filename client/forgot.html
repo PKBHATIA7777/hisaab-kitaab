@@ -50,7 +50,11 @@
 
             <label>
               New password
-              <input type="password" name="newPassword" required autocomplete="new-password" placeholder="••••••••">
+              <div class="password-wrapper">
+                <input type="password" name="newPassword" required autocomplete="new-password" placeholder="••••••••">
+                <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
+              </div>
+              <small class="password-hint">Password must be at least 8 characters</small>
             </label>
 
             <button type="submit" class="btn-primary">
