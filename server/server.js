@@ -73,18 +73,18 @@ const globalLimiter = rateLimit({
   max: isProduction ? 100 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: rateLimitHandler, // <--- Added Handler
+  handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please try again later." },
 });
 app.use(globalLimiter);
 
-// 2. Strict Auth Limiter
+// 2. Strict Auth Limiter - ✅ FIXED: Increased from 5 to 30 in production
 const authLimiter = rateLimit({
   windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000,
-  max: isProduction ? 5 : 50,
+  max: isProduction ? 30 : 50,  // 🔄 CHANGED: 5 → 30 for production
   standardHeaders: true,
   legacyHeaders: false,
-  handler: rateLimitHandler, // <--- Added Handler
+  handler: rateLimitHandler,
   message: { ok: false, message: "Too many login attempts. Please try again in 15 minutes." },
 });
 
@@ -99,7 +99,7 @@ app.use("/api/auth/forgot/request-otp", authLimiter);
 // END SECURITY
 // =========================================
 
-// standard middlewares
+/* standard middlewares */
 app.use(express.json());
 app.use(cookieParser());
 
@@ -127,19 +127,12 @@ app.get("/api/health", (req, res) => {
 // ✅ FIX: API 404 HANDLER
 // =========================================
 // Catch any unhandled /api requests and return JSON instead of HTML
-// ✅ FIX: Remove the wildcard '*' for Express 5 compatibility
 app.use("/api", (req, res) => { 
   res.status(404).json({ 
     ok: false, 
     message: "API endpoint not found" 
   });
 });
-// app.use("/api/*", (req, res) => {
-//   res.status(404).json({
-//     ok: false,
-//     message: "API endpoint not found",
-//   });
-// });
 
 // =========================================
 /** ✅ STATIC FILE SERVING (for Render deployment) */

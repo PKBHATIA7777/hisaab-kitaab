@@ -1061,3 +1061,73 @@ body {
   .password-hint.invalid {
     color: #ff1744; /* Red */
   }
+
+
+
+
+
+  /* client/css/base.css */
+
+/* ... existing styles ... */
+
+/* =========================
+   16. MOBILE FIXES (Native Input Icons)
+   ========================= */
+
+/* 1. Remove native "Reveal Password" icon (Edge/IE) */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}
+
+/* 2. Remove native "Clear" button (Chrome/Android) */
+input[type="password"]::-webkit-search-decoration,
+input[type="password"]::-webkit-search-cancel-button,
+input[type="password"]::-webkit-search-results-button,
+input[type="password"]::-webkit-search-results-decoration {
+  display: none !important;
+}
+
+/* 3. Ensure custom button stays on top */
+.btn-toggle-pass {
+  z-index: 10; /* Increased from 2 to be safe */
+}
+
+
+
+/* client/css/base.css */
+
+/* ... existing styles ... */
+
+/* =========================
+   17. RESPONSIVE HEADER FIX
+   ========================= */
+
+/* Mobile First: Stack items vertically so they never collide */
+.brand-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px; /* Space between Title and Button */
+}
+
+/* Default button style */
+.header-actions button {
+  padding: 8px 15px;
+  font-size: 0.85rem;
+}
+
+/* Desktop Override: Move button to absolute right */
+@media (min-width: 768px) {
+  .brand-header {
+    display: block; /* Switch back to standard block layout */
+  }
+
+  .header-actions {
+    position: absolute;
+    top: 25px; /* Aligned nicely with the H1 */
+    right: 20px;
+  }
+}
