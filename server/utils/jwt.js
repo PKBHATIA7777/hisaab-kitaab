@@ -16,18 +16,28 @@ function createToken(payload, remember = false) {
     expiresIn: remember ? LONG_AGE : SHORT_AGE 
   });
 }
-
 function sendAuthCookie(res, token, remember = false) {
   const maxAgeMs = remember ? LONG_MS : SHORT_MS;
-  const isProduction = process.env.NODE_ENV === "production";
 
   res.cookie("auth_token", token, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
+    secure: true, // ✅ Always true for cross-origin
+    sameSite: "none", // ✅ Always 'none' for cross-origin
     maxAge: maxAgeMs,
   });
 }
+
+// function sendAuthCookie(res, token, remember = false) {
+//   const maxAgeMs = remember ? LONG_MS : SHORT_MS;
+//   const isProduction = process.env.NODE_ENV === "production";
+
+//   res.cookie("auth_token", token, {
+//     httpOnly: true,
+//     secure: isProduction,
+//     sameSite: isProduction ? "none" : "lax",
+//     maxAge: maxAgeMs,
+//   });
+// }
 
 module.exports = {
   createToken,
