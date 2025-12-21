@@ -19,7 +19,6 @@
 </head>
 <body>
 
-
   <a href="#main-content" class="skip-link">Skip to content</a>
   <main class="chapter-wrapper" id="main-content">
   <div class="bubble-container">
@@ -28,23 +27,33 @@
   </div>
 
   <nav class="chapter-nav">
-    <a href="dashboard.html" class="back-link">← Back to Dashboard</a>
+    <a href="dashboard.html" class="back-link">← Back</a>
     
-    <div class="member-menu-container">
-      <button id="member-toggle-btn" class="btn-member-toggle">
-        <span class="icon-users">👥</span> Members
+    <div style="display: flex; gap: 10px;">
+      <button class="btn-member-toggle" onclick="openSummaryModal()">
+        <span class="icon-chart">📊</span> Summary
       </button>
-      
-      <div id="member-dropdown" class="member-dropdown">
-        <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
-        <div id="member-list-content">
+
+      <div class="member-menu-container">
+        <button id="member-toggle-btn" class="btn-member-toggle">
+          <span class="icon-users">👥</span> Members
+        </button>
+        <div id="member-dropdown" class="member-dropdown">
+          <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
+          
+          <div id="member-list-content"></div>
+
+          <div id="admin-actions" style="display:none; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">
+            <button class="btn-add-member" onclick="openAddMemberModal()">
+              + Add Member
+            </button>
           </div>
+        </div>
       </div>
     </div>
   </nav>
 
   <main class="chapter-wrapper">
-    
     <div id="chapter-skeleton" style="text-align: center; margin-top: 20px;">
       <div class="skeleton skeleton-circle" style="width: 100px; height: 100px; margin: 0 auto 20px auto;"></div>
       <div class="skeleton skeleton-title" style="width: 60%; margin: 0 auto 15px auto;"></div>
@@ -57,10 +66,92 @@
       <p id="chapter-desc"></p>
     </div>
 
-    <div class="empty-state-placeholder" id="chapter-empty-state" style="display: none;">
-      <p>No expenses recorded yet. (Functionality coming soon)</p>
+    <div id="expense-list-container" class="expense-list">
     </div>
+
+    <div class="empty-state-placeholder" id="chapter-empty-state" style="display: none;">
+      <p>No expenses yet. Tap + to add one.</p>
+    </div>
+
+    <button class="fab-btn" onclick="openAddExpenseModal()">
+      +
+    </button>
   </main>
+
+  <!-- Add Member Modal -->
+  <div class="modal-overlay" id="add-member-modal">
+    <div class="modal-box" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2>Add Member</h2>
+        <button class="close-modal" onclick="closeAddMemberModal()">×</button>
+      </div>
+      
+      <form id="add-member-form">
+        <label>Member Name
+          <input type="text" name="memberName" required placeholder="e.g. Rahul" maxlength="50">
+        </label>
+        <button type="submit" class="btn-primary">Add to Group</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Expense Modal -->
+  <div class="modal-overlay" id="add-expense-modal">
+    <div class="modal-box" style="max-width: 500px; padding: 0;">
+      <div style="padding: 20px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0; font-size:1.2rem;">Add Expense</h2>
+        <button class="close-modal" onclick="closeAddExpenseModal()">×</button>
+      </div>
+
+      <form id="add-expense-form" style="padding: 20px; overflow-y: auto; max-height: 70vh;">
+        
+        <div style="text-align: center; margin-bottom: 25px;">
+          <label style="font-size: 0.9rem; color: #888; display: block; margin-bottom: 5px;">AMOUNT</label>
+          <div style="display: flex; justify-content: center; align-items: center; gap: 5px;">
+            <span style="font-size: 2rem; color: #333;">₹</span>
+            <input type="number" name="amount" placeholder="0" required class="big-amount-input" inputmode="decimal">
+          </div>
+        </div>
+
+        <label>Description <span style="font-weight:400; color:#888;">(Optional)</span>
+          <input type="text" name="description" placeholder="e.g. Dinner at Taj" maxlength="100">
+        </label>
+
+        <label style="margin-top:15px;">Paid By</label>
+        <div class="payer-scroll-container" id="payer-selection-container">
+        </div>
+
+        <label style="margin-top:20px; display:flex; justify-content:space-between;">
+          Split Among
+          <span style="color:#d000ff; cursor:pointer; font-size:0.85rem;" onclick="toggleSelectAll()">Select All</span>
+        </label>
+        <div class="split-list-container" id="split-selection-container">
+        </div>
+
+        <div style="margin-top: 25px;">
+          <button type="submit" class="btn-primary">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Summary Modal -->
+  <div class="modal-overlay" id="summary-modal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <h2>Chapter Summary</h2>
+        <button class="close-modal" onclick="closeSummaryModal()">×</button>
+      </div>
+      
+      <div style="text-align: center; margin-bottom: 25px;">
+        <div style="font-size: 0.9rem; color: #888; text-transform: uppercase; letter-spacing: 1px;">Total Spent</div>
+        <div id="summary-grand-total" style="font-size: 2.5rem; font-weight: 700; color: #333;">₹0.00</div>
+      </div>
+
+      <div id="summary-list" style="max-height: 300px; overflow-y: auto;">
+      </div>
+    </div>
+  </div>
 
   <script src="js/main.js"></script>
   <script src="js/chapter.js"></script>

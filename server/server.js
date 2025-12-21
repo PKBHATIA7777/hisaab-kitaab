@@ -19,6 +19,7 @@ const db = require("./config/db");
 // ROUTES
 const authRoutes = require("./routes/authRoutes");
 const chapterRoutes = require("./routes/chapterRoutes");
+const expenseRoutes = require("./routes/expenseRoutes"); // ✅ ADDED
 
 const app = express();
 
@@ -114,6 +115,7 @@ app.get("/api/csrf-token", (req, res) => {
 // routes
 app.use("/api/auth", authRoutes);
 app.use("/api/chapters", chapterRoutes);
+app.use("/api/expenses", expenseRoutes); // ✅ ADDED
 
 // simple health route to test server
 app.get("/api/health", (req, res) => {

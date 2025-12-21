@@ -1131,3 +1131,281 @@ input[type="password"]::-webkit-search-results-decoration {
     right: 20px;
   }
 }
+
+
+
+
+/* client/css/base.css - Append this to the bottom */
+
+/* --- ADMIN BADGE & TOOLTIP --- */
+.admin-badge {
+  font-size: 0.75rem;
+  color: #d000ff;
+  font-weight: 700;
+  margin-left: 5px;
+  background: rgba(208, 0, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #eee;
+  color: #666;
+  font-size: 0.7rem;
+  margin-left: 5px;
+  cursor: help;
+  position: relative;
+}
+
+/* Tooltip Text (Hidden by default) */
+.info-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.info-icon:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* --- MEMBER MANAGEMENT --- */
+.btn-add-member {
+  width: 100%;
+  padding: 10px;
+  background: #f5f5f7;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  color: #333;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.2s;
+}
+
+.btn-add-member:hover {
+  background: #fff;
+  border-color: #d000ff;
+  color: #d000ff;
+}
+
+.btn-delete-member {
+  background: none;
+  border: none;
+  color: #ff1744;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 5px;
+  margin-left: auto; /* Push to right */
+  opacity: 0.6;
+}
+
+.btn-delete-member:hover {
+  opacity: 1;
+  background: rgba(255, 23, 68, 0.1);
+  border-radius: 4px;
+}
+
+
+/* client/css/base.css - Append to bottom */
+
+/* --- EXPENSE LIST --- */
+.expense-list {
+  margin-top: 30px;
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-bottom: 80px; /* Space for FAB */
+}
+
+.expense-card {
+  background: #fff;
+  padding: 15px 20px;
+  border-radius: 16px;
+  margin-bottom: 15px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s;
+  animation: slideInUp 0.3s ease-out;
+}
+
+.expense-card:active { transform: scale(0.98); }
+
+.expense-info h4 { margin: 0 0 4px 0; color: #333; font-size: 1rem; }
+.expense-info p { margin: 0; color: #888; font-size: 0.8rem; }
+.expense-amount { font-size: 1.1rem; font-weight: 700; color: #000; }
+
+/* --- FLOATING ACTION BUTTON (FAB) --- */
+.fab-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #000;
+  color: #fff;
+  border: none;
+  font-size: 2rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  cursor: pointer;
+  z-index: 100;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fab-btn:hover { transform: scale(1.1) rotate(90deg); }
+
+/* --- MODAL INPUTS --- */
+.big-amount-input {
+  border: none;
+  background: transparent;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #333;
+  width: 150px;
+  text-align: center;
+  outline: none;
+}
+.big-amount-input::placeholder { color: #ddd; }
+
+/* Payer Horizontal Scroll */
+.payer-scroll-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 10px;
+  padding-bottom: 10px;
+  -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
+}
+
+.payer-option {
+  flex: 0 0 auto;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  padding: 10px 15px;
+  cursor: pointer;
+  text-align: center;
+  min-width: 80px;
+  transition: all 0.2s;
+}
+
+/* Hide Radio/Checkbox visually but keep accessible */
+.payer-option input, .split-option input { display: none; }
+
+/* Selected State for Payer */
+.payer-option.selected {
+  border-color: #d000ff;
+  background: rgba(208, 0, 255, 0.05);
+}
+
+/* Split Vertical List */
+.split-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.split-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.split-option:hover { background: #f9f9f9; }
+
+/* Custom Checkbox Circle */
+.custom-check {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.split-option.selected .custom-check {
+  background: #d000ff;
+  border-color: #d000ff;
+}
+.split-option.selected .custom-check::after {
+  content: "✓";
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+
+/* client/css/base.css - Append to bottom */
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.summary-row:last-child { border-bottom: none; }
+
+.summary-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #333;
+}
+.summary-amount {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.summary-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.summary-bar-fill {
+  height: 100%;
+  background: #d000ff;
+  border-radius: 3px;
+}
