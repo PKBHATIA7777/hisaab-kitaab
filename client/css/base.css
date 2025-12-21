@@ -11,7 +11,25 @@
      --radius-card: 30px;
      --radius-input: 12px;
    }
-   
+   /* client/css/base.css */
+
+/* ✅ NEW: Accessibility Skip Link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #d000ff;
+  color: white;
+  padding: 8px;
+  z-index: 10001;
+  transition: top 0.3s;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.skip-link:focus {
+  top: 0;
+}
    *, *::before, *::after {
      box-sizing: border-box;
    }
@@ -705,6 +723,21 @@ body {
   border: 1px solid #eee;
 }
 
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-text {
+  height: 20px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+
+.skeleton-title {
+  height: 40px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+}
 
 
 /* =========================
@@ -712,13 +745,14 @@ body {
    ========================= */
    .toast-container {
     position: fixed;
-    bottom: 20px;
+    /* ✅ FIX: Use dynamic safe area, fallback to 20px */
+    bottom: max(20px, env(safe-area-inset-bottom)); 
     right: 20px;
     z-index: 10000;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    pointer-events: none; /* Allow clicking through the container */
+    pointer-events: none; 
   }
   
   .toast {

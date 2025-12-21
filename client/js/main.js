@@ -146,7 +146,7 @@ window.addEventListener('resize', debounce(() => {
 /* ======================================
    4. TOAST NOTIFICATIONS SYSTEM
    ====================================== */
-window.showToast = function(message, type = 'info') {
+window.showToast = function(message, type = 'info', action = null) {
   let container = document.querySelector('.toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -157,20 +157,47 @@ window.showToast = function(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   
-  // Add simple icons based on type
-  let icon = '';
+  let icon = 'ℹ️';
   if (type === 'success') icon = '✅';
   if (type === 'error') icon = '❌';
-  if (type === 'info') icon = 'ℹ️';
 
-  toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+  // Basic Text
+  let html = `<span>${icon}</span> <span style="flex-grow:1">${message}</span>`;
+  
+  // ✅ NEW: Action Button (e.g., Undo)
+  if (action) {
+    html += `<button id="toast-action-btn" style="
+      background: rgba(255,255,255,0.2); 
+      border: none; 
+      color: #fff; 
+      padding: 5px 12px; 
+      border-radius: 4px; 
+      cursor: pointer; 
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-left: 10px;
+    ">${action.label}</button>`;
+  }
+
+  toast.innerHTML = html;
   container.appendChild(toast);
 
-  // Remove after 3.5 seconds
-  setTimeout(() => {
+  // Attach click listener for action
+  if (action) {
+    const btn = toast.querySelector('#toast-action-btn');
+    btn.addEventListener('click', () => {
+      action.callback();
+      toast.remove(); // Close immediately on click
+    });
+  }
+
+  // Remove after delay (longer if there is an action)
+  const duration = action ? 6000 : 3500;
+  
+  const timer = setTimeout(() => {
     toast.classList.add('hiding');
     toast.addEventListener('animationend', () => toast.remove());
-  }, 3500);
+  }, duration);
 };
 
 /* ======================================
@@ -225,28 +252,32 @@ window.setupInlineValidation = function(input, validateFn) {
   const errorId = input.name + "-error-msg";
   let errorEl = document.getElementById(errorId);
 
-  // 1. Create error message element dynamically if missing
   if (!errorEl) {
     errorEl = document.createElement("div");
     errorEl.id = errorId;
     errorEl.className = "input-error-msg";
-    // Insert right after the input
+    // ✅ NEW: Live Region for Screen Readers
+    errorEl.setAttribute("aria-live", "assertive"); 
     input.parentNode.insertBefore(errorEl, input.nextSibling);
+    
+    // Link input to error message
+    input.setAttribute("aria-describedby", errorId);
   }
 
-  // 2. The Check Function
   const check = () => {
     const errorMsg = validateFn(input.value);
     
     if (errorMsg) {
       input.classList.add("input-invalid");
       input.classList.remove("input-valid");
+      // ✅ NEW: ARIA Invalid State
+      input.setAttribute("aria-invalid", "true");
       errorEl.textContent = errorMsg;
       errorEl.style.display = "block";
       return false;
     } else {
       input.classList.remove("input-invalid");
-      // Only show green if not empty
+      input.setAttribute("aria-invalid", "false");
       if (input.value.trim().length > 0) {
         input.classList.add("input-valid");
       }
@@ -255,11 +286,10 @@ window.setupInlineValidation = function(input, validateFn) {
     }
   };
 
-  // 3. Attach Listeners
-  input.addEventListener("input", check); // Check while typing
-  input.addEventListener("blur", check);  // Check when leaving field
+  input.addEventListener("input", check);
+  input.addEventListener("blur", check);
   
-  return check; // Return function so form can call it on submit
+  return check;
 };
 
 /* ======================================
@@ -316,4 +346,50 @@ function initPasswordValidation() {
 document.addEventListener("DOMContentLoaded", () => {
   initPasswordToggles();
   initPasswordValidation();
+});
+
+// ✅ NEW: Generate consistent pastel color from any string
+window.getAvatarColor = function(name) {
+  if (!name) return "#ccc";
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Hue: 0-360, Saturation: 70%, Lightness: 60% (Pastel)
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 70%, 60%)`;
+};
+
+// ✅ NEW: Relative Time (e.g. "2 days ago")
+window.timeAgo = function(dateString) {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
+  
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + "y ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + "mo ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + "d ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + "h ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + "m ago";
+  return "Just now";
+};
+
+/* client/js/main.js - Bottom of file */
+
+// ✅ NEW: Mobile Haptics
+// Automatically vibrate on any button or link click
+document.addEventListener('click', (e) => {
+  // Check if the clicked element is a button or link
+  const target = e.target.closest('button, a, .chapter-card');
+  
+  if (target && navigator.vibrate) {
+    // 50ms vibration (light tap)
+    navigator.vibrate(50);
+  }
 });

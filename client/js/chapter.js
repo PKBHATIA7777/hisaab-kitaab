@@ -17,19 +17,34 @@ const memberListEl = document.getElementById("member-list-content");
 const toggleBtn = document.getElementById("member-toggle-btn");
 const dropdown = document.getElementById("member-dropdown");
 
+// ✅ NEW: Skeleton & Content Elements
+const skeletonEl = document.getElementById("chapter-skeleton");
+const contentEl = document.getElementById("chapter-content");
+const emptyStateEl = document.getElementById("chapter-empty-state");
+
 // 2. Load Data on Start
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    // Check auth first
     await apiFetch("/auth/me");
     
-    // Fetch Chapter Details
+    // Simulate short delay so user sees the skeleton (optional, feels smoother)
+    // await new Promise(r => setTimeout(r, 500)); 
+
     const data = await apiFetch(`/chapters/${chapterId}`);
+    
     renderChapter(data);
+    
+    // ✅ FIX: Swap Skeleton for Real Content
+    skeletonEl.style.display = "none";
+    contentEl.style.display = "block";
+    
+    // Show empty state for expenses (since we have none yet)
+    emptyStateEl.style.display = "block";
+
   } catch (err) {
     console.error(err);
     alert("Failed to load chapter or unauthorized");
-    window.location.href = "dashboard.html"; // Go back if error
+    window.location.href = "dashboard.html";
   }
 });
 
@@ -46,8 +61,21 @@ function renderChapter(data) {
 
   // Header
   titleEl.textContent = chapter.name;
-  descEl.textContent = chapter.description || "No description provided";
+  
+  if (chapter.description && chapter.description.trim() !== "") {
+    descEl.textContent = chapter.description;
+    descEl.style.display = "block";
+  } else {
+    descEl.style.display = "none";
+  }
+
+  // Visuals
   iconEl.textContent = getInitials(chapter.name);
+  const color = getAvatarColor(chapter.name); // Use the helper from main.js
+  
+  iconEl.style.background = color;
+  iconEl.style.color = "#fff";
+  iconEl.style.boxShadow = `0 0 30px ${color}60`; // Soft glow
 
   // Members List
   memberListEl.innerHTML = "";

@@ -61,12 +61,19 @@ app.use(
 // --- RATE LIMITER CONFIGURATION ---
 const isProduction = process.env.NODE_ENV === "production";
 
+// ✅ Helper to log rate limit breaches
+const rateLimitHandler = (req, res, next, options) => {
+  console.warn(`⚠️ Rate Limit Exceeded: IP ${req.ip} tried to access ${req.originalUrl}`);
+  res.status(options.statusCode).json(options.message);
+};
+
 // 1. Global Limiter
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProduction ? 100 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: rateLimitHandler, // <--- Added Handler
   message: { ok: false, message: "Too many requests, please try again later." },
 });
 app.use(globalLimiter);
@@ -77,6 +84,7 @@ const authLimiter = rateLimit({
   max: isProduction ? 5 : 50,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: rateLimitHandler, // <--- Added Handler
   message: { ok: false, message: "Too many login attempts. Please try again in 15 minutes." },
 });
 
@@ -116,7 +124,18 @@ app.get("/api/health", (req, res) => {
 });
 
 // =========================================
-// ✅ STATIC FILE SERVING (for Render deployment)
+// ✅ FIX: API 404 HANDLER
+// =========================================
+// Catch any unhandled /api requests and return JSON instead of HTML
+app.use("/api/*", (req, res) => {
+  res.status(404).json({
+    ok: false,
+    message: "API endpoint not found",
+  });
+});
+
+// =========================================
+/** ✅ STATIC FILE SERVING (for Render deployment) */
 // =========================================
 
 // 1. Serve static files from the 'client' directory
