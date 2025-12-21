@@ -127,12 +127,19 @@ app.get("/api/health", (req, res) => {
 // ✅ FIX: API 404 HANDLER
 // =========================================
 // Catch any unhandled /api requests and return JSON instead of HTML
-app.use("/api/*", (req, res) => {
-  res.status(404).json({
-    ok: false,
-    message: "API endpoint not found",
+// ✅ FIX: Remove the wildcard '*' for Express 5 compatibility
+app.use("/api", (req, res) => { 
+  res.status(404).json({ 
+    ok: false, 
+    message: "API endpoint not found" 
   });
 });
+// app.use("/api/*", (req, res) => {
+//   res.status(404).json({
+//     ok: false,
+//     message: "API endpoint not found",
+//   });
+// });
 
 // =========================================
 /** ✅ STATIC FILE SERVING (for Render deployment) */
