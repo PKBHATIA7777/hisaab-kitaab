@@ -34,6 +34,10 @@
         <span class="icon-chart">📊</span> Summary
       </button>
 
+      <button class="btn-member-toggle" onclick="openSettlementModal()">
+        <span class="icon-bill">🤝</span> Settle Up
+      </button>
+
       <div class="member-menu-container">
         <button id="member-toggle-btn" class="btn-member-toggle">
           <span class="icon-users">👥</span> Members
@@ -155,6 +159,30 @@
       </div>
 
       <div id="summary-list" style="max-height: 300px; overflow-y: auto;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Settlements Modal -->
+  <div class="modal-overlay" id="settlement-modal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <h2>Who Pays Whom?</h2>
+        <button class="close-modal" onclick="closeSettlementModal()">×</button>
+      </div>
+      
+      <div id="settlement-loading" style="text-align:center; padding:20px; display:none;">
+        <div class="spinner" style="margin:0 auto; width:30px; height:30px; border-width:3px;"></div>
+        <p style="margin-top:10px; color:#888; font-size:0.9rem;">Calculating debts...</p>
+      </div>
+
+      <div id="settlement-list" style="max-height: 350px; overflow-y: auto;">
+      </div>
+      
+      <div id="settlement-empty" style="text-align:center; padding:30px; display:none;">
+        <div style="font-size:3rem;">🎉</div>
+        <h3 style="margin:10px 0 5px 0;">All Settled Up!</h3>
+        <p style="color:#888; font-size:0.9rem;">No one owes anything to anyone.</p>
       </div>
     </div>
   </div>

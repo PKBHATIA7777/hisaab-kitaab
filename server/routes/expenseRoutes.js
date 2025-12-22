@@ -11,8 +11,9 @@ router.get("/chapter/:chapterId", expenseController.getChapterExpenses);
 router.get("/:id", expenseController.getExpenseDetails);        // Fetch details for edit
 router.put("/:id", expenseController.updateExpense);           // Save edits
 router.delete("/:id", expenseController.deleteExpense);
+router.get("/chapter/:chapterId/summary", expenseController.getExpenseSummary);
 
 // ✅ NEW ROUTE
-router.get("/chapter/:chapterId/summary", expenseController.getExpenseSummary);
+router.get("/chapter/:chapterId/settlements", expenseController.getChapterSettlements);
 
 module.exports = router;

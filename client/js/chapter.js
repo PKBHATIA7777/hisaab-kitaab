@@ -336,7 +336,7 @@ addExpenseForm.onsubmit = async (e) => {
   } catch (err) {
     if (!isEditingExpense) {
       // Rollback optimistic update
-      expenses = expenses.filter(ex => ex.id !== `temp-${Date.now() - 1000}`);
+      expenses = expenses.filter(ex => !ex.id.startsWith("temp-"));
       renderExpenses();
     }
     showToast(err.message || "Failed to save expense", "error");
@@ -503,3 +503,72 @@ window.deleteMember = async function(memberId) {
     showToast(err.message || "Failed to remove member", "error");
   }
 };
+
+// =========================================================
+// ✅ NEW: SETTLEMENT LOGIC
+// =========================================================
+const settlementModal = document.getElementById("settlement-modal");
+const settlementList = document.getElementById("settlement-list");
+const settlementLoading = document.getElementById("settlement-loading");
+const settlementEmpty = document.getElementById("settlement-empty");
+
+window.openSettlementModal = async function() {
+  settlementModal.classList.add("active");
+  
+  // Reset State
+  settlementList.innerHTML = "";
+  settlementList.style.display = "none";
+  settlementEmpty.style.display = "none";
+  settlementLoading.style.display = "block";
+
+  try {
+    const data = await apiFetch(`/expenses/chapter/${chapterId}/settlements`);
+    renderSettlements(data.settlements);
+  } catch (err) {
+    console.error(err);
+    settlementList.innerHTML = `<div style="color:red; text-align:center;">Failed to calculate settlements</div>`;
+    settlementList.style.display = "block";
+  } finally {
+    settlementLoading.style.display = "none";
+  }
+};
+
+window.closeSettlementModal = function() {
+  settlementModal.classList.remove("active");
+};
+
+function renderSettlements(settlements) {
+  if (!settlements || settlements.length === 0) {
+    settlementEmpty.style.display = "block";
+    return;
+  }
+
+  settlementList.style.display = "block";
+  settlementList.innerHTML = "";
+
+  settlements.forEach(item => {
+    // Structure: From (Debtor) -> To (Creditor) : Amount
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:15px 0; border-bottom:1px solid #f0f0f0;";
+    
+    row.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px; flex:1;">
+        <div class="small-avatar" style="background:${getAvatarColor(item.from)}">
+          ${getInitials(item.from)}
+        </div>
+        
+        <div style="font-size:0.9rem; line-height:1.3;">
+          <span style="font-weight:600; color:#333;">${item.from}</span>
+          <div style="color:#888; font-size:0.8rem;">pays <span style="font-weight:600;">${item.to}</span></div>
+        </div>
+      </div>
+
+      <div style="text-align:right;">
+        <div style="font-weight:700; font-size:1.1rem; color:#d000ff;">₹${item.amount}</div>
+        <div style="font-size:0.7rem; color:#ccc;">➔</div>
+      </div>
+    `;
+
+    settlementList.appendChild(row);
+  });
+}

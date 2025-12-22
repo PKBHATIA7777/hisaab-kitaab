@@ -2,7 +2,6 @@
 const db = require("../config/db");
 const { z } = require("zod");
 
-
 // --- VALIDATION SCHEMA ---
 const addExpenseSchema = z.object({
   chapterId: z.string().or(z.number()),
@@ -56,7 +55,7 @@ async function addExpense(req, res) {
       // B. Insert Splits
       for (let i = 0; i < count; i++) {
         const memberId = involvedMemberIds[i];
-
+        
         // Add remainder to the first unlucky person (usually just 1 cent)
         let owes = splitAmount;
         if (i === 0) {
@@ -94,7 +93,6 @@ async function addExpense(req, res) {
   }
 }
 
-
 // Get Expenses for a Chapter (Simple List)
 async function getChapterExpenses(req, res) {
   try {
@@ -125,7 +123,6 @@ async function getChapterExpenses(req, res) {
   }
 }
 
-
 // Delete Expense
 async function deleteExpense(req, res) {
   try {
@@ -150,7 +147,6 @@ async function deleteExpense(req, res) {
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
-
 
 // 1. UPDATE: New Summary Logic using CTEs (Common Table Expressions)
 async function getExpenseSummary(req, res) {
@@ -207,7 +203,6 @@ async function getExpenseSummary(req, res) {
   }
 }
 
-
 // 2. NEW: Get Single Expense Details (for Editing)
 async function getExpenseDetails(req, res) {
   try {
@@ -239,7 +234,6 @@ async function getExpenseDetails(req, res) {
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
-
 
 // 3. NEW: Update Expense
 async function updateExpense(req, res) {
@@ -304,6 +298,123 @@ async function updateExpense(req, res) {
   }
 }
 
+// =========================================================
+// ✅ NEW: SETTLEMENT ALGORITHM (Helper)
+// =========================================================
+function calculateSettlements(balances) {
+  let debtors = [];
+  let creditors = [];
+
+  // 1. Separate into Debtors and Creditors
+  balances.forEach(person => {
+    if (person.balance < -0.01) debtors.push(person); // Tolerance for float precision
+    else if (person.balance > 0.01) creditors.push(person);
+  });
+
+  // 2. Sort by Magnitude (High to Low) to optimize transaction count
+  debtors.sort((a, b) => a.balance - b.balance); // Ascending (because they are negative) e.g. -1000, -500
+  creditors.sort((a, b) => b.balance - a.balance); // Descending e.g. 1000, 500
+
+  const settlements = [];
+  let i = 0; // Debtor pointer
+  let j = 0; // Creditor pointer
+
+  // 3. Greedy Matching Loop
+  while (i < debtors.length && j < creditors.length) {
+    let debtor = debtors[i];
+    let creditor = creditors[j];
+
+    // The amount to settle is the minimum of the absolute values
+    let amount = Math.min(Math.abs(debtor.balance), creditor.balance);
+    
+    // Round to 2 decimals
+    amount = Math.round(amount * 100) / 100;
+
+    // Record the settlement
+    settlements.push({
+      from: debtor.name,
+      to: creditor.name,
+      amount: amount,
+      fromId: debtor.id,
+      toId: creditor.id
+    });
+
+    // Update internal balances
+    debtor.balance += amount;
+    creditor.balance -= amount;
+
+    // Check if settled (using small epsilon for float precision)
+    if (Math.abs(debtor.balance) < 0.01) {
+      i++; // Move to next debtor
+    }
+    if (Math.abs(creditor.balance) < 0.01) {
+      j++; // Move to next creditor
+    }
+  }
+
+  return settlements;
+}
+
+// =========================================================
+// ✅ NEW: GET SETTLEMENTS API
+// =========================================================
+async function getChapterSettlements(req, res) {
+  try {
+    const { chapterId } = req.params;
+    const userId = req.user.userId;
+
+    // 1. Verify Access
+    const { rows: chap } = await db.query(
+      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
+      [chapterId, userId]
+    );
+    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+
+    // 2. Fetch Summary Data (Reusing the logic from getExpenseSummary)
+    // We need Net Balance = Paid - Consumed
+    const queryText = `
+      WITH spent_cte AS (
+        SELECT payer_member_id, SUM(amount) as total
+        FROM expenses WHERE chapter_id = $1 GROUP BY payer_member_id
+      ),
+      used_cte AS (
+        SELECT es.member_id, SUM(es.amount_owed) as total
+        FROM expense_splits es
+        JOIN expenses e ON es.expense_id = e.id
+        WHERE e.chapter_id = $1
+        GROUP BY es.member_id
+      )
+      SELECT 
+        cm.id, 
+        cm.member_name, 
+        COALESCE(s.total, 0) as total_spent,
+        COALESCE(u.total, 0) as total_used
+      FROM chapter_members cm
+      LEFT JOIN spent_cte s ON cm.id = s.payer_member_id
+      LEFT JOIN used_cte u ON cm.id = u.member_id
+      WHERE cm.chapter_id = $1
+    `;
+
+    const { rows } = await db.query(queryText, [chapterId]);
+
+    // 3. Prepare Balances for Algorithm
+    const memberBalances = rows.map(row => ({
+      id: row.id,
+      name: row.member_name,
+      // Net Balance: (+Paid) + (-Consumed)
+      balance: parseFloat(row.total_spent) - parseFloat(row.total_used)
+    }));
+
+    // 4. Run Algorithm
+    const settlements = calculateSettlements(memberBalances);
+
+    res.json({ ok: true, settlements });
+
+  } catch (err) {
+    console.error("getChapterSettlements error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
 
 // Exports
 module.exports = {
@@ -312,5 +423,6 @@ module.exports = {
   deleteExpense,
   getExpenseSummary, // Updated
   getExpenseDetails, // New
-  updateExpense      // New
+  updateExpense,     // New
+  getChapterSettlements // NEW: Settlement Algorithm
 };

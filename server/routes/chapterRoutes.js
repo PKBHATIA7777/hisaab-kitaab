@@ -10,7 +10,7 @@ router.use(requireAuth);
 router.post("/", chapterController.createChapter);
 
 // ✅ CACHE APPLIED: Cache the chapter list for 5 minutes (300 seconds)
-router.get("/", cache(300), chapterController.getMyChapters);
+router.get("/", chapterController.getMyChapters);
 
 router.get("/:id", chapterController.getChapterDetails);
 router.put("/:id", chapterController.updateChapter);
