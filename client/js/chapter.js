@@ -13,6 +13,10 @@ let currentChapter = null;
 let currentMembers = [];
 let expenses = []; // ✅ Store expenses locally
 
+// Edit Mode State
+let isEditingExpense = false;
+let editingExpenseId = null;
+
 // Elements
 const titleEl = document.getElementById("chapter-title");
 const descEl = document.getElementById("chapter-desc");
@@ -126,66 +130,113 @@ function renderExpenses() {
         <h4>${ex.description || "Untitled Expense"}</h4>
         <p>paid by <strong>${ex.payer_name || "Unknown"}</strong> • ${timeAgo(ex.expense_date)}</p>
       </div>
-      <div class="expense-amount">₹${ex.amount}</div>
+      <div style="text-align:right;">
+        <div class="expense-amount">₹${ex.amount}</div>
+        <button onclick="openEditExpenseModal('${ex.id}')" style="background:none; border:none; color:#d000ff; font-size:0.8rem; cursor:pointer; margin-top:5px; padding:0;">
+          View / Edit
+        </button>
+      </div>
     `;
     expenseListEl.appendChild(card);
   });
 }
 
-// --- ADD EXPENSE LOGIC ---
-
-window.openAddExpenseModal = function() {
-  addExpenseForm.reset();
-  
-  // 1. Populate Payers (Radio Logic)
+// --- HELPER: Render Payer and Split Options ---
+function renderPayerAndSplitOptions(selectedPayerId = null, selectedSplitIds = []) {
+  // Payers
   payerContainer.innerHTML = "";
   currentMembers.forEach((m, idx) => {
-    const el = document.createElement("label");
-    el.className = "payer-option";
-    // Auto-select the first person (usually Admin/You)
-    if (idx === 0) el.classList.add("selected");
+    // If Editing: match ID. If Adding: match first index.
+    const isSelected = selectedPayerId ? (m.id === selectedPayerId) : (idx === 0);
     
+    const el = document.createElement("label");
+    el.className = `payer-option ${isSelected ? 'selected' : ''}`;
     el.innerHTML = `
-      <input type="radio" name="payerMemberId" value="${m.id}" ${idx===0 ? 'checked' : ''}>
+      <input type="radio" name="payerMemberId" value="${m.id}" ${isSelected ? 'checked' : ''}>
       <div style="font-weight:600; font-size:0.9rem;">${m.member_name}</div>
     `;
-    
-    // Click Handler for Styling
     el.addEventListener("click", () => {
       document.querySelectorAll(".payer-option").forEach(x => x.classList.remove("selected"));
       el.classList.add("selected");
     });
-    
     payerContainer.appendChild(el);
   });
 
-  // 2. Populate Splits (Checkbox Logic)
+  // Splits
   splitContainer.innerHTML = "";
+  // Default to ALL checked if adding new, or match IDs if editing
+  const isAddMode = selectedSplitIds.length === 0 && !isEditingExpense; 
+  
   currentMembers.forEach(m => {
-    const el = document.createElement("label");
-    el.className = "split-option selected"; // Default: Select All
+    const isChecked = isAddMode || selectedSplitIds.includes(m.id);
     
+    const el = document.createElement("label");
+    el.className = `split-option ${isChecked ? 'selected' : ''}`;
     el.innerHTML = `
-      <input type="checkbox" name="involvedMemberIds[]" value="${m.id}" checked>
+      <input type="checkbox" name="involvedMemberIds[]" value="${m.id}" ${isChecked ? 'checked' : ''}>
       <div class="custom-check"></div>
       <span>${m.member_name}</span>
     `;
-    
     el.addEventListener("change", () => {
       if (el.querySelector("input").checked) el.classList.add("selected");
       else el.classList.remove("selected");
     });
-
     splitContainer.appendChild(el);
   });
+}
 
+// --- EXPENSE MODAL LOGIC ---
+window.openAddExpenseModal = function() {
+  isEditingExpense = false;
+  editingExpenseId = null;
+  document.getElementById("expense-modal-title").textContent = "Add Expense";
+  document.getElementById("btn-save-expense").textContent = "Save Expense";
+  document.getElementById("btn-delete-expense").style.display = "none";
+  
+  addExpenseForm.reset();
+  renderPayerAndSplitOptions(); 
+  
   addExpenseModal.classList.add("active");
-  // Focus Amount Input
   setTimeout(() => addExpenseForm.querySelector(".big-amount-input").focus(), 100);
+};
+
+window.openEditExpenseModal = async function(id) {
+  isEditingExpense = true;
+  editingExpenseId = id;
+  
+  // Show loading toast
+  showToast("Loading details...", "info");
+
+  try {
+    const data = await apiFetch(`/expenses/${id}`);
+    const { expense, involvedMemberIds } = data;
+
+    // Reset Form & Set Mode
+    addExpenseForm.reset();
+    document.getElementById("expense-modal-title").textContent = "Edit Expense";
+    document.getElementById("btn-save-expense").textContent = "Update Expense";
+    document.getElementById("btn-delete-expense").style.display = "block"; // Show Delete
+
+    // Fill Basic Data
+    addExpenseForm.querySelector("input[name='amount']").value = expense.amount;
+    addExpenseForm.querySelector("input[name='description']").value = expense.description;
+
+    // Render Payers & Splits (Reuse logic but set checked status)
+    renderPayerAndSplitOptions(expense.payer_member_id, involvedMemberIds);
+
+    addExpenseModal.classList.add("active");
+
+  } catch (err) {
+    showToast("Failed to load expense details", "error");
+    isEditingExpense = false;
+    editingExpenseId = null;
+  }
 };
 
 window.closeAddExpenseModal = function() {
   addExpenseModal.classList.remove("active");
+  isEditingExpense = false;
+  editingExpenseId = null;
 };
 
 window.toggleSelectAll = function() {
@@ -201,14 +252,27 @@ window.toggleSelectAll = function() {
   });
 };
 
-// --- OPTIMISTIC FORM SUBMIT ---
+window.handleDeleteExpense = async function() {
+  if(!confirm("Are you sure you want to delete this expense?")) return;
+  
+  try {
+    await apiFetch(`/expenses/${editingExpenseId}`, { method: "DELETE" });
+    showToast("Expense deleted", "success");
+    closeAddExpenseModal();
+    loadExpenses(); // Refresh list
+  } catch(err) {
+    showToast("Failed to delete", "error");
+  }
+};
+
+// --- FORM SUBMIT (Handles Both Add & Edit) ---
 addExpenseForm.onsubmit = async (e) => {
   e.preventDefault();
   const formData = new FormData(addExpenseForm);
   
   // 1. Extract Data
   const amount = parseFloat(formData.get("amount"));
-  const description = formData.get("description");
+  const description = formData.get("description") || "";
   const payerId = parseInt(formData.get("payerMemberId"));
   
   // Get all checked split IDs
@@ -223,48 +287,128 @@ addExpenseForm.onsubmit = async (e) => {
     return showToast("Select at least one person to split with", "error");
   }
 
-  // 3. OPTIMISTIC UPDATE (Instant UI)
-  const payerName = currentMembers.find(m => m.id === payerId)?.member_name || "You";
-  
-  const tempExpense = {
-    id: "temp-" + Date.now(),
-    amount: amount,
-    description: description,
-    expense_date: new Date().toISOString(),
-    payer_name: payerName,
-    isTemp: true // Flag for visual style
-  };
-
-  // Add to top of list
-  expenses.unshift(tempExpense);
-  renderExpenses();
-  closeAddExpenseModal(); // Close immediately
-
-  // 4. API CALL (Background)
   try {
-    await apiFetch("/expenses", {
-      method: "POST",
-      body: {
-        chapterId: chapterId,
+    if (isEditingExpense) {
+      // --- UPDATE MODE ---
+      await apiFetch(`/expenses/${editingExpenseId}`, {
+        method: "PUT",
+        body: {
+          amount,
+          description,
+          payerMemberId: payerId,
+          involvedMemberIds: involvedIds
+        }
+      });
+      showToast("Expense updated", "success");
+    } else {
+      // --- CREATE MODE (Optimistic UI) ---
+      const payerName = currentMembers.find(m => m.id === payerId)?.member_name || "You";
+      
+      const tempExpense = {
+        id: "temp-" + Date.now(),
         amount: amount,
         description: description,
-        payerMemberId: payerId,
-        involvedMemberIds: involvedIds
-      }
-    });
-    
-    showToast("Expense saved", "success");
-    // Reload real data to get correct IDs and server timestamp
-    loadExpenses();
+        expense_date: new Date().toISOString(),
+        payer_name: payerName,
+        isTemp: true
+      };
 
+      // Optimistic update
+      expenses.unshift(tempExpense);
+      renderExpenses();
+      
+      await apiFetch("/expenses", {
+        method: "POST",
+        body: {
+          chapterId: chapterId,
+          amount: amount,
+          description: description,
+          payerMemberId: payerId,
+          involvedMemberIds: involvedIds
+        }
+      });
+      
+      showToast("Expense saved", "success");
+      loadExpenses(); // Replace temp with real data
+    }
+    
+    closeAddExpenseModal();
   } catch (err) {
-    // 5. ROLLBACK on Error
-    expenses = expenses.filter(ex => ex.id !== tempExpense.id);
-    renderExpenses();
+    if (!isEditingExpense) {
+      // Rollback optimistic update
+      expenses = expenses.filter(ex => ex.id !== `temp-${Date.now() - 1000}`);
+      renderExpenses();
+    }
     showToast(err.message || "Failed to save expense", "error");
-    // Re-open modal so user doesn't lose data? (Optional, skipping for simplicity)
   }
 };
+
+// --- SUMMARY LOGIC ---
+const summaryModal = document.getElementById("summary-modal");
+const summaryList = document.getElementById("summary-list");
+const summaryGrandTotal = document.getElementById("summary-grand-total");
+
+window.openSummaryModal = async function() {
+  summaryModal.classList.add("active");
+  
+  // Show loading state
+  summaryList.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
+  
+  try {
+    const data = await apiFetch(`/expenses/chapter/${chapterId}/summary`);
+    renderSummary(data);
+  } catch (err) {
+    summaryList.innerHTML = '<div style="color:red; text-align:center;">Failed to load summary</div>';
+  }
+};
+
+window.closeSummaryModal = function() {
+  summaryModal.classList.remove("active");
+};
+
+function renderSummary(data) {
+  const { summary, grandTotal } = data;
+  summaryGrandTotal.textContent = `₹${grandTotal}`;
+  summaryList.innerHTML = "";
+
+  // Calculate max for progress bars based on the higher of the two values
+  const maxVal = Math.max(...summary.map(s => Math.max(parseFloat(s.total_spent), parseFloat(s.total_used))), 1);
+
+  summary.forEach(item => {
+    const spent = parseFloat(item.total_spent);
+    const used = parseFloat(item.total_used);
+    
+    const row = document.createElement("div");
+    row.style.marginBottom = "20px"; // More spacing for double bars
+    
+    // UI: Name Row
+    row.innerHTML = `
+      <div class="summary-row" style="border:none; padding-bottom:5px;">
+        <div class="summary-name">
+          <div class="small-avatar" style="width:30px; height:30px; font-size:0.8rem; background:${getAvatarColor(item.member_name)}">
+            ${getInitials(item.member_name)}
+          </div>
+          ${item.member_name}
+        </div>
+      </div>
+      
+      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-bottom:2px;">
+        <span>Paid</span> <span>₹${spent.toFixed(2)}</span>
+      </div>
+      <div class="summary-bar-bg" style="height:6px; margin-top:0; margin-bottom:8px;">
+        <div class="summary-bar-fill" style="width: ${(spent/maxVal)*100}%; background: #00e676;"></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-bottom:2px;">
+        <span>Consumed</span> <span>₹${used.toFixed(2)}</span>
+      </div>
+      <div class="summary-bar-bg" style="height:6px; margin-top:0;">
+        <div class="summary-bar-fill" style="width: ${(used/maxVal)*100}%; background: #d000ff;"></div>
+      </div>
+    `;
+    summaryList.appendChild(row);
+  });
+}
 
 // --- UTILS ---
 function getInitials(name) {
@@ -308,7 +452,7 @@ toggleBtn.addEventListener("click", (e) => {
 document.addEventListener("click", () => dropdown.classList.remove("active"));
 dropdown.addEventListener("click", (e) => e.stopPropagation());
 
-// Add Member Modal Logic (Re-adding since we overwrote the file)
+// Add Member Modal Logic
 const addMemberModal = document.getElementById("add-member-modal");
 const addMemberFormEl = document.getElementById("add-member-form");
 
@@ -341,7 +485,7 @@ if(addMemberFormEl) {
   };
 }
 
-// Delete Member (keeping from previous version)
+// Delete Member
 window.deleteMember = async function(memberId) {
   if (!confirm("Remove this member? This cannot be undone.")) return;
 
@@ -359,60 +503,3 @@ window.deleteMember = async function(memberId) {
     showToast(err.message || "Failed to remove member", "error");
   }
 };
-
-// --- SUMMARY LOGIC ---
-const summaryModal = document.getElementById("summary-modal");
-const summaryList = document.getElementById("summary-list");
-const summaryGrandTotal = document.getElementById("summary-grand-total");
-
-window.openSummaryModal = async function() {
-  summaryModal.classList.add("active");
-  
-  // Show loading state
-  summaryList.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
-  
-  try {
-    const data = await apiFetch(`/expenses/chapter/${chapterId}/summary`);
-    renderSummary(data);
-  } catch (err) {
-    summaryList.innerHTML = '<div style="color:red; text-align:center;">Failed to load summary</div>';
-  }
-};
-
-window.closeSummaryModal = function() {
-  summaryModal.classList.remove("active");
-};
-
-function renderSummary(data) {
-  const { summary, grandTotal } = data;
-  
-  summaryGrandTotal.textContent = `₹${grandTotal}`;
-  summaryList.innerHTML = "";
-
-  // Find max value for progress bars
-  const maxSpent = Math.max(...summary.map(s => parseFloat(s.total_spent)), 1);
-
-  summary.forEach(item => {
-    const amount = parseFloat(item.total_spent);
-    const percent = (amount / maxSpent) * 100;
-    
-    const row = document.createElement("div");
-    row.style.marginBottom = "15px";
-    
-    row.innerHTML = `
-      <div class="summary-row" style="border:none; padding-bottom:5px;">
-        <div class="summary-name">
-          <div class="small-avatar" style="width:30px; height:30px; font-size:0.8rem; background:${getAvatarColor(item.member_name)}">
-            ${getInitials(item.member_name)}
-          </div>
-          ${item.member_name}
-        </div>
-        <div class="summary-amount">₹${amount.toFixed(2)}</div>
-      </div>
-      <div class="summary-bar-bg">
-        <div class="summary-bar-fill" style="width: ${percent}%;"></div>
-      </div>
-    `;
-    summaryList.appendChild(row);
-  });
-}

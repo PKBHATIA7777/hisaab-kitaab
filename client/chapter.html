@@ -99,7 +99,7 @@
   <div class="modal-overlay" id="add-expense-modal">
     <div class="modal-box" style="max-width: 500px; padding: 0;">
       <div style="padding: 20px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0; font-size:1.2rem;">Add Expense</h2>
+        <h2 style="margin:0; font-size:1.2rem;" id="expense-modal-title">Add Expense</h2>
         <button class="close-modal" onclick="closeAddExpenseModal()">×</button>
       </div>
 
@@ -128,8 +128,14 @@
         <div class="split-list-container" id="split-selection-container">
         </div>
 
-        <div style="margin-top: 25px;">
-          <button type="submit" class="btn-primary">Save Expense</button>
+        <div style="margin-top: 25px; display: flex; gap: 10px;">
+          <button type="submit" class="btn-primary" id="btn-save-expense">Save Expense</button>
+          
+          <button type="button" id="btn-delete-expense" class="btn-secondary" 
+            style="background: #ffebee; color: #d32f2f; border: none; display: none;"
+            onclick="handleDeleteExpense()">
+            Delete
+          </button>
         </div>
       </form>
     </div>

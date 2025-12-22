@@ -2,6 +2,7 @@
 const db = require("../config/db");
 const { z } = require("zod");
 
+
 // --- VALIDATION SCHEMA ---
 const addExpenseSchema = z.object({
   chapterId: z.string().or(z.number()),
@@ -23,8 +24,6 @@ async function addExpense(req, res) {
     const userId = req.user.userId;
 
     // 2. Verify Access (User must be creator of the chapter)
-    // In future, if you allow members to add expenses, you'd check chapter_members link here.
-    // For now, consistent with your "Admin" flow, we check if user created the chapter.
     const { rows: chap } = await db.query(
       "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
       [chapterId, userId]
@@ -34,7 +33,6 @@ async function addExpense(req, res) {
     }
 
     // 3. MATH: Calculate Equal Splits
-    // We do this on backend to prevent floating point errors from frontend
     const count = involvedMemberIds.length;
     const splitAmount = Math.floor((amount / count) * 100) / 100; // Floor to 2 decimals
     let remainder = amount - (splitAmount * count); // Calculate cents left over
@@ -58,7 +56,7 @@ async function addExpense(req, res) {
       // B. Insert Splits
       for (let i = 0; i < count; i++) {
         const memberId = involvedMemberIds[i];
-        
+
         // Add remainder to the first unlucky person (usually just 1 cent)
         let owes = splitAmount;
         if (i === 0) {
@@ -96,6 +94,7 @@ async function addExpense(req, res) {
   }
 }
 
+
 // Get Expenses for a Chapter (Simple List)
 async function getChapterExpenses(req, res) {
   try {
@@ -126,6 +125,7 @@ async function getChapterExpenses(req, res) {
   }
 }
 
+
 // Delete Expense
 async function deleteExpense(req, res) {
   try {
@@ -151,35 +151,48 @@ async function deleteExpense(req, res) {
   }
 }
 
-// ✅ NEW: Calculate Total Spent by Each Member
+
+// 1. UPDATE: New Summary Logic using CTEs (Common Table Expressions)
 async function getExpenseSummary(req, res) {
   try {
     const { chapterId } = req.params;
     const userId = req.user.userId;
 
-    // 1. Verify Access
+    // Verify Access
     const { rows: chap } = await db.query(
       "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
       [chapterId, userId]
     );
     if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
 
-    // 2. Aggregation Query
-    // We LEFT JOIN members to ensure even people who spent 0 show up
-    const { rows } = await db.query(
-      `SELECT 
-         cm.id as member_id, 
-         cm.member_name, 
-         COALESCE(SUM(e.amount), 0) as total_spent
-       FROM chapter_members cm
-       LEFT JOIN expenses e ON cm.id = e.payer_member_id
-       WHERE cm.chapter_id = $1
-       GROUP BY cm.id, cm.member_name
-       ORDER BY total_spent DESC`,
-      [chapterId]
-    );
+    // New Query: Calculates both Spent (Payer) and Used (Consumer)
+    const queryText = `
+      WITH spent_cte AS (
+        SELECT payer_member_id, SUM(amount) as total
+        FROM expenses WHERE chapter_id = $1 GROUP BY payer_member_id
+      ),
+      used_cte AS (
+        SELECT es.member_id, SUM(es.amount_owed) as total
+        FROM expense_splits es
+        JOIN expenses e ON es.expense_id = e.id
+        WHERE e.chapter_id = $1
+        GROUP BY es.member_id
+      )
+      SELECT 
+        cm.id as member_id, 
+        cm.member_name, 
+        COALESCE(s.total, 0) as total_spent,
+        COALESCE(u.total, 0) as total_used
+      FROM chapter_members cm
+      LEFT JOIN spent_cte s ON cm.id = s.payer_member_id
+      LEFT JOIN used_cte u ON cm.id = u.member_id
+      WHERE cm.chapter_id = $1
+      ORDER BY total_spent DESC, total_used DESC
+    `;
 
-    // 3. Calculate Grand Total
+    const { rows } = await db.query(queryText, [chapterId]);
+
+    // Calculate Grand Total (Spent should equal Used theoretically)
     const grandTotal = rows.reduce((acc, row) => acc + parseFloat(row.total_spent), 0);
 
     res.json({ 
@@ -194,9 +207,110 @@ async function getExpenseSummary(req, res) {
   }
 }
 
+
+// 2. NEW: Get Single Expense Details (for Editing)
+async function getExpenseDetails(req, res) {
+  try {
+    const { id } = req.params; // expenseId
+    const userId = req.user.userId;
+
+    // Verify ownership via join
+    const { rows: expenseRows } = await db.query(
+      `SELECT e.* FROM expenses e 
+       JOIN chapters c ON e.chapter_id = c.id
+       WHERE e.id = $1 AND c.created_by = $2`, 
+      [id, userId]
+    );
+    if (expenseRows.length === 0) return res.status(404).json({ ok: false, message: "Not found" });
+
+    // Get splits
+    const { rows: splitRows } = await db.query(
+      "SELECT member_id FROM expense_splits WHERE expense_id = $1",
+      [id]
+    );
+
+    res.json({ 
+      ok: true, 
+      expense: expenseRows[0],
+      involvedMemberIds: splitRows.map(s => s.member_id)
+    });
+  } catch(err) {
+    console.error("getDetails error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+
+// 3. NEW: Update Expense
+async function updateExpense(req, res) {
+  try {
+    const { id } = req.params; 
+    // We expect: amount, description, payerMemberId, involvedMemberIds
+    const { amount, description, payerMemberId, involvedMemberIds } = req.body;
+    const userId = req.user.userId;
+
+    // Verify access
+    const { rows: check } = await db.query(
+      `SELECT e.id, e.chapter_id FROM expenses e 
+       JOIN chapters c ON e.chapter_id = c.id
+       WHERE e.id = $1 AND c.created_by = $2`, 
+      [id, userId]
+    );
+    if (check.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+
+    // Calculate Splits (Same logic as addExpense)
+    const count = involvedMemberIds.length;
+    const splitAmount = Math.floor((amount / count) * 100) / 100;
+    let remainder = amount - (splitAmount * count);
+    remainder = Math.round(remainder * 100) / 100;
+
+    await db.query("BEGIN");
+
+    try {
+      // Update Main Expense
+      await db.query(
+        `UPDATE expenses 
+         SET amount = $1, description = $2, payer_member_id = $3 
+         WHERE id = $4`,
+        [amount, description, payerMemberId, id]
+      );
+
+      // Delete Old Splits
+      await db.query("DELETE FROM expense_splits WHERE expense_id = $1", [id]);
+
+      // Insert New Splits
+      for (let i = 0; i < count; i++) {
+        const memberId = involvedMemberIds[i];
+        let owes = splitAmount;
+        if (i === 0) owes += remainder;
+
+        await db.query(
+          `INSERT INTO expense_splits (expense_id, member_id, amount_owed)
+           VALUES ($1, $2, $3)`,
+          [id, memberId, owes]
+        );
+      }
+
+      await db.query("COMMIT");
+      res.json({ ok: true, message: "Expense updated" });
+
+    } catch (err) {
+      await db.query("ROLLBACK");
+      throw err;
+    }
+  } catch (err) {
+    console.error("updateExpense error:", err);
+    res.status(500).json({ ok: false, message: "Update failed" });
+  }
+}
+
+
+// Exports
 module.exports = {
   addExpense,
   getChapterExpenses,
   deleteExpense,
-  getExpenseSummary // <--- Export this
+  getExpenseSummary, // Updated
+  getExpenseDetails, // New
+  updateExpense      // New
 };
