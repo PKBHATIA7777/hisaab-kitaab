@@ -2,20 +2,26 @@
 (function() { 
   
   /* ======================================
-     0. CONSTANTS & CONFIG (FIX C2 & C9)
+     0. CONSTANTS & CONFIG (FIXED FOR VERCEL)
      ====================================== */
   const CONFIG = {
-    // Detect Environment
-    API_BASE: (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-      ? "http://localhost:5001/api"
-      : "/api",
+    // 1. Detect if we are on Localhost
+    isLocal: window.location.hostname === "localhost" || 
+             window.location.hostname === "127.0.0.1" ||
+             window.location.port === "5500",
+
+    // 2. Set API URL
+    get API_BASE() {
+        return this.isLocal
+          ? "http://localhost:5001/api"
+          : "https://hisaab-kitaab-service-app.onrender.com/api"; // 👈 MUST BE FULL RENDER URL
+    },
     
-    // Magic Numbers extracted to constants
     TIMEOUTS: {
-      TOAST_DURATION: 4000, // 4 seconds
-      DEBOUNCE_DELAY: 300,  // 300ms for search
-      SESSION_CHECK: 60000, // Check every 1 min
-      SESSION_WARN: 300000, // Warn 5 mins before expiry
+      TOAST_DURATION: 4000, 
+      DEBOUNCE_DELAY: 300,  
+      SESSION_CHECK: 60000, 
+      SESSION_WARN: 300000, 
       GOOGLE_INIT_DELAY: 500,
     },
     
@@ -25,7 +31,7 @@
     }
   };
 
-  // Expose for other scripts if needed
+  // Expose for debugging
   window.APP_CONFIG = CONFIG;
 
   /* ======================================
@@ -38,7 +44,7 @@
     if (csrfToken) return Promise.resolve(csrfToken);
     if (csrfPromise) return csrfPromise;
   
-    // Use CONFIG.API_BASE
+    // Use the full URL from CONFIG
     csrfPromise = fetch(CONFIG.API_BASE + "/csrf-token", { credentials: "include" })
       .then(res => res.json())
       .then(data => {
@@ -57,7 +63,7 @@
     return csrfPromise;
   }
   
-  // Debounce Utility (global for reuse)
+  // Debounce Utility
   window.debounce = function(func, wait) {
     let timeout;
     return function(...args) {
@@ -76,7 +82,7 @@
   
     if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
   
-    // Use CONFIG.API_BASE
+    // Use the full URL from CONFIG
     const res = await fetch(CONFIG.API_BASE + path, {
       method: options.method || "GET",
       headers: headers,
@@ -110,6 +116,8 @@
     }
     return data;
   };
+
+  /* ... (Keep the rest of the file exactly as it was) ... */
 
   /* ======================================
      2. SESSION & AUTH
