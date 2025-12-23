@@ -1,35 +1,35 @@
-// load environment variables first
+/* server/server.js */
 require("dotenv").config();
-
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const compression = require("compression");
-const csrfProtection = require("./middleware/csrfMiddleware");
 const path = require("path");
-
-// --- SECURITY IMPORTS ---
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-// -----------------------
+const logger = require("./middleware/logger"); // ✅ Import Logger
 
-// DB (connection / pool)
-const db = require("./config/db");
+const csrfProtection = require("./middleware/csrfMiddleware");
+const db = require("./config/db"); // Import DB to ensure validation runs
 
 // ROUTES
 const authRoutes = require("./routes/authRoutes");
 const chapterRoutes = require("./routes/chapterRoutes");
-const expenseRoutes = require("./routes/expenseRoutes"); // ✅ ADDED
+const expenseRoutes = require("./routes/expenseRoutes");
 
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 
 // =========================================
-// 0. PROXY TRUST (CRITICAL FOR RENDER/HEROKU)
+// 0. PROXY TRUST (Critical for Rate Limit & Cookies)
 // =========================================
 app.set("trust proxy", 1);
 
+// 1. Logger (Run this first to capture everything) ✅ Fix AN1/AN5
+app.use(logger);
+
 // =========================================
-/** 1. CORS (MUST BE FIRST) */
+// 2. CORS
 // =========================================
 app.use(
   cors({
@@ -39,7 +39,7 @@ app.use(
 );
 
 // =========================================
-// 2. SECURITY & PERFORMANCE MIDDLEWARES
+// 3. SECURITY HEADERS (FIX S10)
 // =========================================
 app.use(compression());
 
@@ -56,19 +56,24 @@ app.use(
       },
     },
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    // ✅ HSTS: Force HTTPS for 1 year (31536000s)
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
   })
 );
 
-// --- RATE LIMITER CONFIGURATION ---
-const isProduction = process.env.NODE_ENV === "production";
-
-// ✅ Helper to log rate limit breaches
+// =========================================
+// 4. RATE LIMITING (ENHANCED)
+// =========================================
 const rateLimitHandler = (req, res, next, options) => {
-  console.warn(`⚠️ Rate Limit Exceeded: IP ${req.ip} tried to access ${req.originalUrl}`);
+  console.warn(`⚠️ Rate Limit: IP ${req.ip} -> ${req.originalUrl}`);
   res.status(options.statusCode).json(options.message);
 };
 
-// 1. Global Limiter
+// 1. Global Limiter (Read operations mostly)
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProduction ? 100 : 1000,
@@ -79,73 +84,80 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// 2. Strict Auth Limiter - ✅ FIXED: Increased from 5 to 30 in production
+// 2. Strict Auth Limiter (Login/OTP)
 const authLimiter = rateLimit({
-  windowMs: isProduction ? 15 * 60 * 1000 : 60 * 1000,
-  max: isProduction ? 30 : 50,  // 🔄 CHANGED: 5 → 30 for production
+  windowMs: 15 * 60 * 1000, 
+  max: 30, // 30 attempts per 15 min
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  message: { ok: false, message: "Too many login attempts. Please try again in 15 minutes." },
+  message: { ok: false, message: "Too many login attempts. Try again in 15 mins." },
 });
-
-// Apply strict limits to sensitive routes
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register/request-otp", authLimiter);
 app.use("/api/auth/register/verify-otp", authLimiter);
 app.use("/api/auth/register/complete", authLimiter);
 app.use("/api/auth/forgot/request-otp", authLimiter);
+app.use("/api/auth", authLimiter); // Apply to all auth routes for safety
+
+// ✅ FIX S4: Write Limiter (Spam Protection for Create/Edit/Delete)
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 10, // Max 10 writes per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+  message: { ok: false, message: "You are doing that too fast. Please slow down." }
+});
+
+// Apply write limiter only to data mutations
+app.use("/api/chapters", (req, res, next) => {
+  if (["POST", "PUT", "DELETE"].includes(req.method)) {
+    return writeLimiter(req, res, next);
+  }
+  next();
+});
+app.use("/api/expenses", (req, res, next) => {
+  if (["POST", "PUT", "DELETE"].includes(req.method)) {
+    return writeLimiter(req, res, next);
+  }
+  next();
+});
 
 // =========================================
-// END SECURITY
+// MIDDLEWARE
 // =========================================
-
-/* standard middlewares */
 app.use(express.json());
 app.use(cookieParser());
-
-// CSRF protection
 app.use(csrfProtection);
 
-// CSRF token endpoint
-app.get("/api/csrf-token", (req, res) => {
-  res.json({ csrfToken: req.cookies.csrf_token });
+// ✅ FIX S6: Config Endpoint (Serve Public Keys dynamically)
+app.get("/api/config", (req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+    // Add other public config here if needed (e.g. Stripe Public Key)
+  });
 });
 
-// routes
+// ROUTES
+app.get("/api/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.csrf_token });
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/chapters", chapterRoutes);
-app.use("/api/expenses", expenseRoutes); // ✅ ADDED
+app.use("/api/expenses", expenseRoutes);
 
-// simple health route to test server
 app.get("/api/health", (req, res) => {
-  res.json({
-    status: "ok",
-    message: "Hisaab-Kitaab backend is running",
-  });
+  res.json({ status: "ok", message: "System operational" });
 });
 
-// =========================================
-// ✅ FIX: API 404 HANDLER
-// =========================================
-// Catch any unhandled /api requests and return JSON instead of HTML
+// 404 API Handler
 app.use("/api", (req, res) => { 
-  res.status(404).json({ 
-    ok: false, 
-    message: "API endpoint not found" 
-  });
+  res.status(404).json({ ok: false, message: "API endpoint not found" });
 });
 
-// =========================================
-/** ✅ STATIC FILE SERVING (for Render deployment) */
-// =========================================
-
-// 1. Serve static files from the 'client' directory
+// Static Files & SPA Fallback
 app.use(express.static(path.join(__dirname, "../client")));
-
-// 2. Handle SPA / Fallback (FIXED)
-// We use a Regex to match everything EXCEPT paths starting with /api
-// This ensures API 404s stay as 404s, and don't return index.html
 app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, "../client/index.html"));
 });
@@ -153,8 +165,6 @@ app.get(/^(?!\/api).+/, (req, res) => {
 // =========================================
 // HOUSEKEEPING: Cleanup old OTPs
 // =========================================
-
-// Run this check every 1 hour
 setInterval(async () => {
   try {
     await db.query("DELETE FROM otps WHERE expires_at < NOW()");
@@ -164,12 +174,9 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000); // 1 hour
 
-// =========================================
-// SERVER START
-// =========================================
-
+// Start
 const PORT = process.env.PORT || 5001;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔒 Environment: ${process.env.NODE_ENV || "development"}`);
 });

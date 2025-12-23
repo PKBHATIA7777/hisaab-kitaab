@@ -1,38 +1,18 @@
+/* server/controllers/authController.js */
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const { sendOtpEmail } = require("../utils/email");
 const bcrypt = require("bcrypt");
 const db = require("../config/db");
-const { createToken, sendAuthCookie, SHORT_MS, LONG_MS } = require("../utils/jwt");
+const { createToken, sendAuthCookie, clearAuthCookies, SHORT_MS, LONG_MS } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
-const { z } = require("zod");
-
-// =========================================
-// VALIDATION SCHEMAS
-// =========================================
-
-const registerRequestSchema = z.object({
-  email: z.string().email("Invalid email address").trim().toLowerCase(),
-});
-
-const registerCompleteSchema = z.object({
-  realName: z.string().min(2, "Name must be at least 2 characters").trim(),
-  
-  // ✅ FIX: Added dot (.) to the allowed characters regex
-  username: z.string()
-    .min(3, "Username must be 3+ chars")
-    .regex(/^[a-z0-9_.]+$/, "Username can only contain letters, numbers, underscores, and dots"), 
-    
-  // (Note: Password length check is now handled manually in the function for consistency, 
-  // but keeping it here is fine too as a first line of defense)
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-const loginSchema = z.object({
-  identifier: z.string().min(1, "Email or username is required").trim().toLowerCase(),
-  password: z.string().min(1, "Password is required"),
-});
+const { 
+  registerSchema, 
+  loginSchema, 
+  emailSchema, 
+  normalizeEmail 
+} = require("../utils/validation"); // ✅ Import shared validation
 
 // helper: generate 6-digit OTP
 function generateOtpCode() {
@@ -57,32 +37,59 @@ async function findUserByIdentifier(identifier) {
   return rows[0] || null;
 }
 
+// ✅ FIX S9: Enhanced OTP Verification with Brute Force Protection
+async function verifyOtpLogic(email, otp, purpose) {
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Fetch OTP with attempts
+  const { rows } = await db.query(
+    `SELECT * FROM otps 
+     WHERE email = $1 AND purpose = $2 AND used = FALSE AND expires_at > NOW()
+     ORDER BY created_at DESC LIMIT 1`,
+    [cleanEmail, purpose]
+  );
+  
+  const otpRow = rows[0];
+
+  if (!otpRow) {
+    throw new Error("Invalid or expired OTP");
+  }
+
+  // 2. Check Max Attempts (Brute Force Protection)
+  if (otpRow.attempts >= 3) {
+    // Delete/Invalidate immediately if max attempts reached
+    await db.query("DELETE FROM otps WHERE id = $1", [otpRow.id]);
+    throw new Error("Too many failed attempts. Please request a new code.");
+  }
+
+  // 3. Verify Code
+  if (otpRow.code !== otp) {
+    // Increment attempts
+    await db.query("UPDATE otps SET attempts = attempts + 1 WHERE id = $1", [otpRow.id]);
+    throw new Error("Invalid OTP code");
+  }
+
+  return otpRow;
+}
+
 // POST /api/auth/register/request-otp
 async function registerRequestOtp(req, res) {
   try {
-    // 1. Validate Input using Zod
-    const result = registerRequestSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
-    }
-    const { email } = result.data;
+    // ✅ Use Shared Schema (Fix C5)
+    const result = emailSchema.safeParse(req.body.email);
+    if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+    
+    const email = result.data; // Already lowercased & trimmed
 
-    // 2. Check if email already exists
-    const { rows: existingRows } = await db.query(
-      "SELECT * FROM users WHERE email = $1 LIMIT 1",
-      [email]
-    );
+    // Check if user exists
+    const { rows } = await db.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (rows.length > 0) return res.status(400).json({ ok: false, message: "Email already registered" });
 
-    if (existingRows[0]) {
-      // ✅ We explicitly tell the user that the account exists
-      return res.status(400).json({ ok: false, message: "Email already in use" });
-    }
-
-    // 3. Generate and Send OTP
+    // Generate and Send OTP
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Insert/Update OTP (Including the new 'attempts' column from Step 2)
+    // Insert/Update OTP (Including the new 'attempts' column)
     await db.query(
       `INSERT INTO otps (email, code, purpose, expires_at, used, attempts)
        VALUES ($1, $2, 'signup', $3, FALSE, 0)
@@ -112,75 +119,44 @@ async function registerRequestOtp(req, res) {
   }
 }
 
-// ✅ UPDATED: POST /api/auth/register/verify-otp
-// Verifies OTP and marks it for completion (not fully used yet)
+// ✅ FIX S9: UPDATED registerVerifyOtp with verifyOtpLogic
 async function registerVerifyOtp(req, res) {
   try {
     const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
 
-    if (!email || !otp) {
-      return res.status(400).json({
-        ok: false,
-        message: "Email and OTP are required",
-      });
-    }
+    // Use shared logic with brute force protection
+    const otpRow = await verifyOtpLogic(email, otp, "signup");
 
-    const cleanEmail = email.trim().toLowerCase();
-
-    const { rows: otpRows } = await db.query(
-      `SELECT * FROM otps
-       WHERE email = $1
-         AND purpose = 'signup'
-         AND code = $2
-         AND used = FALSE
-         AND expires_at > NOW()
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [cleanEmail, otp]
-    );
-    const otpRow = otpRows[0];
-
-    if (!otpRow) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Invalid or expired OTP" });
-    }
-
-    // Create a temporary token for completing registration
+    // Success - Issue Token
     const tempToken = jwt.sign(
-      { email: cleanEmail, purpose: "complete_signup", otpId: otpRow.id },
+      { email: email.trim().toLowerCase(), purpose: "complete_signup", otpId: otpRow.id },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" } // 15 minutes to complete registration
+      { expiresIn: "15m" }
     );
 
-    // Send token as cookie
     res.cookie("signup_token", tempToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 15 * 60 * 1000,
     });
 
-    return res.json({
-      ok: true,
-      message: "Email verified successfully",
-    });
+    return res.json({ ok: true, message: "Email verified successfully" });
   } catch (err) {
-    console.error("registerVerifyOtp error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in verify-otp" });
+    // Return 400 for logic errors (invalid otp), 500 for system
+    const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
+    return res.status(status).json({ ok: false, message: err.message });
   }
 }
 
 // ✅ UPDATED FUNCTION: registerComplete with Transactions
 async function registerComplete(req, res) {
   try {
-    // 1. Validate Input
-    const result = registerCompleteSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
-    }
+    // ✅ Use Shared Schema
+    const result = registerSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+
     const { realName, username, password } = result.data;
     
     // 2. Verify signup token
@@ -217,7 +193,7 @@ async function registerComplete(req, res) {
     try {
       // 3. Re-Check if OTP was already consumed (Safety Lock)
       const { rows: otpCheck } = await db.query(
-        "SELECT used FROM otps WHERE id = $1 FOR UPDATE", // 'FOR UPDATE' locks this row
+        "SELECT used FROM otps WHERE id = $1 FOR UPDATE",
         [otpId]
       );
       
@@ -279,7 +255,7 @@ async function registerComplete(req, res) {
       });
 
     } catch (err) {
-      await db.query("ROLLBACK"); // ❌ ROLLBACK ON ERROR
+      await db.query("ROLLBACK");
       throw err;
     }
 
@@ -291,16 +267,16 @@ async function registerComplete(req, res) {
   }
 }
 
-// POST /api/auth/login - ✅ UPDATED WITH REMEMBER ME
+// POST /api/auth/login
 async function login(req, res) {
   try {
+    // ✅ Use Shared Schema
     const result = loginSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
     const { identifier, password } = result.data;
 
-    // Extract rememberMe (it's not in the Zod schema, so we get it from req.body directly)
     const rememberMe = !!req.body.rememberMe; 
 
     const cleanIdentifier = identifier.trim().toLowerCase();
@@ -342,7 +318,6 @@ async function login(req, res) {
     const token = createToken({ userId: user.id.toString() }, rememberMe);
     sendAuthCookie(res, token, rememberMe);
 
-    // Calculate expiry for the frontend
     const sessionDuration = rememberMe ? LONG_MS : SHORT_MS;
 
     return res.json({
@@ -354,7 +329,6 @@ async function login(req, res) {
         username: user.username,
         email: user.email,
       },
-      // Send this to client so it knows when to warn
       sessionExpiresAt: Date.now() + sessionDuration 
     });
   } catch (err) {
@@ -407,7 +381,6 @@ async function googleLogin(req, res) {
       let username = baseUsername;
       let counter = 1;
 
-      // ensure username is unique
       while (true) {
         const { rows: uRows } = await db.query(
           "SELECT 1 FROM users WHERE username = $1 LIMIT 1",
@@ -474,14 +447,12 @@ async function setPassword(req, res) {
 
     const { newPassword } = req.body;
     
-    // --- ✅ PASSWORD SECURITY FIX ---
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ 
         ok: false, 
         message: "Password must be at least 8 characters long" 
       });
     }
-    // --- END FIX ---
 
     const user = await findUserById(payload.userId);
     if (!user) {
@@ -525,19 +496,15 @@ async function setPassword(req, res) {
 // POST /api/auth/forgot/request-otp
 async function forgotRequestOtp(req, res) {
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Email is required" });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
+    // ✅ Use Shared Schema
+    const result = emailSchema.safeParse(req.body.email);
+    if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+    
+    const email = result.data; // Already lowercased & trimmed
 
     const { rows: userRows } = await db.query(
       "SELECT * FROM users WHERE email = $1 LIMIT 1",
-      [cleanEmail]
+      [email]
     );
     const user = userRows[0] || null;
 
@@ -552,18 +519,19 @@ async function forgotRequestOtp(req, res) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await db.query(
-      `INSERT INTO otps (email, code, purpose, expires_at, used)
-       VALUES ($1, $2, 'reset', $3, FALSE)
+      `INSERT INTO otps (email, code, purpose, expires_at, used, attempts)
+       VALUES ($1, $2, 'reset', $3, FALSE, 0)
        ON CONFLICT (email, purpose)
        DO UPDATE SET code = EXCLUDED.code,
                      expires_at = EXCLUDED.expires_at,
                      used = FALSE,
+                     attempts = 0,
                      created_at = NOW()`,
-      [cleanEmail, code, expiresAt]
+      [email, code, expiresAt]
     );
 
     await sendOtpEmail(
-      cleanEmail,
+      email,
       "Your Hisaab-Kitaab password reset code",
       `Your password reset code is ${code}. It will expire in 10 minutes.`
     );
@@ -580,7 +548,7 @@ async function forgotRequestOtp(req, res) {
   }
 }
 
-// POST /api/auth/forgot/reset
+// ✅ FIX S9: UPDATED resetPassword with verifyOtpLogic
 async function resetPassword(req, res) {
   try {
     const { email, otp, newPassword } = req.body;
@@ -592,41 +560,23 @@ async function resetPassword(req, res) {
       });
     }
 
-    // --- ✅ PASSWORD SECURITY FIX ---
-    if (!newPassword || newPassword.length < 8) {
+    if (newPassword.length < 8) {
       return res.status(400).json({ 
         ok: false, 
         message: "Password must be at least 8 characters long" 
       });
     }
-    // --- END FIX ---
 
+    // 1. Verify OTP with attempts check
+    const otpRow = await verifyOtpLogic(email, otp, "reset");
+
+    // 2. Reset Password
     const cleanEmail = email.trim().toLowerCase();
-
-    const { rows: otpRows } = await db.query(
-      `SELECT * FROM otps
-       WHERE email = $1
-         AND purpose = 'reset'
-         AND code = $2
-         AND used = FALSE
-         AND expires_at > NOW()
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [cleanEmail, otp]
-    );
-    const otpRow = otpRows[0] || null;
-
-    if (!otpRow) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Invalid or expired OTP" });
-    }
-
     const { rows: userRows } = await db.query(
       "SELECT * FROM users WHERE email = $1 LIMIT 1",
       [cleanEmail]
     );
-    const user = userRows[0] || null;
+    const user = userRows[0];
 
     if (!user) {
       return res
@@ -645,17 +595,16 @@ async function resetPassword(req, res) {
       [passwordHash, user.id]
     );
 
+    // 3. Mark OTP Used
     await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
 
     return res.json({
       ok: true,
-      message: "Password has been reset successfully",
+      message: "Password reset successfully",
     });
   } catch (err) {
-    console.error("resetPassword error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in reset password" });
+    const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
+    return res.status(status).json({ ok: false, message: err.message });
   }
 }
 
@@ -699,29 +648,24 @@ async function me(req, res) {
   }
 }
 
+// ✅ FIX B12: Clean up all cookies using helper
 // POST /api/auth/logout
 function logout(req, res) {
   try {
-    res.cookie("auth_token", "", {
-      httpOnly: true,
-      secure: false,
-      sameSite: "strict",
-      expires: new Date(0),
-    });
+    // ✅ FIX B12: Clean up all cookies
+    clearAuthCookies(res);
 
     return res.json({ ok: true, message: "Logged out" });
   } catch (err) {
     console.error("logout error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in logout" });
+    return res.status(500).json({ ok: false, message: "Server error in logout" });
   }
 }
 
 module.exports = {
   registerRequestOtp,
   registerVerifyOtp,
-  registerComplete, // ✅ NEW EXPORT
+  registerComplete,
   login,
   googleLogin,
   setPassword,

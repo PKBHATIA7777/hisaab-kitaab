@@ -1,28 +1,40 @@
 /* server/controllers/expenseController.js */
 const db = require("../config/db");
 const { z } = require("zod");
+const xss = require("xss"); // Secure input (Phase 1)
 
 // --- VALIDATION SCHEMA ---
 const addExpenseSchema = z.object({
   chapterId: z.string().or(z.number()),
   amount: z.number().positive("Amount must be greater than 0"),
   description: z.string().max(100, "Description too long").optional(),
-  payerMemberId: z.string().or(z.number()), // The ID from chapter_members table
-  involvedMemberIds: z.array(z.string().or(z.number())).min(1, "Select at least one person to split with")
+  payerMemberId: z.string().or(z.number()),
+  
+  // Option A: Equal Split (Existing)
+  involvedMemberIds: z.array(z.string().or(z.number())).optional(),
+  
+  // Option B: Unequal Split (New Feature Support)
+  // Expects: [{ memberId: 1, amount: 50 }, { memberId: 2, amount: 150 }]
+  customSplits: z.array(z.object({
+    memberId: z.string().or(z.number()),
+    amount: z.number().positive()
+  })).optional()
+}).refine(data => data.involvedMemberIds || data.customSplits, {
+  message: "Either involvedMemberIds or customSplits must be provided"
 });
 
 async function addExpense(req, res) {
   try {
-    // 1. Validate Input
     const result = addExpenseSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
 
-    const { chapterId, amount, description, payerMemberId, involvedMemberIds } = result.data;
+    const { chapterId, amount, payerMemberId, involvedMemberIds, customSplits } = result.data;
+    const description = xss(result.data.description || ""); // Sanitized
     const userId = req.user.userId;
 
-    // 2. Verify Access (User must be creator of the chapter)
+    // 1. Verify Access
     const { rows: chap } = await db.query(
       "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
       [chapterId, userId]
@@ -31,15 +43,47 @@ async function addExpense(req, res) {
       return res.status(403).json({ ok: false, message: "Unauthorized or Chapter not found" });
     }
 
-    // 3. MATH: Calculate Equal Splits
-    const count = involvedMemberIds.length;
-    const splitAmount = Math.floor((amount / count) * 100) / 100; // Floor to 2 decimals
-    let remainder = amount - (splitAmount * count); // Calculate cents left over
+    // 2. MATH LOGIC (INTEGER MODE)
+    // Convert total to "cents" to avoid float errors
+    const totalCents = Math.round(amount * 100);
+    const finalSplits = []; // Stores { memberId, amount }
 
-    // Fix precision issues (e.g. 0.0099999 -> 0.01)
-    remainder = Math.round(remainder * 100) / 100;
+    if (customSplits && customSplits.length > 0) {
+      // --- Handle Custom/Unequal Splits ---
+      let splitSumCents = 0;
+      customSplits.forEach(s => {
+        const c = Math.round(s.amount * 100);
+        splitSumCents += c;
+        finalSplits.push({ memberId: s.memberId, amount: c / 100 });
+      });
 
-    // 4. DATABASE TRANSACTION
+      // Validation: Sum must match total
+      if (Math.abs(splitSumCents - totalCents) > 1) { // 1 cent tolerance
+        return res.status(400).json({ 
+          ok: false, 
+          message: `Splits sum (${splitSumCents/100}) does not match Total (${amount})` 
+        });
+      }
+    } else {
+      // --- Handle Equal Splits ---
+      const count = involvedMemberIds.length;
+      if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
+
+      const baseShareCents = Math.floor(totalCents / count);
+      let remainderCents = totalCents % count;
+
+      involvedMemberIds.forEach(mId => {
+        let myShareCents = baseShareCents;
+        // Distribute remainder 1 cent at a time
+        if (remainderCents > 0) {
+          myShareCents += 1;
+          remainderCents--;
+        }
+        finalSplits.push({ memberId: mId, amount: myShareCents / 100 });
+      });
+    }
+
+    // 3. DATABASE TRANSACTION
     await db.query("BEGIN");
 
     try {
@@ -48,24 +92,16 @@ async function addExpense(req, res) {
         `INSERT INTO expenses (chapter_id, payer_member_id, amount, description, expense_date)
          VALUES ($1, $2, $3, $4, NOW())
          RETURNING id, created_at`,
-        [chapterId, payerMemberId, amount, description || ""]
+        [chapterId, payerMemberId, amount, description]
       );
       const expenseId = expenseRows[0].id;
 
       // B. Insert Splits
-      for (let i = 0; i < count; i++) {
-        const memberId = involvedMemberIds[i];
-        
-        // Add remainder to the first unlucky person (usually just 1 cent)
-        let owes = splitAmount;
-        if (i === 0) {
-          owes += remainder;
-        }
-
+      for (const split of finalSplits) {
         await db.query(
           `INSERT INTO expense_splits (expense_id, member_id, amount_owed)
            VALUES ($1, $2, $3)`,
-          [expenseId, memberId, owes]
+          [expenseId, split.memberId, split.amount]
         );
       }
 
@@ -93,7 +129,7 @@ async function addExpense(req, res) {
   }
 }
 
-// Get Expenses for a Chapter (Simple List)
+// Get Expenses for a Chapter (Simple List) - UNCHANGED
 async function getChapterExpenses(req, res) {
   try {
     const { chapterId } = req.params;
@@ -123,7 +159,7 @@ async function getChapterExpenses(req, res) {
   }
 }
 
-// Delete Expense
+// Delete Expense - UNCHANGED
 async function deleteExpense(req, res) {
   try {
     const { id } = req.params; // expense id
@@ -148,7 +184,7 @@ async function deleteExpense(req, res) {
   }
 }
 
-// 1. UPDATE: New Summary Logic using CTEs (Common Table Expressions)
+// Get Expense Summary - UNCHANGED
 async function getExpenseSummary(req, res) {
   try {
     const { chapterId } = req.params;
@@ -203,7 +239,7 @@ async function getExpenseSummary(req, res) {
   }
 }
 
-// 2. NEW: Get Single Expense Details (for Editing)
+// Get Single Expense Details - UNCHANGED
 async function getExpenseDetails(req, res) {
   try {
     const { id } = req.params; // expenseId
@@ -235,12 +271,17 @@ async function getExpenseDetails(req, res) {
   }
 }
 
-// 3. NEW: Update Expense
+// Update Expense - UPDATED WITH INTEGER MATH
 async function updateExpense(req, res) {
   try {
     const { id } = req.params; 
-    // We expect: amount, description, payerMemberId, involvedMemberIds
-    const { amount, description, payerMemberId, involvedMemberIds } = req.body;
+    const result = addExpenseSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+    }
+
+    const { chapterId, amount, payerMemberId, involvedMemberIds, customSplits } = result.data;
+    const description = xss(result.data.description || "");
     const userId = req.user.userId;
 
     // Verify access
@@ -252,11 +293,39 @@ async function updateExpense(req, res) {
     );
     if (check.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
 
-    // Calculate Splits (Same logic as addExpense)
-    const count = involvedMemberIds.length;
-    const splitAmount = Math.floor((amount / count) * 100) / 100;
-    let remainder = amount - (splitAmount * count);
-    remainder = Math.round(remainder * 100) / 100;
+    // MATH LOGIC (SAME AS addExpense - INTEGER MODE)
+    const totalCents = Math.round(amount * 100);
+    const finalSplits = [];
+
+    if (customSplits && customSplits.length > 0) {
+      let splitSumCents = 0;
+      customSplits.forEach(s => {
+        const c = Math.round(s.amount * 100);
+        splitSumCents += c;
+        finalSplits.push({ memberId: s.memberId, amount: c / 100 });
+      });
+      if (Math.abs(splitSumCents - totalCents) > 1) {
+        return res.status(400).json({ 
+          ok: false, 
+          message: `Splits sum (${splitSumCents/100}) does not match Total (${amount})` 
+        });
+      }
+    } else {
+      const count = involvedMemberIds.length;
+      if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
+
+      const baseShareCents = Math.floor(totalCents / count);
+      let remainderCents = totalCents % count;
+
+      involvedMemberIds.forEach(mId => {
+        let myShareCents = baseShareCents;
+        if (remainderCents > 0) {
+          myShareCents += 1;
+          remainderCents--;
+        }
+        finalSplits.push({ memberId: mId, amount: myShareCents / 100 });
+      });
+    }
 
     await db.query("BEGIN");
 
@@ -264,24 +333,20 @@ async function updateExpense(req, res) {
       // Update Main Expense
       await db.query(
         `UPDATE expenses 
-         SET amount = $1, description = $2, payer_member_id = $3 
-         WHERE id = $4`,
-        [amount, description, payerMemberId, id]
+         SET amount = $1, description = $2, payer_member_id = $3, chapter_id = $4
+         WHERE id = $5`,
+        [amount, description, payerMemberId, chapterId, id]
       );
 
       // Delete Old Splits
       await db.query("DELETE FROM expense_splits WHERE expense_id = $1", [id]);
 
       // Insert New Splits
-      for (let i = 0; i < count; i++) {
-        const memberId = involvedMemberIds[i];
-        let owes = splitAmount;
-        if (i === 0) owes += remainder;
-
+      for (const split of finalSplits) {
         await db.query(
           `INSERT INTO expense_splits (expense_id, member_id, amount_owed)
            VALUES ($1, $2, $3)`,
-          [id, memberId, owes]
+          [id, split.memberId, split.amount]
         );
       }
 
@@ -299,79 +364,73 @@ async function updateExpense(req, res) {
 }
 
 // =========================================================
-// ✅ NEW: SETTLEMENT ALGORITHM (Helper)
+// ✅ FIX B6 & B1: SETTLEMENT ALGORITHM (INTEGER MATH)
 // =========================================================
 function calculateSettlements(balances) {
+  // 1. Convert everything to Cents (Integers)
   let debtors = [];
   let creditors = [];
 
-  // 1. Separate into Debtors and Creditors
   balances.forEach(person => {
-    if (person.balance < -0.01) debtors.push(person); // Tolerance for float precision
-    else if (person.balance > 0.01) creditors.push(person);
+    // Round to nearest cent
+    const balanceCents = Math.round(person.balance * 100);
+    
+    // Ignore near-zero balances (floating point noise)
+    if (balanceCents < -1) debtors.push({ ...person, balanceCents });
+    else if (balanceCents > 1) creditors.push({ ...person, balanceCents });
   });
 
-  // 2. Sort by Magnitude (High to Low) to optimize transaction count
-  debtors.sort((a, b) => a.balance - b.balance); // Ascending (because they are negative) e.g. -1000, -500
-  creditors.sort((a, b) => b.balance - a.balance); // Descending e.g. 1000, 500
+  // 2. Sort by Magnitude (Optimization)
+  debtors.sort((a, b) => a.balanceCents - b.balanceCents); // Ascending (-1000 before -500)
+  creditors.sort((a, b) => b.balanceCents - a.balanceCents); // Descending (1000 before 500)
 
   const settlements = [];
-  let i = 0; // Debtor pointer
-  let j = 0; // Creditor pointer
+  let i = 0; 
+  let j = 0; 
 
   // 3. Greedy Matching Loop
   while (i < debtors.length && j < creditors.length) {
     let debtor = debtors[i];
     let creditor = creditors[j];
 
-    // The amount to settle is the minimum of the absolute values
-    let amount = Math.min(Math.abs(debtor.balance), creditor.balance);
-    
-    // Round to 2 decimals
-    amount = Math.round(amount * 100) / 100;
+    // Amount to settle is Min(|debt|, credit)
+    let amountCents = Math.min(Math.abs(debtor.balanceCents), creditor.balanceCents);
 
-    // Record the settlement
+    // Record Settlement
     settlements.push({
       from: debtor.name,
       to: creditor.name,
-      amount: amount,
+      amount: (amountCents / 100).toFixed(2), // Convert back to float for UI
       fromId: debtor.id,
       toId: creditor.id
     });
 
-    // Update internal balances
-    debtor.balance += amount;
-    creditor.balance -= amount;
+    // Adjust Balances
+    debtor.balanceCents += amountCents;
+    creditor.balanceCents -= amountCents;
 
-    // Check if settled (using small epsilon for float precision)
-    if (Math.abs(debtor.balance) < 0.01) {
-      i++; // Move to next debtor
-    }
-    if (Math.abs(creditor.balance) < 0.01) {
-      j++; // Move to next creditor
-    }
+    // Move Pointers if settled (0 or very close to 0)
+    if (Math.abs(debtor.balanceCents) < 1) i++;
+    if (Math.abs(creditor.balanceCents) < 1) j++;
   }
 
   return settlements;
 }
 
-// =========================================================
-// ✅ NEW: GET SETTLEMENTS API
-// =========================================================
+// Get Chapter Settlements - UPDATED TO USE NEW INTEGER MATH
 async function getChapterSettlements(req, res) {
   try {
     const { chapterId } = req.params;
     const userId = req.user.userId;
 
-    // 1. Verify Access
+    // Verify Access
     const { rows: chap } = await db.query(
       "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
       [chapterId, userId]
     );
     if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
 
-    // 2. Fetch Summary Data (Reusing the logic from getExpenseSummary)
-    // We need Net Balance = Paid - Consumed
+    // New Query: Calculates both Spent (Payer) and Used (Consumer)
     const queryText = `
       WITH spent_cte AS (
         SELECT payer_member_id, SUM(amount) as total
@@ -397,15 +456,14 @@ async function getChapterSettlements(req, res) {
 
     const { rows } = await db.query(queryText, [chapterId]);
 
-    // 3. Prepare Balances for Algorithm
+    // Prepare Balances
     const memberBalances = rows.map(row => ({
       id: row.id,
       name: row.member_name,
-      // Net Balance: (+Paid) + (-Consumed)
+      // Keep as float here, algorithm handles conversion
       balance: parseFloat(row.total_spent) - parseFloat(row.total_used)
     }));
 
-    // 4. Run Algorithm
     const settlements = calculateSettlements(memberBalances);
 
     res.json({ ok: true, settlements });
@@ -421,8 +479,9 @@ module.exports = {
   addExpense,
   getChapterExpenses,
   deleteExpense,
-  getExpenseSummary, // Updated
-  getExpenseDetails, // New
-  updateExpense,     // New
-  getChapterSettlements // NEW: Settlement Algorithm
+  getExpenseSummary, 
+  getExpenseDetails, 
+  updateExpense,     
+  getChapterSettlements,
+  calculateSettlements // Export for testing if needed
 };

@@ -17,11 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <meta name="google-signin-client_id"
-        content="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="bubble-container">
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
@@ -33,7 +32,7 @@
     <p>Your way of handling expenses</p>
   </div>
 
-  <main>
+  <main id="main-content">
     <div class="auth-wrapper">
       <section class="auth-card">
         <h1 class="auth-title">Welcome Back</h1>
@@ -49,7 +48,7 @@
             Password
             <div class="password-wrapper">
               <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
-              <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
+              <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">👁️</button>
             </div>
           </label>
 
@@ -64,21 +63,8 @@
           <a href="forgot.html">Forgot password?</a>
         </p>
 
-        <div id="g_id_onload"
-             data-client_id="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com"
-             data-context="signin"
-             data-callback="handleGoogleCredential"
-             data-auto_prompt="false">
-        </div>
-
-        <div class="g_id_signin"
-             data-type="standard"
-             data-size="large"
-             data-theme="outline"
-             data-text="continue_with"
-             data-shape="pill"
-             data-logo_alignment="left">
-        </div>
+        <!-- Google Sign In -->
+        <div class="g_id_signin"></div>
 
         <p style="margin-top: 20px; font-size: 0.9rem; color:#666;">
           New here? <a href="signup.html">Create an account</a>

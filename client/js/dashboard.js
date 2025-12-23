@@ -9,7 +9,6 @@ const logoutBtn = document.getElementById("logout-btn");
 // ==========================================
 // ✅ STATE MANAGEMENT
 // ==========================================
-// ✅ NEW: Store data globally for sorting
 let allChapters = []; 
 
 let isEditMode = false;
@@ -26,7 +25,7 @@ function renderSkeletons() {
 }
 
 // ==========================================
-// HELPER FUNCTIONS (NEW)
+// HELPER FUNCTIONS
 // ==========================================
 function getInitials(name) {
   if (!name) return "?";
@@ -65,7 +64,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons();
 
   // ==========================================
-  // ✅ FIX: Inject Search & Sort Controls
+  // ✅ Inject Search & Sort Controls
   // ==========================================
   const controlsHtml = `
     <div style="
@@ -129,18 +128,64 @@ document.addEventListener("DOMContentLoaded", async () => {
   const clearBtn = document.getElementById('search-clear-btn');
   const sortSelect = document.getElementById('chapter-sort');
 
-  // Helper: Filter Visible Cards
+  // ✅ FIX P2: Enhanced runFilter with empty state handling & mobile optimization
   const runFilter = () => {
-    const term = searchInput.value.toLowerCase();
+    const term = searchInput.value.toLowerCase().trim();
     const cards = document.querySelectorAll('.chapter-card.card-content');
-    
+    let visibleCount = 0;
+
     cards.forEach(card => {
       const name = card.querySelector('.chapter-name').textContent.toLowerCase();
-      card.style.display = name.includes(term) ? 'flex' : 'none';
+      const match = name.includes(term);
+      card.style.display = match ? 'flex' : 'none';
+      if (match) visibleCount++;
     });
     
+    // Toggle Clear Button
     if (clearBtn) clearBtn.style.display = term.length > 0 ? 'flex' : 'none';
+
+    // ✅ FIX U8: Show "No Results" message
+    const emptyState = document.querySelector('.empty-state-container');
+    const noResultsMsg = document.getElementById('no-search-results');
+    
+    if (visibleCount === 0 && term.length > 0) {
+       // Hide normal empty state if it exists
+       if(emptyState) emptyState.style.display = 'none';
+       
+       // Create temp "No Results" if missing
+       if(!noResultsMsg) {
+         const msg = document.createElement('div');
+         msg.id = 'no-search-results';
+         msg.style.cssText = 'text-align: center; padding: 40px; color: #888; grid-column: 1 / -1;';
+         msg.innerHTML = `<p>No chapters found for "<b>${term}</b>"</p>`;
+         chaptersGrid.appendChild(msg);
+       } else {
+         noResultsMsg.style.display = 'block';
+         noResultsMsg.innerHTML = `<p>No chapters found for "<b>${term}</b>"</p>`;
+       }
+    } else {
+       if(noResultsMsg) noResultsMsg.style.display = 'none';
+       // Re-show empty state if we really have 0 chapters total
+       if(visibleCount === 0 && term.length === 0 && emptyState) {
+         emptyState.style.display = 'flex';
+       }
+    }
   };
+
+  // ✅ FIX P2: Debounce Search (Wait 300ms before filtering) - Uses global debounce from main.js
+  if (searchInput) {
+    searchInput.addEventListener('input', debounce(runFilter, 300));
+    searchInput.addEventListener('focus', () => searchInput.style.borderColor = '#d000ff');
+    searchInput.addEventListener('blur', () => searchInput.style.borderColor = '#eee');
+  }
+  
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      runFilter();
+      searchInput.focus();
+    });
+  }
 
   // Helper: Sort Data & Re-render
   const runSort = () => {
@@ -165,21 +210,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Re-apply search filter if user had typed something
     runFilter(); 
   };
-
-  // Event Listeners
-  if (searchInput) {
-    searchInput.addEventListener('input', runFilter);
-    searchInput.addEventListener('focus', () => searchInput.style.borderColor = '#d000ff');
-    searchInput.addEventListener('blur', () => searchInput.style.borderColor = '#eee');
-  }
-  
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      runFilter();
-      searchInput.focus();
-    });
-  }
 
   if (sortSelect) {
     sortSelect.addEventListener('change', runSort);
@@ -347,7 +377,7 @@ async function reloadChaptersGrid() {
 }
 
 // ==========================================
-// ✅ UPDATED RENDERGRID FUNCTION (NEW VERSION)
+// ✅ RENDERGRID FUNCTION
 // ==========================================
 function renderGrid(chapters) {
   chaptersGrid.innerHTML = "";
@@ -396,7 +426,6 @@ function renderGrid(chapters) {
     card.style.position = "relative";
 
     const initials = getInitials(chapter.name);
-    // ✅ FIX: Dynamic Color & Time
     const color = getAvatarColor(chapter.name);
     const timeString = timeAgo(chapter.created_at);
 
@@ -432,7 +461,7 @@ function renderGrid(chapters) {
 }
 
 // ==========================================
-// ✅ UPDATED MODAL FUNCTIONS
+// ✅ MODAL FUNCTIONS
 // ==========================================
 
 // 1. Open for CREATING (Reset everything)
@@ -476,7 +505,6 @@ window.openEditModal = function(id, currentName, currentDesc) {
 
   // Populate form
   createForm.name.value = currentName;
-  // Handle null/undefined description
   createForm.description.value = (currentDesc && currentDesc !== 'null') ? currentDesc : '';
 
   // Hide members section (Rename only)
@@ -517,7 +545,6 @@ document.addEventListener('keydown', (e) => {
 
 // 2. Close on Outside Click (Refined)
 createModal.addEventListener("click", (e) => {
-  // Only close if clicking the overlay itself (not the box inside)
   if (e.target === createModal) {
     closeModal();
   }
@@ -529,8 +556,7 @@ createModal.addEventListener("click", (e) => {
 
 // 1. Toggle the little menu
 window.toggleMenu = function(e, id) {
-  e.stopPropagation(); // Don't open chapter
-  // Close all other menus
+  e.stopPropagation();
   document.querySelectorAll('.menu-dropdown').forEach(el => {
     if (el.id !== `menu-${id}`) el.classList.remove('active');
   });
@@ -544,15 +570,13 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
 });
 
-/* client/js/dashboard.js - Delete Logic */
-
+/* Delete Logic */
 let deleteTargetId = null;
 const deleteModal = document.getElementById("delete-modal");
 const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
 
 // 1. Open Modal
 window.confirmDelete = function(id) {
-  // Close the dropdown menu first
   document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
 
   deleteTargetId = id;
@@ -571,7 +595,7 @@ if (confirmDeleteBtn) {
     if (!deleteTargetId) return;
 
     const id = deleteTargetId;
-    closeDeleteModal(); // Close UI immediately
+    closeDeleteModal();
 
     performDeleteWithUndo(id);
   });
@@ -579,28 +603,20 @@ if (confirmDeleteBtn) {
 
 // 4. The "Undo" Logic
 function performDeleteWithUndo(id) {
-  // A. Visually hide the card immediately (Optimistic UI)
-  // We will schedule the API call
   let isUndoClicked = false;
 
-  // Show Toast with Undo
   showToast("Chapter deleted", "info", {
     label: "UNDO ↩️",
     callback: () => {
       isUndoClicked = true;
       showToast("Deletion cancelled", "success");
-      // No visual change needed if we didn't touch DOM,
-      // but if we hid it, we would show it back.
-      // Since we haven't touched DOM yet, we just don't run the API call.
     }
   });
 
-  // B. Wait 4 seconds. If no Undo, kill it.
   setTimeout(async () => {
     if (!isUndoClicked) {
       try {
         await apiFetch(`/chapters/${id}`, { method: "DELETE" });
-        // NOW we remove it from screen (Refresh Grid)
         reloadChaptersGrid();
       } catch (err) {
         showToast("Failed to delete", "error");
@@ -621,12 +637,12 @@ function trapFocus(modal) {
 
   modal.addEventListener('keydown', function(e) {
     if (e.key === 'Tab') {
-      if (e.shiftKey) { /* Shift + Tab */
+      if (e.shiftKey) {
         if (document.activeElement === firstElement) {
           e.preventDefault();
           lastElement.focus();
         }
-      } else { /* Tab */
+      } else {
         if (document.activeElement === lastElement) {
           e.preventDefault();
           firstElement.focus();
@@ -636,9 +652,8 @@ function trapFocus(modal) {
   });
 }
 
-// Attach to existing openModal
 const originalOpenModal = window.openModal;
 window.openModal = function() {
-  originalOpenModal(); // Call the old one
+  originalOpenModal();
   trapFocus(document.getElementById('create-modal'));
 };

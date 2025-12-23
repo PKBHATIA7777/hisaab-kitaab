@@ -4,749 +4,734 @@
    /* @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap'); */
 
    :root {
-     --font-main: 'Poppins', sans-serif;
-     --color-primary: #000000; /* Black buttons */
-     --color-primary-hover: #333333;
-     --color-accent: #d000ff; /* Purple for text gradients */
-     --radius-card: 30px;
-     --radius-input: 12px;
-   }
-   /* client/css/base.css */
-
-/* ✅ NEW: Accessibility Skip Link */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  background: #d000ff;
-  color: white;
-  padding: 8px;
-  z-index: 10001;
-  transition: top 0.3s;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-.skip-link:focus {
-  top: 0;
-}
-   *, *::before, *::after {
-     box-sizing: border-box;
-   }
-   
-/* client/css/base.css */
-
-body {
-  margin: 0;
-  
-  /* CHANGED: Use dvh (Dynamic Viewport Height) for mobile stability */
-  min-height: 100vh; /* Fallback for old browsers */
-  min-height: 100dvh; 
-  
-  font-family: var(--font-main);
-  background: linear-gradient(180deg, #000000 10%, #1a0029 100%);
-  color: #333;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow-x: hidden; /* Prevent horizontal scroll */
-  position: relative;
-}
-   /* =========================
-   2. BACKGROUND BUBBLES (OPTIMIZED STEP 13)
-   ========================= */
-.bubble-container {
-  position: fixed; /* Changed from absolute to fixed to prevent scroll issues */
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1; 
-  overflow: hidden;
-  pointer-events: none;
-  
-  /* Performance hint */
-  transform: translateZ(0); 
-}
-
-.bubble {
-  position: absolute;
-  bottom: -100px;
-  border-radius: 50%;
-  background: transparent;
-  opacity: 0.8; /* Slightly reduced opacity for performance */
-  
-  /* GPU Acceleration */
-  will-change: transform;
-  transform: translate3d(0, 0, 0); 
-  animation: floatUp linear infinite;
-}
-
-/* Use translate3d to force GPU usage */
-@keyframes floatUp {
-  0% { 
-    transform: translate3d(0, 0, 0) scale(0.8) rotate(0deg); 
-    opacity: 1; 
+    --font-main: 'Poppins', sans-serif;
+    --color-primary: #000000; /* Black buttons */
+    --color-primary-hover: #333333;
+    --color-accent: #d000ff; /* Purple for text gradients */
+    --radius-card: 30px;
+    --radius-input: 12px;
+    --primary-color: #d000ff;
   }
-  100% { 
-    transform: translate3d(0, -120vh, 0) scale(1.2) rotate(360deg); 
-    opacity: 0; 
+  
+  *, *::before, *::after {
+    box-sizing: border-box;
   }
-}
-
-/* --- MOBILE OPTIMIZATION: Hide heavy bubbles --- */
-@media (max-width: 768px) {
-  /* Only show 3 bubbles on mobile to save battery */
-  .bubble:nth-child(4),
-  .bubble:nth-child(5),
-  .bubble:nth-child(6) {
-    display: none; 
+  
+  body {
+    margin: 0;
+    min-height: 100vh; /* Fallback for old browsers */
+    min-height: 100dvh; 
+    font-family: var(--font-main);
+    background: linear-gradient(180deg, #000000 10%, #1a0029 100%);
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    position: relative;
   }
-}
-
-/* --- ACCESSIBILITY: Disable if user prefers reduced motion --- */
-@media (prefers-reduced-motion: reduce) {
+  
+  /* =========================
+     2. BACKGROUND BUBBLES (OPTIMIZED)
+     ========================= */
+  .bubble-container {
+    position: fixed; 
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; 
+    overflow: hidden;
+    pointer-events: none;
+    /* ✅ FIX P12: Hint browser to optimize compositing */
+    will-change: transform;
+  }
+  
   .bubble {
-    animation: none;
-    display: none;
+    position: absolute;
+    bottom: -100px;
+    border-radius: 50%;
+    background: transparent;
+    opacity: 0.8;
+    /* Use transform for smooth 60fps animation */
+    transform: translate3d(0, 0, 0); 
+    animation: floatUp linear infinite;
   }
-}
-
-/* Individual Bubble Styles (Unchanged but ensuring valid syntax) */
-.bubble:nth-child(1) { left: 10%; width: 40px; height: 40px; border: 2px solid #ff00cc; box-shadow: 0 0 10px #ff00cc; animation-duration: 12s; }
-.bubble:nth-child(2) { left: 30%; width: 80px; height: 80px; border: 3px solid #00e5ff; box-shadow: 0 0 15px #00e5ff; animation-duration: 9s; animation-delay: 2s; }
-.bubble:nth-child(3) { left: 70%; width: 25px; height: 25px; border: 2px solid #ffd700; box-shadow: 0 0 10px #ffd700; animation-duration: 15s; animation-delay: 4s; }
-.bubble:nth-child(4) { left: 50%; width: 60px; height: 60px; border: 2px solid #00ff40; box-shadow: 0 0 15px #00ff40; animation-duration: 11s; animation-delay: 1s; }
-.bubble:nth-child(5) { left: 85%; width: 55px; height: 55px; border: 2px solid #ff3300; box-shadow: 0 0 15px #ff3300; animation-duration: 13s; animation-delay: 5s; }
-.bubble:nth-child(6) { left: 15%; width: 35px; height: 35px; border: 2px solid #d000ff; box-shadow: 0 0 10px #d000ff; animation-duration: 16s; animation-delay: 3s; }
-   
-   /* =========================
-      3. BRAND HEADER (Title above box)
-      ========================= */
-   .brand-header {
-     text-align: center;
-     margin-bottom: 20px; /* Reduced from 25px */
-     color: white;
-     z-index: 1;
-     animation: fadeInDown 0.8s ease-out;
-   }
-   
-   .brand-header h1 {
-     font-size: 3rem;
-     margin: 0;
-     font-weight: 700;
-     /* Gradient Text */
-     background: linear-gradient(to right, #ffffff, #d000ff);
-     -webkit-background-clip: text;
-     -webkit-text-fill-color: transparent;
-     filter: drop-shadow(0 0 10px rgba(208, 0, 255, 0.3));
-   }
-   
-   .brand-header p {
-     font-size: 1rem;
-     margin: 5px 0 0 0;
-     font-weight: 300;
-     opacity: 0.9;
-     letter-spacing: 1px;
-   }
-   
-   /* =========================
-      4. WHITE AUTH CARD (Updated Dimensions)
-      ========================= */
-   .auth-wrapper {
-     width: 100%;
-     display: flex;
-     justify-content: center;
-     padding: 15px; /* Reduced padding wrapper */
-     z-index: 1;
-   }
-   
-   .auth-card {
-     background: #ffffff;
-     width: 100%;
-     max-width: 460px; /* INCREASED from 400px to 460px */
-     padding: 30px;    /* DECREASED from 40px to 30px to make it shorter */
-     border-radius: var(--radius-card);
-     box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-     text-align: center;
-     animation: fadeInUp 0.8s ease-out;
-   }
-   
-   .auth-title {
-     font-size: 1.8rem;
-     margin: 0 0 5px 0; /* Tightened margin */
-     color: #000;
-     font-weight: 700;
-   }
-   
-   .auth-subtitle {
-     color: #666;
-     margin-bottom: 20px; /* Tightened margin */
-     font-size: 0.95rem;
-   }
-   
-   /* =========================
-      5. FORMS & INPUTS (More Compact)
-      ========================= */
-   form label {
-     display: block;
-     text-align: left;
-     font-size: 0.85rem;
-     color: #333;
-     font-weight: 600;
-     margin-bottom: 4px; /* Reduced from 6px */
-     margin-left: 5px;
-   }
-   
-   form input {
-     width: 100%;
-     padding: 12px; /* Slightly reduced padding to save height */
-     margin-bottom: 15px; /* Reduced from 20px to compact height */
-     border-radius: var(--radius-input);
-     border: 2px solid #eee;
-     background: #f9f9f9;
-     font-family: var(--font-main);
-     font-size: 0.95rem;
-     transition: all 0.3s;
-   }
-   
-   form input:focus {
-     outline: none;
-     border-color: #6a00ff;
-     background: #fff;
-     box-shadow: 0 0 0 4px rgba(106, 0, 255, 0.1);
-   }
-   
-   /* Buttons */
-   .btn-primary {
-     width: 100%;
-     padding: 14px; /* Slight tweak */
-     border: none;
-     border-radius: var(--radius-input);
-     background: #000;
-     color: #fff;
-     font-family: var(--font-main);
-     font-weight: 600;
-     font-size: 1rem;
-     cursor: pointer;
-     transition: transform 0.2s, box-shadow 0.2s;
-   }
-   
-   .btn-primary:hover {
-     transform: translateY(-2px);
-     box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-     background: linear-gradient(45deg, #000000, #333333);
-   }
-   
-   .btn-secondary {
-     width: 100%;
-     padding: 14px;
-     border: 2px solid #eee;
-     border-radius: var(--radius-input);
-     background: white;
-     color: #333;
-     font-family: var(--font-main);
-     font-weight: 600;
-     cursor: pointer;
-     margin-top: 10px;
-     transition: all 0.2s;
-   }
-   
-   .btn-secondary:hover {
-     background: #f5f5f5;
-     border-color: #ddd;
-   }
-   
-   /* Links */
-   a {
-     color: #6a00ff;
-     text-decoration: none;
-     font-weight: 600;
-   }
-   a:hover { text-decoration: underline; }
-   
-   /* Google Button Spacing */
-   .g_id_signin {
-     margin-top: 15px; /* Reduced from 20px */
-     display: flex;
-     justify-content: center;
-   }
-   
-   /* Animations */
-   @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-   @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-   
-   /* for real dashboard  */
-   
-   /* =========================
-      6. DASHBOARD GRID & CARDS (UPDATED STEP 9)
-      ========================= */
-   .dashboard-container {
-     width: 100%;
-     max-width: 1000px;
-     padding: 20px;
-     /* Add padding-top to account for the fixed/sticky header if needed, 
-        but for now standard padding is safe */
-     margin: 0 auto; 
-     z-index: 1;
-     text-align: center;
-   }
-   
-   .section-title {
-     color: #fff;
-     margin-bottom: 25px;
-     font-weight: 600;
-     font-size: 1.5rem;
-     letter-spacing: 1px;
-   }
-   
-   /* --- MOBILE FIRST GRID --- */
-   .chapters-grid {
-     display: grid;
-     /* Default: 1 column for mobile (Stacked cards) */
-     grid-template-columns: 1fr; 
-     gap: 20px;
-     width: 100%;
-   }
-   
-   /* --- TABLET & DESKTOP OVERRIDE --- */
-   @media (min-width: 768px) {
-     .chapters-grid {
-       /* On larger screens, fit as many 220px cards as possible */
-       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-       gap: 30px;
-     }
-   }
-   
-   /* Common Card Style */
-   .chapter-card {
-     background: #ffffff;
-     border-radius: 20px;
-     height: 220px;
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     justify-content: center;
-     cursor: pointer;
-     transition: transform 0.3s, box-shadow 0.3s;
-     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-     position: relative;
-     overflow: hidden;
-     text-decoration: none; /* For links */
-   }
-   
-   .chapter-card:hover {
-     transform: translateY(-5px);
-     box-shadow: 0 15px 40px rgba(0,0,0,0.5);
-   }
-   
-   /* The "Add New" Card */
-   .card-add {
-     border: 3px dashed #ddd;
-     background: rgba(255,255,255,0.9);
-   }
-   
-   .plus-icon {
-     width: 60px;
-     height: 60px;
-     background: #eee;
-     border-radius: 50%;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     font-size: 2rem;
-     color: #888;
-     transition: all 0.3s;
-   }
-   
-   .card-add:hover .plus-icon {
-     background: #ddd;
-     color: #555;
-     transform: scale(1.1);
-   }
-   
-   /* The "Content" Card */
-   .card-content {
-     padding: 20px;
-   }
-   
-   .chapter-initials {
-     width: 70px;
-     height: 70px;
-     background: #ffcc00; /* The Yellow Background */
-     color: #000;
-     border-radius: 50%;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     font-size: 1.5rem;
-     font-weight: 700;
-     margin-bottom: 15px;
-     box-shadow: 0 5px 15px rgba(255, 204, 0, 0.4);
-   }
-   
-   .chapter-name {
-     font-size: 1.1rem;
-     font-weight: 700;
-     color: #333;
-     margin: 0;
-     line-height: 1.3;
-     text-align: center;
-     /* Limit to 2 lines */
-     display: -webkit-box;
-     -webkit-line-clamp: 2;
-     -webkit-box-orient: vertical;
-     overflow: hidden;
-   }
-   
-   /* =========================
-      7. MODAL (Glassmorphism)
-      ========================= */
-      .modal-overlay {
-        position: fixed;
-        top: 0; 
-        left: 0;
-        width: 100%; 
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(8px); /* Stronger blur for focus */
-        z-index: 2000; /* Higher than everything */
-        
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        
-        /* Hidden State */
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.3s ease, visibility 0.3s ease;
-      }
-      
-      .modal-overlay.active {
-        opacity: 1;
-        visibility: visible;
-      }
-      
-      .modal-box {
-        background: #ffffff;
-        width: 90%;
-        max-width: 500px;
-        border-radius: 25px;
-        padding: 30px;
-        box-shadow: 0 25px 60px rgba(0,0,0,0.5);
-        
-        /* Hidden State (Zoomed out slightly) */
-        transform: scale(0.9) translateY(10px);
-        opacity: 0;
-        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
-        
-        max-height: 90dvh; /* Use dynamic viewport height */
-        overflow-y: auto;
-      }
-      
-      /* Active State (Pop in) */
-      .modal-overlay.active .modal-box {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-      }
-   
-      .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-      }
-      
-      .modal-header h2 {
-        margin: 0;
-        font-size: 1.5rem;
-        background: linear-gradient(to right, #000, #d000ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-   
-   .close-modal {
-     background: none;
-     border: none;
-     font-size: 1.5rem;
-     cursor: pointer;
-     color: #888;
-   }
-   
-   /* Dynamic Member List */
-   .member-list {
-     margin-bottom: 15px;
-     max-height: 150px;
-     overflow-y: auto;
-     border: 1px solid #eee;
-     border-radius: 12px;
-     padding: 10px;
-     background: #f9f9f9;
-   }
-   
-   .member-item {
-     display: flex;
-     gap: 10px;
-     margin-bottom: 8px;
-   }
-   
-   .member-item input {
-     margin-bottom: 0; /* Override default input margin */
-   }
-   
-   .btn-small {
-     padding: 5px 10px;
-     font-size: 0.8rem;
-     margin-top: 5px;
-     cursor: pointer;
-     background: #eee;
-     border: none;
-     border-radius: 5px;
-   }
-   
-   /* =========================
-      8. CHAPTER DETAILS PAGE (UPDATED STEP 11)
-      ========================= */
-   
-   /* Top Navigation Bar - SAFE AREA AWARE */
-   .chapter-nav {
-     /* CHANGED: Sticky ensures it stays visible but respects layout */
-     position: -webkit-sticky; /* Safari support */
-     position: sticky;
-     top: 0;
-     left: 0;
-     width: 100%;
-     
-     display: flex;
-     justify-content: space-between;
-     align-items: center;
-     
-     /* CHANGED: Dynamic padding for Notches */
-     /* Uses the larger of 20px OR the device's safe area */
-     padding: 20px; 
-     padding-top: max(20px, env(safe-area-inset-top));
-     padding-left: max(20px, env(safe-area-inset-left));
-     padding-right: max(20px, env(safe-area-inset-right));
-     
-     z-index: 100; /* Ensure it stays above scrolling content */
-     
-     /* Added Glass Background (Essential for sticky headers) */
-     background: rgba(0, 0, 0, 0.2); 
-     backdrop-filter: blur(10px);
-     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-   }
-   
-   /* Back Link - UPGRADED TO BUTTON LOOK */
-   .back-link {
-     color: #fff;
-     font-size: 0.9rem;
-     text-decoration: none;
-     background: rgba(255, 255, 255, 0.15); /* Glass effect */
-     padding: 8px 20px;
-     border-radius: 30px;
-     border: 1px solid rgba(255, 255, 255, 0.1);
-     backdrop-filter: blur(5px);
-     transition: all 0.3s ease;
-     font-weight: 500;
-     display: flex;
-     align-items: center;
-     gap: 8px; /* Space between arrow and text */
-   }
-   
-   .back-link:hover {
-     background: rgba(255, 255, 255, 0.3);
-     transform: translateX(-3px); /* Subtle slide effect */
-     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-   }
-   
-   /* Member Toggle Button */
-   .btn-member-toggle {
-     background: rgba(255, 255, 255, 0.2);
-     border: 1px solid rgba(255, 255, 255, 0.3);
-     color: #fff;
-     padding: 8px 16px;
-     border-radius: 20px;
-     cursor: pointer;
-     backdrop-filter: blur(5px);
-     transition: background 0.3s;
-     display: flex;
-     align-items: center;
-     gap: 8px;
-     font-family: var(--font-main);
-   }
-   .btn-member-toggle:hover {
-     background: rgba(255, 255, 255, 0.3);
-   }
-   
-   /* Member Dropdown (The "Expandable" part) */
-   .member-dropdown {
-     position: absolute;
-     top: 60px;
-     right: 30px;
-     width: 280px;
-     background: #ffffff;
-     border-radius: 16px;
-     padding: 20px;
-     box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-     opacity: 0;
-     visibility: hidden;
-     transform: translateY(-10px);
-     transition: all 0.3s ease;
-   }
-   
-   .member-dropdown.active {
-     opacity: 1;
-     visibility: visible;
-     transform: translateY(0);
-   }
-   
-   /* Member Item Row */
-   .dropdown-member-item {
-     display: flex;
-     align-items: center;
-     gap: 12px;
-     padding: 8px 0;
-     border-bottom: 1px solid #f0f0f0;
-   }
-   .dropdown-member-item:last-child { border-bottom: none; }
-   
-   .small-avatar {
-     width: 35px;
-     height: 35px;
-     background: #d000ff; /* Purple for users */
-     color: #fff;
-     border-radius: 50%;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     font-size: 0.85rem;
-     font-weight: 600;
-   }
-   
-   .member-name-text {
-     font-size: 0.95rem;
-     color: #333;
-   }
-   
-   /* Header Card Style */
-   .chapter-wrapper {
-     max-width: 800px;
-     margin: 0 auto;
-     padding: 20px;
-     text-align: center;
-     z-index: 1;
-   }
-   
-   .chapter-header-card {
-     margin-top: 20px;
-     color: #fff;
-     animation: fadeInDown 0.8s ease-out;
-   }
-   
-   .chapter-icon-large {
-     width: 100px;
-     height: 100px;
-     background: #ffcc00;
-     color: #000;
-     border-radius: 50%;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     font-size: 2.5rem;
-     font-weight: 700;
-     margin: 0 auto 20px auto;
-     box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
-   }
-   
-   #chapter-title {
-     font-size: 2.5rem;
-     margin: 0;
-     font-weight: 700;
-   }
-   
-   #chapter-desc {
-     font-size: 1.1rem;
-     margin-top: 10px;
-     opacity: 0.8;
-     font-weight: 300;
-   }
-   
-   .empty-state-placeholder {
-     margin-top: 50px;
-     padding: 40px;
-     background: rgba(255,255,255,0.1);
-     border-radius: 20px;
-     color: #fff;
-     border: 1px dashed rgba(255,255,255,0.3);
-   }
-   
-
-
-   /* =========================
-   9. SKELETON LOADING (NEW STEP 16)
-   ========================= */
-.skeleton {
-  background: #f0f0f0;
-  border-radius: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-/* The shimmering light effect */
-.skeleton::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.6) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  animation: shimmer 1.5s infinite;
-  transform: translateX(-100%);
-}
-
-@keyframes shimmer {
-  100% { transform: translateX(100%); }
-}
-
-/* Specific shape for a Chapter Card Skeleton */
-.skeleton-card {
-  height: 220px; /* Match real card height */
-  width: 100%;
-  box-shadow: none; /* Flat look for skeletons */
-  border: 1px solid #eee;
-}
-
-.skeleton-circle {
-  border-radius: 50%;
-}
-
-.skeleton-text {
-  height: 20px;
-  margin-bottom: 10px;
-  border-radius: 4px;
-}
-
-.skeleton-title {
-  height: 40px;
-  margin-bottom: 15px;
-  border-radius: 8px;
-}
-
-
-/* =========================
-   10. TOAST NOTIFICATIONS (NEW STEP 17)
-   ========================= */
-   .toast-container {
+  
+  /* ✅ FIX P12: Disable animation on Low Power Mode or Reduce Motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .bubble {
+      animation: none;
+      display: none; 
+    }
+  }
+  
+  /* Use translate3d to force GPU usage */
+  @keyframes floatUp {
+    0% { 
+      transform: translate3d(0, 0, 0) scale(0.8) rotate(0deg); 
+      opacity: 1; 
+    }
+    100% { 
+      transform: translate3d(0, -120vh, 0) scale(1.2) rotate(360deg); 
+      opacity: 0; 
+    }
+  }
+  
+  /* --- MOBILE OPTIMIZATION: Hide heavy bubbles --- */
+  @media (max-width: 768px) {
+    /* Only show 3 bubbles on mobile to save battery */
+    .bubble:nth-child(4),
+    .bubble:nth-child(5),
+    .bubble:nth-child(6) {
+      display: none; 
+    }
+  }
+  
+  /* Individual Bubble Styles */
+  .bubble:nth-child(1) { left: 10%; width: 40px; height: 40px; border: 2px solid #ff00cc; box-shadow: 0 0 10px #ff00cc; animation-duration: 12s; }
+  .bubble:nth-child(2) { left: 30%; width: 80px; height: 80px; border: 3px solid #00e5ff; box-shadow: 0 0 15px #00e5ff; animation-duration: 9s; animation-delay: 2s; }
+  .bubble:nth-child(3) { left: 70%; width: 25px; height: 25px; border: 2px solid #ffd700; box-shadow: 0 0 10px #ffd700; animation-duration: 15s; animation-delay: 4s; }
+  .bubble:nth-child(4) { left: 50%; width: 60px; height: 60px; border: 2px solid #00ff40; box-shadow: 0 0 15px #00ff40; animation-duration: 11s; animation-delay: 1s; }
+  .bubble:nth-child(5) { left: 85%; width: 55px; height: 55px; border: 2px solid #ff3300; box-shadow: 0 0 15px #ff3300; animation-duration: 13s; animation-delay: 5s; }
+  .bubble:nth-child(6) { left: 15%; width: 35px; height: 35px; border: 2px solid #d000ff; box-shadow: 0 0 10px #d000ff; animation-duration: 16s; animation-delay: 3s; }
+  
+  /* =========================
+     3. BRAND HEADER (Title above box)
+     ========================= */
+  .brand-header {
+    text-align: center;
+    margin-bottom: 20px; /* Reduced from 25px */
+    color: white;
+    z-index: 1;
+    animation: fadeInDown 0.8s ease-out;
+  }
+  
+  .brand-header h1 {
+    font-size: 3rem;
+    margin: 0;
+    font-weight: 700;
+    /* Gradient Text */
+    background: linear-gradient(to right, #ffffff, #d000ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 10px rgba(208, 0, 255, 0.3));
+  }
+  
+  .brand-header p {
+    font-size: 1rem;
+    margin: 5px 0 0 0;
+    font-weight: 300;
+    opacity: 0.9;
+    letter-spacing: 1px;
+  }
+  
+  /* =========================
+     4. WHITE AUTH CARD (Updated Dimensions)
+     ========================= */
+  .auth-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 15px; /* Reduced padding wrapper */
+    z-index: 1;
+  }
+  
+  .auth-card {
+    background: #ffffff;
+    width: 100%;
+    max-width: 460px; /* INCREASED from 400px to 460px */
+    padding: 30px;    /* DECREASED from 40px to 30px to make it shorter */
+    border-radius: var(--radius-card);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    text-align: center;
+    animation: fadeInUp 0.8s ease-out;
+  }
+  
+  .auth-title {
+    font-size: 1.8rem;
+    margin: 0 0 5px 0; /* Tightened margin */
+    color: #000;
+    font-weight: 700;
+  }
+  
+  .auth-subtitle {
+    color: #555; /* ✅ FIXED A2: Darkened from #666 for better contrast */
+    margin-bottom: 20px; /* Tightened margin */
+    font-size: 0.95rem;
+  }
+  
+  /* =========================
+     5. FORMS & INPUTS (More Compact)
+     ========================= */
+  form label {
+    display: block;
+    text-align: left;
+    font-size: 0.85rem;
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 4px; /* Reduced from 6px */
+    margin-left: 5px;
+  }
+  
+  form input, 
+  select, 
+  textarea {
+    width: 100%;
+    padding: 12px; /* Slightly reduced padding to save height */
+    margin-bottom: 15px; /* Reduced from 20px to compact height */
+    border-radius: var(--radius-input);
+    border: 2px solid #eee;
+    background: #f9f9f9;
+    font-family: var(--font-main);
+    /* ✅ FIX M6: Prevent iOS zoom on focus */
+    font-size: 16px !important; 
+    transition: all 0.3s;
+  }
+  
+  form input::placeholder {
+    color: #aaa !important; /* ✅ FIXED A2: Higher contrast placeholder */
+  }
+  
+  form input:focus {
+    outline: none;
+    border-color: #6a00ff;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(106, 0, 255, 0.1);
+  }
+  
+  /* Buttons */
+  .btn-primary {
+    width: 100%;
+    padding: 14px; /* Slight tweak */
+    border: none;
+    border-radius: var(--radius-input);
+    background: #000;
+    color: #fff;
+    font-family: var(--font-main);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    background: linear-gradient(45deg, #000000, #333333);
+  }
+  
+  .btn-secondary {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #eee;
+    border-radius: var(--radius-input);
+    background: white;
+    color: #333;
+    font-family: var(--font-main);
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.2s;
+  }
+  
+  .btn-secondary:hover {
+    background: #f5f5f5;
+    border-color: #ddd;
+  }
+  
+  /* Links */
+  a {
+    color: #6a00ff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  a:hover { text-decoration: underline; }
+  
+  /* Google Button Spacing */
+  .g_id_signin {
+    margin-top: 15px; /* Reduced from 20px */
+    display: flex;
+    justify-content: center;
+  }
+  
+  /* Animations */
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  
+  /* =========================
+     6. DASHBOARD GRID (MOBILE FIRST FIX M1)
+     ========================= */
+  .dashboard-container {
+    width: 100%;
+    max-width: 1000px;
+    padding: 20px;
+    margin: 0 auto; 
+    z-index: 1;
+    text-align: center;
+  }
+  
+  .section-title {
+    color: #fff;
+    margin-bottom: 25px;
+    font-weight: 600;
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+  }
+  
+  .chapters-grid {
+    display: grid;
+    /* ✅ FIX M1: Force full width on mobile */
+    grid-template-columns: 100%; 
+    gap: 15px; 
+    width: 100%;
+    padding-bottom: 80px; /* Space for FAB/Footer */
+  }
+  
+  @media (min-width: 600px) {
+    .chapters-grid {
+      /* Tablet/Desktop: Adaptive columns */
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
+      gap: 30px;
+    }
+  }
+  
+  /* Common Card Style */
+  .chapter-card {
+    background: #ffffff;
+    border-radius: 20px;
+    height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none; /* For links */
+  }
+  
+  .chapter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+  }
+  
+  /* The "Add New" Card */
+  .card-add {
+    border: 3px dashed #ddd;
+    background: rgba(255,255,255,0.9);
+  }
+  
+  .plus-icon {
+    width: 60px;
+    height: 60px;
+    background: #eee;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #555; /* ✅ FIXED A2: Darkened from #888 */
+    transition: all 0.3s;
+  }
+  
+  .card-add:hover .plus-icon {
+    background: #ddd;
+    color: #333; /* ✅ FIXED A2: Darkened */
+    transform: scale(1.1);
+  }
+  
+  /* The "Content" Card */
+  .card-content {
+    padding: 20px;
+  }
+  
+  .chapter-initials {
+    width: 70px;
+    height: 70px;
+    background: #ffcc00; /* The Yellow Background */
+    color: #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    box-shadow: 0 5px 15px rgba(255, 204, 0, 0.4);
+  }
+  
+  .chapter-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #333;
+    margin: 0;
+    line-height: 1.3;
+    text-align: center;
+    /* ✅ FIX M7: Text overflow */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Fallback */
+  }
+  
+  /* =========================
+     7. MODAL (SAFE AREA FIX M2)
+     ========================= */
+  .modal-overlay {
     position: fixed;
-    /* ✅ FIX: Use dynamic safe area, fallback to 20px */
-    bottom: max(20px, env(safe-area-inset-bottom)); 
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px); /* Stronger blur for focus */
+    z-index: 2000; /* Higher than everything */
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Hidden State */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    /* ✅ FIX M2: Safe area */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .modal-box {
+    background: #ffffff;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 25px;
+    padding: 30px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    
+    /* Hidden State (Zoomed out slightly) */
+    transform: scale(0.9) translateY(10px);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    
+    max-height: 90dvh; /* Use dynamic viewport height */
+    overflow-y: auto;
+  }
+  
+  /* Active State (Pop in) */
+  .modal-overlay.active .modal-box {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    background: linear-gradient(to right, #000, #d000ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .close-modal {
+    background: none;
+    border: none;
+    font-size: 2rem; /* Larger icon */
+    cursor: pointer;
+    color: #555; /* ✅ FIXED A2: Darkened from #888 */
+    /* ✅ FIX M10: Minimum 44x44px touch target */
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: -10px; /* Visual alignment fix */
+  }
+  
+  /* Dynamic Member List */
+  .member-list {
+    margin-bottom: 15px;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 10px;
+    background: #f9f9f9;
+  }
+  
+  .member-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  
+  .member-item input {
+    margin-bottom: 0; /* Override default input margin */
+  }
+  
+  .btn-small {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    margin-top: 5px;
+    cursor: pointer;
+    background: #eee;
+    border: none;
+    border-radius: 5px;
+  }
+  
+  /* =========================
+     8. CHAPTER DETAILS PAGE (UPDATED STEP 11)
+     ========================= */
+  
+  /* Top Navigation Bar - SAFE AREA AWARE */
+  .chapter-nav {
+    position: -webkit-sticky; /* Safari support */
+    position: sticky;
+    top: 0;
+    left: 0;
+    width: 100%;
+    
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    /* CHANGED: Dynamic padding for Notches */
+    padding: 20px; 
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    
+    z-index: 100; /* Ensure it stays above scrolling content */
+    
+    /* Added Glass Background (Essential for sticky headers) */
+    background: rgba(0, 0, 0, 0.2); 
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Back Link - UPGRADED TO BUTTON LOOK */
+  .back-link {
+    color: #fff;
+    font-size: 0.9rem;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.15); /* Glass effect */
+    padding: 8px 20px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between arrow and text */
+  }
+  
+  .back-link:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateX(-3px); /* Subtle slide effect */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  }
+  
+  /* Member Toggle Button */
+  .btn-member-toggle {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-main);
+  }
+  .btn-member-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  
+  /* Member Dropdown (The "Expandable" part) */
+  .member-dropdown {
+    position: absolute;
+    top: 60px;
+    right: 30px;
+    width: 280px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+  }
+  
+  .member-dropdown.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+  
+  /* Member Item Row */
+  .dropdown-member-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .dropdown-member-item:last-child { border-bottom: none; }
+  
+  .small-avatar {
+    width: 35px;
+    height: 35px;
+    background: #d000ff; /* Purple for users */
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  .member-name-text {
+    font-size: 0.95rem;
+    color: #333;
+  }
+  
+  /* Header Card Style */
+  .chapter-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+    z-index: 1;
+  }
+  
+  .chapter-header-card {
+    margin-top: 20px;
+    color: #fff;
+    animation: fadeInDown 0.8s ease-out;
+  }
+  
+  .chapter-icon-large {
+    width: 100px;
+    height: 100px;
+    background: #ffcc00;
+    color: #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 auto 20px auto;
+    box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
+  }
+  
+  #chapter-title {
+    font-size: 2.5rem;
+    margin: 0;
+    font-weight: 700;
+  }
+  
+  #chapter-desc {
+    font-size: 1.1rem;
+    margin-top: 10px;
+    opacity: 0.8;
+    font-weight: 300;
+  }
+  
+  .empty-state-placeholder {
+    margin-top: 50px;
+    padding: 40px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    color: #fff;
+    border: 1px dashed rgba(255,255,255,0.3);
+  }
+  
+  /* =========================
+     9. SKELETON LOADING (CLS FIX P3)
+     ========================= */
+  .skeleton {
+    background: #f0f0f0;
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* The shimmering light effect */
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.6) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    animation: shimmer 1.5s infinite;
+    transform: translateX(-100%);
+  }
+  
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+  
+  /* Specific shape for a Chapter Card Skeleton */
+  .skeleton-card {
+    /* ✅ FIX P3: Explicit height to match real card */
+    height: 220px; 
+    width: 100%;
+    display: block; /* Ensure it takes space */
+    box-shadow: none; /* Flat look for skeletons */
+    border: 1px solid #eee;
+  }
+  
+  .skeleton-circle {
+    border-radius: 50%;
+  }
+  
+  .skeleton-text {
+    height: 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+  }
+  
+  .skeleton-title {
+    height: 40px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+  }
+  
+  /* =========================
+     10. TOAST NOTIFICATIONS (SAFE AREA & POSITION FIX M9)
+     ========================= */
+  .toast-container {
+    position: fixed;
+    /* ✅ FIX M9: Move up if FAB is present, respect safe area */
+    bottom: max(90px, calc(80px + env(safe-area-inset-bottom))); 
     right: 20px;
     z-index: 10000;
     display: flex;
@@ -774,6 +759,57 @@ body {
     pointer-events: auto; /* Make the toast itself interactive if needed */
   }
   
+  /* ✅ FIX U3: Animated Checkmark for Success Toast */
+  .checkmark-circle {
+    width: 20px;
+    height: 20px;
+    position: relative;
+    display: inline-block;
+    vertical-align: top;
+    margin-right: 10px;
+  }
+  .checkmark-circle .background {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2ecc71;
+    position: absolute;
+  }
+  .checkmark-circle .checkmark {
+    border-radius: 5px;
+  }
+  .checkmark-circle .draw:after {
+    content: '';
+    box-sizing: border-box;
+    position: absolute;
+    width: 6px;
+    height: 10px;
+    border-right: 2px solid white;
+    border-top: 2px solid white;
+    transform: rotate(135deg) translate(-20%, -10%);
+    top: 5px;
+    left: 5px;
+    animation: checkmark-draw 0.6s ease;
+  }
+  
+  @keyframes checkmark-draw {
+    0% { height: 0; width: 0; opacity: 0; }
+    50% { height: 0; width: 0; opacity: 1; }
+    100% { height: 10px; width: 6px; opacity: 1; }
+  }
+  
+  /* Loading Spinner Enhancement */
+  .spinner {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 3px solid #fff;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  
   /* Variants */
   .toast.success { border-left: 4px solid #00e676; }
   .toast.error   { border-left: 4px solid #ff1744; }
@@ -792,54 +828,51 @@ body {
   @keyframes fadeOut {
     to { opacity: 0; transform: translateY(10px) scale(0.95); }
   }
-
-
-  /* =========================
-   11. BUTTON LOADING STATES (NEW STEP 20)
-   ========================= */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* When this class is added, text becomes invisible but keeps width */
-.btn-loading {
-  position: relative;
-  color: transparent !important; 
-  pointer-events: none; /* Prevent double clicks */
-  cursor: not-allowed;
-  opacity: 0.8;
-}
-
-/* The Spinner Centered */
-.btn-loading::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  /* Center exactly */
-  margin-top: -10px;
-  margin-left: -10px;
   
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #ffffff; /* White spinner */
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-/* Dark spinner for secondary (white) buttons */
-.btn-secondary.btn-loading::after {
-  border: 2px solid rgba(0, 0, 0, 0.1);
-  border-top-color: #333;
-}
-
-
-
-/* =========================
-   12. EMPTY STATE (NEW STEP 21)
-   ========================= */
-   .empty-state-container {
+  /* =========================
+     11. BUTTON LOADING STATES (NEW STEP 20)
+     ========================= */
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  /* When this class is added, text becomes invisible but keeps width */
+  .btn-loading {
+    position: relative;
+    color: transparent !important; 
+    pointer-events: none; /* Prevent double clicks */
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+  
+  /* The Spinner Centered */
+  .btn-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    /* Center exactly */
+    margin-top: -10px;
+    margin-left: -10px;
+    
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff; /* White spinner */
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  
+  /* Dark spinner for secondary (white) buttons */
+  .btn-secondary.btn-loading::after {
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #333;
+  }
+  
+  /* =========================
+     12. EMPTY STATE (NEW STEP 21)
+     ========================= */
+  .empty-state-container {
     grid-column: 1 / -1; /* Span full width of grid */
     display: flex;
     flex-direction: column;
@@ -869,7 +902,7 @@ body {
   }
   
   .empty-subtitle {
-    color: #ccc;
+    color: #bbb; /* ✅ FIXED A2: Darkened from #ccc */
     font-size: 1rem;
     max-width: 400px;
     margin-bottom: 25px;
@@ -880,44 +913,40 @@ body {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
-
-
-
+  
   /* =========================
-   13. INLINE VALIDATION (NEW STEP 23)
-   ========================= */
-.input-invalid {
-  border-color: #ff1744 !important;
-  background-color: rgba(255, 23, 68, 0.05) !important;
-  box-shadow: 0 0 0 4px rgba(255, 23, 68, 0.1) !important;
-}
-
-.input-valid {
-  border-color: #00e676 !important;
-}
-
-.input-error-msg {
-  color: #ff1744;
-  font-size: 0.8rem;
-  margin-top: -15px; /* Pull it up into the input's bottom margin */
-  margin-bottom: 15px;
-  margin-left: 5px;
-  display: none; /* Hidden by default */
-  font-weight: 500;
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-
-
-/* =========================
-   14. CARD MENU ACTIONS (NEW STEP 25)
-   ========================= */
-   .card-header-row {
+     13. INLINE VALIDATION (NEW STEP 23)
+     ========================= */
+  .input-invalid {
+    border-color: #ff1744 !important;
+    background-color: rgba(255, 23, 68, 0.05) !important;
+    box-shadow: 0 0 0 4px rgba(255, 23, 68, 0.1) !important;
+  }
+  
+  .input-valid {
+    border-color: #00e676 !important;
+  }
+  
+  .input-error-msg {
+    color: #ff1744;
+    font-size: 0.8rem;
+    margin-top: -15px; /* Pull it up into the input's bottom margin */
+    margin-bottom: 15px;
+    margin-left: 5px;
+    display: none; /* Hidden by default */
+    font-weight: 500;
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  /* =========================
+     14. CARD MENU ACTIONS (TOUCH TARGET FIX M5)
+     ========================= */
+  .card-header-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -929,9 +958,15 @@ body {
     border: none;
     font-size: 1.5rem;
     line-height: 1;
-    color: #888;
+    color: #555; /* ✅ FIXED A2: Darkened from #888 */
     cursor: pointer;
-    padding: 0 10px;
+    /* ✅ FIX M5: 44px min touch target */
+    padding: 10px;
+    min-width: 44px; 
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin-right: -10px; /* Align with edge */
     margin-top: -5px;
   }
@@ -977,40 +1012,59 @@ body {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
-
-
-
-  /* client/css/base.css */
-
-.loader-container {
-  grid-column: 1 / -1; /* Centers it across the whole grid */
-  display: flex;
-  justify-content: center;
-  padding: 50px;
-}
-
-.spinner {
-  width: 50px;
-  height: 50px;
-  border: 5px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #d000ff; /* Your Purple Brand Color */
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-
-
-/* client/css/base.css - Append to bottom */
-
-/* =========================
-   15. PASSWORD TOGGLE & UI
-   ========================= */
-   .password-wrapper {
+  
+  /* loader-container */
+  .loader-container {
+    grid-column: 1 / -1; /* Centers it across the whole grid */
+    display: flex;
+    justify-content: center;
+    padding: 50px;
+  }
+  
+  /* =========================
+     15. ACCESSIBILITY (PHASE 4)
+     ========================= */
+  
+  /* ✅ FIX A1: Visible Focus Indicators (Keyboard Users) */
+  :focus-visible {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  
+  /* Remove default ugly outline only if we have custom focus-visible */
+  button:focus:not(:focus-visible) {
+    outline: none;
+  }
+  
+  /* ✅ FIX A3: Skip to Content Link */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 10px;
+    background: var(--primary-color);
+    color: white;
+    padding: 8px 16px;
+    z-index: 9999;
+    transition: top 0.2s;
+    border-radius: 0 0 4px 4px;
+    text-decoration: none;
+    font-weight: bold;
+  }
+  
+  .skip-link:focus {
+    top: 0;
+  }
+  
+  /* ✅ FIX A2: Contrast Improvements */
+  .text-muted {
+    color: #b0b0b0 !important; /* Was #888, now lighter for dark bg */
+  }
+  
+  /* =========================
+     16. PASSWORD TOGGLE & UI
+     ========================= */
+  .password-wrapper {
     position: relative;
     width: 100%;
     margin-bottom: 15px; /* Wrapper takes the margin instead of input */
@@ -1033,11 +1087,11 @@ body {
     cursor: pointer;
     font-size: 1.2rem;
     line-height: 1;
-    color: #888;
+    color: #555; /* ✅ FIXED A2: Darkened from #888 */
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2;
+    z-index: 10; /* Increased from 2 to be safe */
     transition: color 0.2s;
   }
   
@@ -1050,7 +1104,7 @@ body {
     font-size: 0.8rem;
     margin-top: -10px;
     margin-bottom: 15px;
-    color: #666;
+    color: #555; /* ✅ FIXED A2: Darkened from #666 */
     font-weight: 500;
     transition: all 0.3s ease;
   }
@@ -1061,351 +1115,322 @@ body {
   .password-hint.invalid {
     color: #ff1744; /* Red */
   }
-
-
-
-
-
-  /* client/css/base.css */
-
-/* ... existing styles ... */
-
-/* =========================
-   16. MOBILE FIXES (Native Input Icons)
-   ========================= */
-
-/* 1. Remove native "Reveal Password" icon (Edge/IE) */
-input::-ms-reveal,
-input::-ms-clear {
-  display: none !important;
-}
-
-/* 2. Remove native "Clear" button (Chrome/Android) */
-input[type="password"]::-webkit-search-decoration,
-input[type="password"]::-webkit-search-cancel-button,
-input[type="password"]::-webkit-search-results-button,
-input[type="password"]::-webkit-search-results-decoration {
-  display: none !important;
-}
-
-/* 3. Ensure custom button stays on top */
-.btn-toggle-pass {
-  z-index: 10; /* Increased from 2 to be safe */
-}
-
-
-
-/* client/css/base.css */
-
-/* ... existing styles ... */
-
-/* =========================
-   17. RESPONSIVE HEADER FIX
-   ========================= */
-
-/* Mobile First: Stack items vertically so they never collide */
-.brand-header {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 15px; /* Space between Title and Button */
-}
-
-/* Default button style */
-.header-actions button {
-  padding: 8px 15px;
-  font-size: 0.85rem;
-}
-
-/* Desktop Override: Move button to absolute right */
-@media (min-width: 768px) {
+  
+  /* =========================
+     17. MOBILE FIXES (Native Input Icons)
+     ========================= */
+  
+  /* 1. Remove native "Reveal Password" icon (Edge/IE) */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none !important;
+  }
+  
+  /* 2. Remove native "Clear" button (Chrome/Android) */
+  input[type="password"]::-webkit-search-decoration,
+  input[type="password"]::-webkit-search-cancel-button,
+  input[type="password"]::-webkit-search-results-button,
+  input[type="password"]::-webkit-search-results-decoration {
+    display: none !important;
+  }
+  
+  /* =========================
+     18. RESPONSIVE HEADER FIX
+     ========================= */
+  
+  /* Mobile First: Stack items vertically so they never collide */
   .brand-header {
-    display: block; /* Switch back to standard block layout */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 15px; /* Space between Title and Button */
   }
-
-  .header-actions {
+  
+  /* Default button style */
+  .header-actions button {
+    padding: 8px 15px;
+    font-size: 0.85rem;
+  }
+  
+  /* Desktop Override: Move button to absolute right */
+  @media (min-width: 768px) {
+    .brand-header {
+      display: block; /* Switch back to standard block layout */
+    }
+  
+    .header-actions {
+      position: absolute;
+      top: 25px; /* Aligned nicely with the H1 */
+      right: 20px;
+    }
+  }
+  
+  /* --- ADMIN BADGE & TOOLTIP --- */
+  .admin-badge {
+    font-size: 0.75rem;
+    color: #d000ff;
+    font-weight: 700;
+    margin-left: 5px;
+    background: rgba(208, 0, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  
+  .info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #eee;
+    color: #555; /* ✅ FIXED A2: Darkened from #666 */
+    font-size: 0.7rem;
+    margin-left: 5px;
+    cursor: help;
+    position: relative;
+  }
+  
+  /* Tooltip Text (Hidden by default) */
+  .info-icon::after {
+    content: attr(data-tooltip);
     position: absolute;
-    top: 25px; /* Aligned nicely with the H1 */
-    right: 20px;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 10;
   }
-}
-
-
-
-
-/* client/css/base.css - Append this to the bottom */
-
-/* --- ADMIN BADGE & TOOLTIP --- */
-.admin-badge {
-  font-size: 0.75rem;
-  color: #d000ff;
-  font-weight: 700;
-  margin-left: 5px;
-  background: rgba(208, 0, 255, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.info-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #eee;
-  color: #666;
-  font-size: 0.7rem;
-  margin-left: 5px;
-  cursor: help;
-  position: relative;
-}
-
-/* Tooltip Text (Hidden by default) */
-.info-icon::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 120%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #333;
-  color: #fff;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 0.7rem;
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.info-icon:hover::after {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* --- MEMBER MANAGEMENT --- */
-.btn-add-member {
-  width: 100%;
-  padding: 10px;
-  background: #f5f5f7;
-  border: 1px dashed #ccc;
-  border-radius: 8px;
-  color: #333;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: all 0.2s;
-}
-
-.btn-add-member:hover {
-  background: #fff;
-  border-color: #d000ff;
-  color: #d000ff;
-}
-
-.btn-delete-member {
-  background: none;
-  border: none;
-  color: #ff1744;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0 5px;
-  margin-left: auto; /* Push to right */
-  opacity: 0.6;
-}
-
-.btn-delete-member:hover {
-  opacity: 1;
-  background: rgba(255, 23, 68, 0.1);
-  border-radius: 4px;
-}
-
-
-/* client/css/base.css - Append to bottom */
-
-/* --- EXPENSE LIST --- */
-.expense-list {
-  margin-top: 30px;
-  width: 100%;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  padding-bottom: 80px; /* Space for FAB */
-}
-
-.expense-card {
-  background: #fff;
-  padding: 15px 20px;
-  border-radius: 16px;
-  margin-bottom: 15px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.05);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: transform 0.2s;
-  animation: slideInUp 0.3s ease-out;
-}
-
-.expense-card:active { transform: scale(0.98); }
-
-.expense-info h4 { margin: 0 0 4px 0; color: #333; font-size: 1rem; }
-.expense-info p { margin: 0; color: #888; font-size: 0.8rem; }
-.expense-amount { font-size: 1.1rem; font-weight: 700; color: #000; }
-
-/* --- FLOATING ACTION BUTTON (FAB) --- */
-.fab-btn {
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #000;
-  color: #fff;
-  border: none;
-  font-size: 2rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-  cursor: pointer;
-  z-index: 100;
-  transition: transform 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.fab-btn:hover { transform: scale(1.1) rotate(90deg); }
-
-/* --- MODAL INPUTS --- */
-.big-amount-input {
-  border: none;
-  background: transparent;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #333;
-  width: 150px;
-  text-align: center;
-  outline: none;
-}
-.big-amount-input::placeholder { color: #ddd; }
-
-/* Payer Horizontal Scroll */
-.payer-scroll-container {
-  display: flex;
-  overflow-x: auto;
-  gap: 10px;
-  padding-bottom: 10px;
-  -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
-}
-
-.payer-option {
-  flex: 0 0 auto;
-  border: 2px solid #eee;
-  border-radius: 12px;
-  padding: 10px 15px;
-  cursor: pointer;
-  text-align: center;
-  min-width: 80px;
-  transition: all 0.2s;
-}
-
-/* Hide Radio/Checkbox visually but keep accessible */
-.payer-option input, .split-option input { display: none; }
-
-/* Selected State for Payer */
-.payer-option.selected {
-  border-color: #d000ff;
-  background: rgba(208, 0, 255, 0.05);
-}
-
-/* Split Vertical List */
-.split-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  padding: 10px;
-}
-
-.split-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.split-option:hover { background: #f9f9f9; }
-
-/* Custom Checkbox Circle */
-.custom-check {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #ddd;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-.split-option.selected .custom-check {
-  background: #d000ff;
-  border-color: #d000ff;
-}
-.split-option.selected .custom-check::after {
-  content: "✓";
-  color: #fff;
-  font-size: 0.8rem;
-}
-
-@keyframes slideInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-
-
-/* client/css/base.css - Append to bottom */
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f5f5f5;
-}
-.summary-row:last-child { border-bottom: none; }
-
-.summary-name {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  color: #333;
-}
-.summary-amount {
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-.summary-bar-bg {
-  width: 100%;
-  height: 6px;
-  background: #f0f0f0;
-  border-radius: 3px;
-  margin-top: 5px;
-  overflow: hidden;
-}
-.summary-bar-fill {
-  height: 100%;
-  background: #d000ff;
-  border-radius: 3px;
-}
+  
+  .info-icon:hover::after {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  /* --- MEMBER MANAGEMENT --- */
+  .btn-add-member {
+    width: 100%;
+    padding: 10px;
+    background: #f5f5f7;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    color: #333;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.2s;
+  }
+  
+  .btn-add-member:hover {
+    background: #fff;
+    border-color: #d000ff;
+    color: #d000ff;
+  }
+  
+  .btn-delete-member {
+    background: none;
+    border: none;
+    color: #ff1744;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 5px;
+    margin-left: auto; /* Push to right */
+    opacity: 0.6;
+  }
+  
+  .btn-delete-member:hover {
+    opacity: 1;
+    background: rgba(255, 23, 68, 0.1);
+    border-radius: 4px;
+  }
+  
+  /* --- EXPENSE LIST --- */
+  .expense-list {
+    margin-top: 30px;
+    width: 100%;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 80px; /* Space for FAB */
+  }
+  
+  .expense-card {
+    background: #fff;
+    padding: 15px 20px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.2s;
+    animation: slideInUp 0.3s ease-out;
+  }
+  
+  .expense-card:active { transform: scale(0.98); }
+  
+  .expense-info h4 { margin: 0 0 4px 0; color: #333; font-size: 1rem; }
+  .expense-info p { margin: 0; color: #555; font-size: 0.8rem; } /* ✅ FIXED A2 */
+  .expense-amount { font-size: 1.1rem; font-weight: 700; color: #000; }
+  
+  /* --- FLOATING ACTION BUTTON (SAFE AREA FIX M3) --- */
+  .fab-btn {
+    position: fixed;
+    /* ✅ FIX M3: Respect iPhone Home Indicator */
+    bottom: max(30px, calc(10px + env(safe-area-inset-bottom)));
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #000;
+    color: #fff;
+    border: none;
+    font-size: 2rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    cursor: pointer;
+    z-index: 100;
+    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fab-btn:hover { transform: scale(1.1) rotate(90deg); }
+  
+  /* --- MODAL INPUTS --- */
+  .big-amount-input {
+    border: none;
+    background: transparent;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #333;
+    width: 150px;
+    text-align: center;
+    outline: none;
+  }
+  .big-amount-input::placeholder { color: #bbb; } /* ✅ FIXED A2 */
+  
+  /* Payer Horizontal Scroll */
+  .payer-scroll-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 10px;
+    -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
+  }
+  
+  .payer-option {
+    flex: 0 0 auto;
+    border: 2px solid #eee;
+    border-radius: 12px;
+    padding: 10px 15px;
+    cursor: pointer;
+    text-align: center;
+    min-width: 80px;
+    transition: all 0.2s;
+  }
+  
+  /* Hide Radio/Checkbox visually but keep accessible */
+  .payer-option input, .split-option input { display: none; }
+  
+  /* Selected State for Payer */
+  .payer-option.selected {
+    border-color: #d000ff;
+    background: rgba(208, 0, 255, 0.05);
+  }
+  
+  /* Split Vertical List */
+  .split-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #f0f0f0;
+    border-radius: 12px;
+    padding: 10px;
+  }
+  
+  .split-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .split-option:hover { background: #f9f9f9; }
+  
+  /* Custom Checkbox Circle */
+  .custom-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .split-option.selected .custom-check {
+    background: #d000ff;
+    border-color: #d000ff;
+  }
+  .split-option.selected .custom-check::after {
+    content: "✓";
+    color: #fff;
+    font-size: 0.8rem;
+  }
+  
+  @keyframes slideInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  
+  .summary-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: #333;
+  }
+  .summary-amount {
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+  .summary-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+  .summary-bar-fill {
+    height: 100%;
+    background: #d000ff;
+    border-radius: 3px;
+  }
+  

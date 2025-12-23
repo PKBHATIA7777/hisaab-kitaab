@@ -18,6 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="bubble-container">
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
@@ -29,7 +30,7 @@
     <p>Your way of handling expenses</p>
   </div>
 
-  <main>
+  <main id="main-content">
     <div class="auth-wrapper">
       <section class="auth-card">
         <h1 class="auth-title">Reset Password</h1>
@@ -60,7 +61,7 @@
               New password
               <div class="password-wrapper">
                 <input type="password" name="newPassword" required autocomplete="new-password" placeholder="••••••••">
-                <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
+                <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">👁️</button>
               </div>
               <small class="password-hint">Password must be at least 8 characters</small>
             </label>
@@ -100,9 +101,8 @@
             body: { email },
           });
           alert("If this email exists, OTP is sent (check server console).");
-          // Hide the first form to make it cleaner, or just show the second step
           forgotForm.style.display = 'none'; 
-          document.querySelector('.auth-subtitle').textContent = "Create a new password"; // Update UI text
+          document.querySelector('.auth-subtitle').textContent = "Create a new password";
           resetStep.hidden = false;
         } catch (err) {
           alert(err.message || "Failed to send reset OTP");

@@ -1,5 +1,7 @@
+/* server/controllers/chapterController.js */
 const db = require("../config/db");
 const { z } = require("zod");
+const xss = require("xss"); // ✅ FIX S2: Import XSS library
 
 // --- VALIDATION SCHEMAS ---
 const createChapterSchema = z.object({
@@ -13,53 +15,66 @@ const addMemberSchema = z.object({
 });
 
 // =========================================
-// 1. Create Chapter (Now with Auto-Admin)
+// 1. Create Chapter (FIX B4: Duplicate Prevention)
 // =========================================
 async function createChapter(req, res) {
   try {
     const result = createChapterSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
 
-    const { name, description, members } = result.data;
+    const name = xss(result.data.name);
+    const description = xss(result.data.description || "");
+    const rawMembers = result.data.members;
+    
     const userId = req.user.userId;
 
-    // 1. Fetch Creator's Real Name (to add as "Admin" member)
+    // 1. Fetch Creator Name
     const { rows: userRows } = await db.query("SELECT real_name FROM users WHERE id = $1", [userId]);
     const creatorName = userRows[0]?.real_name || "Admin";
 
-    // Prevent duplicates if user manually added themselves
-    const otherMembers = members.filter(m => m.toLowerCase() !== creatorName.toLowerCase());
+    // 2. Normalize & Deduplicate Members Input (FIX B4)
+    const uniqueMembers = new Set();
+    const cleanMembers = [];
+    
+    // Add Creator to 'seen' set to avoid adding them twice
+    uniqueMembers.add(creatorName.toLowerCase());
 
-    // ✅ NEW CHECK: Prevent Duplicate Chapter Names
+    for (const m of rawMembers) {
+        const clean = xss(m).trim();
+        const lower = clean.toLowerCase();
+        if (!uniqueMembers.has(lower) && lower.length > 0) {
+            uniqueMembers.add(lower);
+            cleanMembers.push(clean);
+        }
+    }
+
+    // 3. Check Duplicate Chapter Name
     const { rows: existing } = await db.query(
       "SELECT id FROM chapters WHERE name = $1 AND created_by = $2",
       [name, userId]
     );
     if (existing.length > 0) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: "You already have a chapter with this name." 
-      });
+      return res.status(400).json({ ok: false, message: "You already have a chapter with this name." });
     }
 
     await db.query("BEGIN");
 
     try {
-      // 2. Insert Chapter
+      // 4. Insert Chapter
       const { rows: chapterRows } = await db.query(
         `INSERT INTO chapters (name, description, created_by) VALUES ($1, $2, $3) RETURNING *`,
-        [name, description || "", userId]
+        [name, description, userId]
       );
       const chapter = chapterRows[0];
 
-      // 3. Insert Admin (Creator) - Linked via user_id
+      // 5. Insert Creator
       await db.query(
         `INSERT INTO chapter_members (chapter_id, member_name, user_id) VALUES ($1, $2, $3)`,
         [chapter.id, creatorName, userId]
       );
 
-      // 4. Insert Other Members
-      for (const memberName of otherMembers) {
+      // 6. Insert Deduplicated Members
+      for (const memberName of cleanMembers) {
         await db.query(
           `INSERT INTO chapter_members (chapter_id, member_name) VALUES ($1, $2)`,
           [chapter.id, memberName]
@@ -88,7 +103,9 @@ async function addMember(req, res) {
     const result = addMemberSchema.safeParse(req.body);
 
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
-    const { memberName } = result.data;
+    
+    // ✅ FIX S2: Sanitize Input
+    const memberName = xss(result.data.memberName);
 
     // Verify Ownership
     const { rows: chap } = await db.query("SELECT id FROM chapters WHERE id = $1 AND created_by = $2", [id, userId]);
@@ -194,9 +211,13 @@ async function updateChapter(req, res) {
       return res.status(400).json({ ok: false, message: "Name is required" });
     }
 
+    // ✅ FIX S2: Sanitize Inputs
+    const sanitizedName = xss(name.trim());
+    const sanitizedDescription = xss(description || "");
+
     const { rowCount } = await db.query(
       `UPDATE chapters SET name = $1, description = $2 WHERE id = $3 AND created_by = $4`,
-      [name.trim(), description || "", id, userId]
+      [sanitizedName, sanitizedDescription, id, userId]
     );
 
     if (rowCount === 0) {
@@ -252,6 +273,6 @@ module.exports = {
   getChapterDetails,
   updateChapter,
   deleteChapter,
-  addMember,     // ✅ NEW
-  deleteMember   // ✅ NEW
+  addMember,
+  deleteMember
 };

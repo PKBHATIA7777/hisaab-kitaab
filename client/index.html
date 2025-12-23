@@ -17,11 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <meta name="google-signin-client_id"
-        content="326032414248-ibhu4fckc65blbp3hh5d9bsl8c4ni5kf.apps.googleusercontent.com">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="bubble-container">
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
@@ -33,7 +32,7 @@
     <p>Your way of handling expenses</p>
   </div>
 
-  <main>
+  <main id="main-content">
     <div class="auth-wrapper">
       <section class="auth-card">
         <h1 class="auth-title">Split your bills</h1>
@@ -51,14 +50,8 @@
           </button>
         </div>
 
-        <div class="g_id_signin"
-             data-type="standard"
-             data-size="large"
-             data-theme="outline"
-             data-text="continue_with"
-             data-shape="pill"
-             data-logo_alignment="center">
-        </div>
+        <!-- Google Sign In -->
+        <div class="g_id_signin"></div>
         
         <footer style="margin-top:30px; font-size: 0.8rem; color:#888;">
           &copy; 2025 Hisaab-Kitaab

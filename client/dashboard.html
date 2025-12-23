@@ -18,79 +18,83 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-
   <a href="#main-content" class="skip-link">Skip to content</a>
-  <div class="bubble-container">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-  </div>
 
-  <div class="brand-header">
-    <h1>Hisaab-Kitaab</h1>
-    <div class="header-actions">
-      <button class="btn-secondary" id="logout-btn">Logout</button>
+  <main id="main-content">
+    <div class="bubble-container">
+      <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+      <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
     </div>
-  </div>
 
-  <div class="dashboard-container">
-    <h2 class="section-title">Create your expense chapter</h2>
-    
-    <div class="chapters-grid" id="chapters-grid">
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="create-modal">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h2>New Chapter</h2>
-        <button class="close-modal" onclick="closeModal()">×</button>
-      </div>
-      
-      <form id="create-chapter-form">
-        <label>Chapter Name <span style="color:red">*</span>
-          <input type="text" name="name" required placeholder="e.g. Goa Trip 2025" maxlength="100">
-          <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-10px; margin-bottom:10px;">
-            <span id="name-count">0</span>/100
-          </div>
-        </label>
-
-        <label>Description (Optional)
-          <input type="text" name="description" placeholder="Short tagline (max 50 chars)" maxlength="50">
-          <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-10px; margin-bottom:10px;">
-            <span id="desc-count">0</span>/50
-          </div>
-        </label>
-
-        <label>Members <span style="color:red">*</span></label>
-        <div class="member-list" id="member-list-container">
-        </div>
-        <button type="button" class="btn-small" onclick="addMemberInput()">+ Add another person</button>
-
-        <div style="margin-top: 25px;">
-          <button type="submit" class="btn-primary">Create Chapter</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="delete-modal">
-    <div class="modal-box" style="max-width: 400px; text-align: center;">
-      <div style="font-size: 3rem; margin-bottom: 10px;">🗑️</div>
-      <h2 style="margin-top: 0;">Delete Chapter?</h2>
-      <p style="color: #666; margin-bottom: 25px;">
-        Are you sure? This will permanently delete this chapter and all its expenses.
-      </p>
-      
-      <div style="display: flex; gap: 10px; justify-content: center;">
-        <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn-primary" id="confirm-delete-btn" style="background: #ff1744; border:none;">
-          Yes, Delete
-        </button>
+    <div class="brand-header">
+      <h1>Hisaab-Kitaab</h1>
+      <div class="header-actions">
+        <button class="btn-secondary" id="logout-btn">Logout</button>
       </div>
     </div>
-  </div>
 
-  <script src="js/main.js"></script>
-  <script src="js/dashboard.js"></script> 
+    <div class="dashboard-container">
+      <h2 class="section-title">Create your expense chapter</h2>
+      
+      <div class="chapters-grid" id="chapters-grid">
+      </div>
+    </div>
+
+    <!-- Create Chapter Modal -->
+    <div class="modal-overlay" id="create-modal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2>New Chapter</h2>
+          <button class="close-modal" aria-label="Close Modal" onclick="closeModal()">×</button>
+        </div>
+        
+        <form id="create-chapter-form">
+          <label>Chapter Name <span style="color:red">*</span>
+            <input type="text" name="name" required placeholder="e.g. Goa Trip 2025" maxlength="100">
+            <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-10px; margin-bottom:10px;">
+              <span id="name-count">0</span>/100
+            </div>
+          </label>
+
+          <label>Description (Optional)
+            <input type="text" name="description" placeholder="Short tagline (max 50 chars)" maxlength="50">
+            <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-10px; margin-bottom:10px;">
+              <span id="desc-count">0</span>/50
+            </div>
+          </label>
+
+          <label>Members <span style="color:red">*</span></label>
+          <div class="member-list" id="member-list-container">
+          </div>
+          <button type="button" class="btn-small" onclick="addMemberInput()">+ Add another person</button>
+
+          <div style="margin-top: 25px;">
+            <button type="submit" class="btn-primary">Create Chapter</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Chapter Modal -->
+    <div class="modal-overlay" id="delete-modal">
+      <div class="modal-box" style="max-width: 400px; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 10px;">🗑️</div>
+        <h2 style="margin-top: 0;">Delete Chapter?</h2>
+        <p style="color: #666; margin-bottom: 25px;">
+          Are you sure? This will permanently delete this chapter and all its expenses.
+        </p>
+        
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+          <button class="btn-primary" id="confirm-delete-btn" style="background: #ff1744; border:none;">
+            Yes, Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script src="js/dashboard.js"></script> 
+  </main>
 </body>
 </html>
