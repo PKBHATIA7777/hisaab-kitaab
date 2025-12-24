@@ -571,4 +571,61 @@ function renderSettlements(settlements) {
 
     settlementList.appendChild(row);
   });
-}
+};
+
+// ==========================================
+// ✅ EXCEL EXPORT LOGIC
+// ==========================================
+window.downloadReport = async function() {
+  const btn = document.querySelector("button[onclick='downloadReport()']");
+  
+  try {
+    if (btn) setBtnLoading(btn, true); // Use existing helper
+    showToast("Generating report...", "info");
+
+    // 1. Get CSRF Token using the existing utility
+    // We need this because we are bypassing apiFetch for the binary download
+    const { csrfToken } = await apiFetch("/csrf-token");
+
+    // 2. Request the Blob
+    const response = await fetch(`${APP_CONFIG.API_BASE}/chapters/${chapterId}/export`, {
+      method: "GET",
+      headers: {
+        "X-CSRF-Token": csrfToken
+      },
+      credentials: "include" // Important: Sends auth cookies
+    });
+
+    if (!response.ok) {
+      // Try to parse error message if possible
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.message || "Export failed");
+    }
+
+    // 3. Convert Response to Blob & Trigger Download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    // Create temporary link
+    const a = document.createElement("a");
+    a.href = url;
+    // Name the file: ChapterName_Timestamp.xlsx
+    const cleanName = currentChapter.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.download = `hisaab_kitaab_${cleanName}_${Date.now()}.xlsx`;
+    
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    showToast("Report downloaded successfully", "success");
+
+  } catch (err) {
+    console.error("Download error:", err);
+    showToast(err.message || "Failed to download report", "error");
+  } finally {
+    if (btn) setBtnLoading(btn, false);
+  }
+};
