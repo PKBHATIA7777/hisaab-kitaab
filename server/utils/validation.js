@@ -24,8 +24,11 @@ const registerSchema = z.object({
   password: passwordSchema,
 });
 
+// ✅ UPDATED: Allow email OR username as identifier
 const loginSchema = z.object({
-  email: emailSchema,
+  // WAS: email: emailSchema,
+  // CHANGE TO:
+  identifier: z.string().min(1, "Email or username is required"),
   password: z.string(),
 });
 
