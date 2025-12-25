@@ -117,8 +117,6 @@
     return data;
   };
 
-  /* ... (Keep the rest of the file exactly as it was) ... */
-
   /* ======================================
      2. SESSION & AUTH
      ====================================== */
@@ -408,11 +406,20 @@
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     
-    // Mobile Haptics
+    // Mobile Haptics (Updated for Step 6)
     document.addEventListener('click', (e) => {
-      const target = e.target.closest('button, a, .chapter-card');
+      // Add all clickable elements here
+      const target = e.target.closest('button, a, .chapter-card, .expense-card, .nav-icon-btn, .fab-btn');
+      
       if (target && navigator.vibrate) {
-        navigator.vibrate(50);
+        // 1. Light tap vibration
+        navigator.vibrate(10); 
+        
+        // 2. Add a visual "click" effect to non-buttons (like cards)
+        if (target.classList.contains('expense-card')) {
+           target.style.transform = "scale(0.98)";
+           setTimeout(() => target.style.transform = "scale(1)", 100);
+        }
       }
     });
     

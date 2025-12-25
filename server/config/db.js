@@ -41,7 +41,7 @@ const pool = new Pool({
   // ✅ Connection Pooling Limits
   max: 20, // Max clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Error if connection takes > 2 seconds
+  connectionTimeoutMillis: 10000, // Error if connection takes > 10 seconds
 });
 
 // ✅ Retry-enabled query function (up to 3 attempts)

@@ -27,45 +27,56 @@
     </div>
 
     <nav class="chapter-nav">
-      <a href="dashboard.html" class="back-link">← Back</a>
+      <a href="dashboard.html" class="nav-icon-btn" aria-label="Back">
+        ←
+      </a>
       
-      <div style="display: flex; gap: 10px;">
-        <button class="btn-member-toggle" onclick="openSummaryModal()">
-          <span class="icon-chart">📊</span> Summary
-        </button>
+      <div class="nav-title-placeholder"></div>
 
-        <button class="btn-member-toggle" onclick="openSettlementModal()">
-          <span class="icon-bill">🤝</span> Settle Up
-        </button>
-
-        <button class="btn-member-toggle" onclick="downloadReport()" aria-label="Download Excel Report">
-          <span class="icon-download">📥</span> Export
-        </button>
-
-        <div class="member-menu-container">
-          <button id="member-toggle-btn" class="btn-member-toggle">
-            <span class="icon-users">👥</span> Members
+      <div class="nav-actions">
+        <button id="chapter-menu-btn" class="nav-icon-btn">⋮</button>
+        
+        <div id="chapter-menu-dropdown" class="nav-dropdown">
+          <button onclick="openSummaryModal()">
+            <span>📊</span> Summary
           </button>
-          <div id="member-dropdown" class="member-dropdown">
-            <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
-            
-            <div id="member-list-content"></div>
-
-            <div id="admin-actions" style="display:none; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">
-              <button class="btn-add-member" onclick="openAddMemberModal()">
-                + Add Member
-              </button>
-            </div>
-          </div>
+          <button onclick="openSettlementModal()">
+            <span>🤝</span> Settle Up
+          </button>
+          <button onclick="downloadReport()">
+            <span>📥</span> Export Report
+          </button>
+          <hr>
+          <button id="nav-members-trigger">
+            <span>👥</span> Members
+          </button>
         </div>
       </div>
     </nav>
 
+    <div id="member-dropdown" class="member-dropdown" style="display:none;">
+      <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
+      <div id="member-list-content"></div>
+      <div id="admin-actions" style="display:none; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">
+        <button class="btn-add-member" onclick="openAddMemberModal()">+ Add Member</button>
+      </div>
+    </div>
+
     <main class="chapter-wrapper">
-      <div id="chapter-skeleton" style="text-align: center; margin-top: 20px;">
-        <div class="skeleton skeleton-circle" style="width: 100px; height: 100px; margin: 0 auto 20px auto;"></div>
-        <div class="skeleton skeleton-title" style="width: 60%; margin: 0 auto 15px auto;"></div>
-        <div class="skeleton skeleton-text" style="width: 40%; margin: 0 auto;"></div>
+      <div id="chapter-skeleton" style="margin-top: 60px; padding: 0 15px;">
+        
+        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 40px;">
+          <div class="skeleton" style="width: 80px; height: 80px; border-radius: 50%; margin-bottom: 15px;"></div>
+          <div class="skeleton" style="width: 60%; height: 30px; border-radius: 8px; margin-bottom: 10px;"></div>
+          <div class="skeleton" style="width: 40%; height: 15px; border-radius: 4px;"></div>
+        </div>
+      
+        <div class="skeleton-list">
+          <div class="skeleton skeleton-expense-card"></div>
+          <div class="skeleton skeleton-expense-card"></div>
+          <div class="skeleton skeleton-expense-card"></div>
+        </div>
+      
       </div>
 
       <div id="chapter-content" class="chapter-header-card" style="display: none;">

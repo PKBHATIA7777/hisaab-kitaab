@@ -33,6 +33,49 @@ const addExpenseForm = document.getElementById("add-expense-form");
 const payerContainer = document.getElementById("payer-selection-container");
 const splitContainer = document.getElementById("split-selection-container");
 
+// --- NEW MENU LOGIC ---
+const menuBtn = document.getElementById("chapter-menu-btn");
+const menuDropdown = document.getElementById("chapter-menu-dropdown");
+const membersTrigger = document.getElementById("nav-members-trigger");
+const memberDropdown = document.getElementById("member-dropdown");
+
+// 1. Toggle Main Menu
+if(menuBtn) {
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle("active");
+    // Close member dropdown if open
+    if(memberDropdown) memberDropdown.classList.remove("active");
+  });
+}
+
+// 2. Handle "Members" click inside the menu
+if(membersTrigger) {
+  membersTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Close the main menu
+    menuDropdown.classList.remove("active");
+    
+    // Toggle the existing member list dropdown
+    // We position it nicely relative to the top right
+    if(memberDropdown) {
+        memberDropdown.style.display = "block"; // Ensure it's visible in DOM
+        // Allow a slight tick for display:block to apply before animating opacity
+        requestAnimationFrame(() => {
+            memberDropdown.classList.toggle("active");
+        });
+    }
+  });
+}
+
+// 3. Close everything when clicking outside
+document.addEventListener("click", (e) => {
+  if (menuDropdown) menuDropdown.classList.remove("active");
+  if (memberDropdown && !e.target.closest("#member-dropdown")) {
+    memberDropdown.classList.remove("active");
+  }
+});
+
 // --- INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -440,17 +483,6 @@ function timeAgo(dateString) {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
-
-// Dropdown Toggles (Members)
-const toggleBtn = document.getElementById("member-toggle-btn");
-const dropdown = document.getElementById("member-dropdown");
-
-toggleBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  dropdown.classList.toggle("active");
-});
-document.addEventListener("click", () => dropdown.classList.remove("active"));
-dropdown.addEventListener("click", (e) => e.stopPropagation());
 
 // Add Member Modal Logic
 const addMemberModal = document.getElementById("add-member-modal");

@@ -1434,3 +1434,337 @@
     border-radius: 3px;
   }
   
+
+
+
+
+
+  /* //mobile fixes */
+
+  /* =========================================
+   MOBILE UI FIXES (Added for Step 1)
+   ========================================= */
+
+@media (max-width: 768px) {
+  /* 1. Fix Header Collision */
+  .chapter-header-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 60px; /* Push down to clear the sticky nav bar */
+    padding: 0 15px; /* Prevent text touching screen edges */
+  }
+
+  /* 2. Resize Avatar */
+  .chapter-icon-large {
+    width: 80px;  /* Slightly smaller for mobile */
+    height: 80px;
+    font-size: 2rem;
+    margin: 0 0 15px 0; /* Strict bottom margin */
+    flex-shrink: 0; /* Prevent squishing */
+  }
+
+  /* 3. Resize Title to fit screen */
+  #chapter-title {
+    font-size: 1.8rem !important; /* Force smaller size */
+    line-height: 1.2;
+    word-wrap: break-word; /* Ensure long names wrap */
+    max-width: 100%;
+  }
+
+  /* 4. Tweak Description */
+  #chapter-desc {
+    font-size: 0.95rem;
+    margin-top: 8px;
+    padding: 0 10px;
+  }
+}
+
+
+/* =========================================
+   STEP 2: APP BAR & DROPDOWN STYLES
+   ========================================= */
+
+/* 1. App Bar Layout */
+.chapter-nav {
+  padding: 15px 20px; /* More breathing room */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 2. Icon Buttons (Back & Menu) */
+.nav-icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  text-decoration: none; /* For the <a> tag */
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.nav-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.nav-icon-btn:active {
+  transform: scale(0.95);
+}
+
+/* 3. The Dropdown Container */
+.nav-actions {
+  position: relative;
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: 55px;
+  right: 0;
+  width: 220px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  transform-origin: top right;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 200;
+}
+
+.nav-dropdown.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+/* 4. Dropdown Items */
+.nav-dropdown button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: #333;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-main);
+}
+
+.nav-dropdown button:hover {
+  background: #f5f5f7;
+  color: #d000ff;
+}
+
+.nav-dropdown button span {
+  font-size: 1.2rem;
+}
+
+.nav-dropdown hr {
+  border: 0;
+  border-top: 1px solid #eee;
+  margin: 4px 0;
+}
+
+
+/* =========================================
+   STEP 3: EXPENSE LIST POLISH
+   ========================================= */
+
+/* 1. Container Spacing */
+.expense-list {
+  /* Add breathing room from screen edges */
+  padding-left: 15px;
+  padding-right: 15px; 
+  /* Ensure it doesn't get too wide on tablets */
+  box-sizing: border-box; 
+}
+
+/* 2. Modern Card Styling */
+.expense-card {
+  /* Soften the white background so it's not blinding against black */
+  background: rgba(255, 255, 255, 0.95);
+  
+  /* Add a subtle glow/border instead of a harsh shadow */
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  
+  /* Make them slightly taller for better tap targets */
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  
+  /* Glassmorphism hint */
+  backdrop-filter: blur(5px);
+}
+
+/* 3. Typography inside Cards */
+.expense-info h4 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 6px; /* Space between Title and Subtitle */
+  color: #222;
+  letter-spacing: 0.3px;
+}
+
+.expense-info p {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 6px; /* Space if you add icons later */
+}
+
+/* Make the amount stand out more */
+.expense-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #d000ff; /* Use your accent color */
+  text-align: right;
+  letter-spacing: -0.5px;
+}
+
+
+/* =========================================
+   STEP 4: FAB & BOTTOM POLISH
+   ========================================= */
+
+/* 1. The Glowing Button */
+.fab-btn {
+  /* Change from Black to Neon Purple */
+  background: linear-gradient(135deg, #d000ff, #9c27b0) !important;
+  color: #fff !important;
+  
+  /* Make it slightly larger */
+  width: 64px !important; 
+  height: 64px !important;
+  
+  /* Stronger Glow */
+  box-shadow: 0 10px 25px rgba(208, 0, 255, 0.5) !important;
+  border: 2px solid rgba(255, 255, 255, 0.2) !important;
+  
+  /* Ensure it sits well above the bottom bar */
+  bottom: max(30px, calc(20px + env(safe-area-inset-bottom))) !important;
+}
+
+/* 2. Press Effect */
+.fab-btn:active {
+  transform: scale(0.95) rotate(90deg) !important;
+  box-shadow: 0 5px 15px rgba(208, 0, 255, 0.3) !important;
+}
+
+/* 3. Bottom Fade Gradient (Prevents hard cut-off) */
+/* We add this pseudo-element to the body or main container */
+body::after {
+  content: "";
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 120px; /* Fade height */
+  background: linear-gradient(to top, #000000 10%, transparent 100%);
+  pointer-events: none; /* Let clicks pass through */
+  z-index: 50; /* Below the FAB (z-index 100) but above content */
+}
+
+
+
+/* =========================================
+   STEP 5: SKELETON POLISH
+   ========================================= */
+
+/* The Container for dummy cards */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Matches the margin-bottom of real cards */
+}
+
+/* The Dummy Card Shape */
+.skeleton-expense-card {
+  width: 100%;
+  height: 85px; /* Approx height of a real expense card */
+  border-radius: 16px; /* Matches .expense-card border-radius */
+  
+  /* Make it slightly transparent so it looks subtle on black */
+  opacity: 0.1; 
+  background: #fff;
+  
+  /* Add the shimmer animation */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ensure the shimmer effect is visible */
+.skeleton::after {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.1) 50%, /* Lighter shimmer for dark mode */
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+
+/* =========================================
+   STEP 6: TYPOGRAPHY & MICRO-INTERACTIONS
+   ========================================= */
+
+/* 1. Expense Card Typography */
+.expense-info h4 {
+  font-size: 1.1rem !important; /* Slightly larger title */
+  color: #000 !important;
+  margin-bottom: 4px !important;
+}
+
+.expense-info p {
+  font-size: 0.85rem !important;
+  color: #666 !important;
+}
+
+/* Make the "Paid by" bold, keep date subtle */
+.expense-info p strong {
+  color: #333;
+  font-weight: 600;
+}
+
+/* 2. The Amount (Make it POP) */
+.expense-amount {
+  font-size: 1.4rem !important; /* Much bigger */
+  font-weight: 800 !important;   /* Extra Bold */
+  letter-spacing: -0.5px;
+  
+  /* Gradient Text for the Amount */
+  background: linear-gradient(135deg, #d000ff, #7e00ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 3. Modal Inputs (Make them feel native) */
+input, select, textarea {
+  font-size: 16px !important; /* Prevents iOS Zoom */
+  background: #f5f5f7 !important; /* Light gray vs white */
+  border: 1px solid transparent !important;
+}
+
+input:focus {
+  background: #fff !important;
+  border-color: #d000ff !important;
+  box-shadow: 0 0 0 4px rgba(208, 0, 255, 0.1) !important;
+}
