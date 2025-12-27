@@ -34,6 +34,8 @@
       GOOGLE_BTN: '.g_id_signin',
     }
   };
+
+  window.APP_CONFIG = CONFIG;
 // ... rest of the file
 
   /* ======================================

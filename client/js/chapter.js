@@ -336,6 +336,7 @@ addExpenseForm.onsubmit = async (e) => {
       await apiFetch(`/expenses/${editingExpenseId}`, {
         method: "PUT",
         body: {
+          chapterId: chapterId, // ✅ FIX: Added chapterId to fix 400 Bad Request
           amount,
           description,
           payerMemberId: payerId,

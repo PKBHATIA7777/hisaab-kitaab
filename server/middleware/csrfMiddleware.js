@@ -13,6 +13,9 @@ function csrfProtection(req, res, next) {
     req.cookies.csrf_token = token;
   }
 
+  // ✅ FIX: Make token accessible to server.js route handlers
+  req.csrf_token = req.cookies.csrf_token; 
+
   // 2. Verify Token on Mutations (POST, PUT, DELETE)
   const method = req.method.toUpperCase();
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
