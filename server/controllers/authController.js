@@ -330,96 +330,86 @@ async function registerComplete(req, res) {
   }
 }
 
-// POST /api/auth/login (UPDATED: now uses OTP flow)
+// POST /api/auth/login (Standard + Final OTP Step) - ✅ FIXED
 async function login(req, res) {
   try {
+    // 1. Check for OTP Login Token (Cookie)
     const loginToken = req.cookies.login_token;
-    if (!loginToken) {
-      return res.status(401).json({
-        ok: false,
-        message: "Login verification required. Please use OTP flow.",
-      });
-    }
-
-    let payload;
-    try {
-      payload = jwt.verify(loginToken, process.env.JWT_SECRET);
-      if (payload.purpose !== "complete_login") {
-        throw new Error("Invalid token purpose");
-      }
-    } catch {
-      return res.status(401).json({
-        ok: false,
-        message: "Invalid or expired login verification. Please start over.",
-      });
-    }
-
-    const email = payload.email;
-    const otpId = payload.otpId;
-
-    const { rows: otpCheck } = await db.query(
-      "SELECT used FROM otps WHERE id = $1 FOR UPDATE",
-      [otpId]
-    );
     
-    if (!otpCheck[0] || otpCheck[0].used) {
-      res.clearCookie("login_token");
-      return res.status(400).json({
-        ok: false,
-        message: "This login verification has already been used",
-      });
+    // CASE A: OTP LOGIN (Final Step)
+    if (loginToken) {
+        let payload;
+        try {
+          payload = jwt.verify(loginToken, process.env.JWT_SECRET);
+          if (payload.purpose !== "complete_login") throw new Error();
+        } catch {
+          // If token invalid, fall through to password check or error
+          res.clearCookie("login_token");
+          return res.status(401).json({ ok: false, message: "Session expired. Please verify OTP again." });
+        }
+
+        // Verify OTP wasn't reused
+        const { rows: otpCheck } = await db.query("SELECT used FROM otps WHERE id = $1 FOR UPDATE", [payload.otpId]);
+        if (!otpCheck[0] || otpCheck[0].used) {
+          return res.status(400).json({ ok: false, message: "This code has already been used." });
+        }
+
+        // Get User
+        const user = await findUserByIdentifier(payload.email);
+        if (!user) return res.status(400).json({ ok: false, message: "User not found" });
+
+        // ✅ FIX: REMOVED the "password_hash" check here.
+        // Since they verified via OTP, we trust them and log them in immediately.
+
+        // Complete Login
+        await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [payload.otpId]);
+        res.clearCookie("login_token"); // Clear temp cookie
+
+        // Issue real session
+        const rememberMe = !!req.body.rememberMe;
+        const token = createToken({ userId: user.id.toString() }, rememberMe);
+        sendAuthCookie(res, token, rememberMe);
+
+        return res.json({
+          ok: true,
+          message: "Login successful",
+          user: { id: user.id, realName: user.real_name, username: user.username, email: user.email },
+          sessionExpiresAt: Date.now() + (rememberMe ? LONG_MS : SHORT_MS)
+        });
     }
 
-    const user = await findUserByIdentifier(email);
-    if (!user) {
-      res.clearCookie("login_token");
-      return res.status(400).json({ ok: false, message: "User not found" });
+    // CASE B: PASSWORD LOGIN (Standard)
+    // If no OTP cookie, we expect password in body
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ ok: false, message: "Missing credentials" });
     }
 
-    if (user.needs_password) {
-      res.clearCookie("login_token");
-      return res.status(400).json({
-        ok: false,
-        message: "Please set your password first.",
-      });
-    }
+    const user = await findUserByIdentifier(identifier);
+    if (!user) return res.status(400).json({ ok: false, message: "Invalid credentials" });
 
+    // Block if user has no password (e.g. Google user trying to force password login)
     if (!user.password_hash) {
-      res.clearCookie("login_token");
-      return res.status(400).json({ ok: false, message: "Password not configured" });
+      return res.status(400).json({ ok: false, message: "This account uses Google/OTP login." });
     }
 
-    const now = new Date();
-    await db.query(
-      "UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2",
-      [now, user.id]
-    );
-
-    await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
-    res.clearCookie("login_token");
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ ok: false, message: "Invalid credentials" });
 
     const rememberMe = !!req.body.rememberMe;
     const token = createToken({ userId: user.id.toString() }, rememberMe);
     sendAuthCookie(res, token, rememberMe);
 
-    const sessionDuration = rememberMe ? LONG_MS : SHORT_MS;
-
     return res.json({
       ok: true,
       message: "Login successful",
-      user: {
-        id: user.id,
-        realName: user.real_name,
-        username: user.username,
-        email: user.email,
-      },
-      sessionExpiresAt: Date.now() + sessionDuration 
+      user: { id: user.id, realName: user.real_name, username: user.username, email: user.email },
+      sessionExpiresAt: Date.now() + (rememberMe ? LONG_MS : SHORT_MS)
     });
+
   } catch (err) {
     console.error("login error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in login" });
+    return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
 
