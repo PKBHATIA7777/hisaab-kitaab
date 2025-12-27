@@ -12,11 +12,15 @@
 
     // 2. Set API URL
     get API_BASE() {
+        // 🟢 FIX: Dynamic Hostname Matching
+        // If you are on 127.0.0.1, this becomes http://127.0.0.1:5001/api
+        // If you are on localhost, this becomes http://localhost:5001/api
         return this.isLocal
-          ? "http://localhost:5001/api"
-          : "https://hisaab-kitaab-service-app.onrender.com/api"; // 👈 MUST BE FULL RENDER URL
+          ? `http://${window.location.hostname}:5001/api`
+          : "https://hisaab-kitaab-service-app.onrender.com/api"; 
     },
     
+    // ... rest of your config remains exactly the same ...
     TIMEOUTS: {
       TOAST_DURATION: 4000, 
       DEBOUNCE_DELAY: 300,  
@@ -30,9 +34,7 @@
       GOOGLE_BTN: '.g_id_signin',
     }
   };
-
-  // Expose for debugging
-  window.APP_CONFIG = CONFIG;
+// ... rest of the file
 
   /* ======================================
      1. NETWORK STACK
@@ -277,21 +279,33 @@
     return check;
   };
 
+  /* ✅ UPDATED: Instant Touch Response + Haptic Feedback */
   function initPasswordToggles() {
     document.querySelectorAll('.btn-toggle-pass').forEach(btn => {
+      // 1. Clean slate: Clone to remove old listeners
       const newBtn = btn.cloneNode(true);
       btn.parentNode.replaceChild(newBtn, btn);
-      newBtn.addEventListener('click', (e) => {
-        e.preventDefault();
+
+      const toggle = (e) => {
+        // Prevent default to stop:
+        // 1. The input from losing focus (keyboard closing)
+        // 2. Double-firing if both touchstart and click happen
+        if (e.cancelable) e.preventDefault();
+
         const input = newBtn.previousElementSibling;
-        if (input.type === 'password') {
-          input.type = 'text';
-          newBtn.textContent = '🙈';
-        } else {
-          input.type = 'password';
-          newBtn.textContent = '👁️';
-        }
-      });
+        const isPass = input.type === 'password';
+        
+        input.type = isPass ? 'text' : 'password';
+        newBtn.textContent = isPass ? '🙈' : '👁️';
+
+        // 3. Add Haptic Tick (The "Physical" Feel)
+        if (navigator.vibrate) navigator.vibrate(10);
+      };
+
+      // 4. Use 'touchstart' for instant mobile response
+      // Fallback to 'click' for desktop users
+      newBtn.addEventListener('touchstart', toggle, { passive: false });
+      newBtn.addEventListener('click', toggle);
     });
   }
 

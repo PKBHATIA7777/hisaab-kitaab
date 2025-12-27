@@ -19,8 +19,8 @@
   
   body {
     margin: 0;
-    min-height: 100vh; /* Fallback for old browsers */
-    min-height: 100dvh; 
+    min-height: 100vh;
+    min-height: 100dvh;
     font-family: var(--font-main);
     background: linear-gradient(180deg, #000000 10%, #1a0029 100%);
     color: #333;
@@ -28,8 +28,18 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    overflow-x: hidden; /* Prevent horizontal scroll */
+    overflow-x: hidden;
     position: relative;
+  
+    /* 🔴 NEW: Disable Pull-to-Refresh & Text Selection */
+    overscroll-behavior-y: none; 
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent; /* Remove blue tap box on Android */
+  }
+  input, textarea, .selectable {
+    user-select: text;
+    -webkit-user-select: text;
   }
   
   /* =========================
@@ -1767,4 +1777,64 @@ input:focus {
   background: #fff !important;
   border-color: #d000ff !important;
   box-shadow: 0 0 0 4px rgba(208, 0, 255, 0.1) !important;
+}
+
+
+/* =========================
+   20. NEW: NATIVE ANIMATIONS
+   ========================= */
+
+/* A. Shake Animation (For Errors) */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.shake-card {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* B. Step Transitions (For Login/Signup Slides) */
+.step-wrapper {
+  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.35s ease;
+  width: 100%;
+}
+
+/* Visible State */
+.step-active {
+  transform: translateX(0);
+  opacity: 1;
+  position: relative; /* In flow */
+  pointer-events: auto;
+}
+
+/* Hidden (Left - Previous Step) */
+.step-hidden-left {
+  transform: translateX(-40px);
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  width: 100%;
+}
+
+/* Hidden (Right - Next Step) */
+.step-hidden-right {
+  transform: translateX(40px);
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  width: 100%;
+}
+
+/* C. Touch Target Fix for Password Eye */
+.btn-toggle-pass {
+  /* Ensure min size of 44x44px for easy tapping */
+  min-width: 44px;
+  min-height: 44px;
+  /* ... existing styles remain ... */
 }

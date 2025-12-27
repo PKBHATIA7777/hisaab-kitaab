@@ -2,6 +2,8 @@
 const { z } = require("zod");
 const xss = require("xss");
 
+// ... existing sanitizers ...
+
 // 1. Common Sanitizers
 const sanitize = (str) => {
   if (typeof str !== 'string') return '';
@@ -13,21 +15,22 @@ const normalizeEmail = (email) => {
   return email.trim().toLowerCase();
 };
 
-// 2. Shared Zod Schemas
 const emailSchema = z.string().email("Invalid email format").transform(normalizeEmail);
 const passwordSchema = z.string().min(8, "Password must be at least 8 characters");
 
 // 3. Request Validators
 const registerSchema = z.object({
-  username: z.string().min(2).max(50).trim(),
-  email: emailSchema,
+  // 🔴 REMOVED: username: z.string().min(2).max(50).trim(),
+  // 🟢 NEW: Username is optional/removed from input
+  realName: z.string().min(2, "Name is required").trim(),
+  username: z.string().optional(), // kept optional just in case, but we won't send it
+  // We still validate email implicitly via the signup token, but 
+  // sometimes we might pass it for consistency. The controller handles the main logic.
+  // Actually, the controller only extracts realName and password usually.
   password: passwordSchema,
 });
 
-// ✅ UPDATED: Allow email OR username as identifier
 const loginSchema = z.object({
-  // WAS: email: emailSchema,
-  // CHANGE TO:
   identifier: z.string().min(1, "Email or username is required"),
   password: z.string(),
 });

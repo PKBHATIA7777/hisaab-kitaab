@@ -28,13 +28,112 @@ async function findUserById(id) {
   return rows[0] || null;
 }
 
-// helper: find user by email or username
+// helper: find user by identifier (updated to handle nullable username)
 async function findUserByIdentifier(identifier) {
   const { rows } = await db.query(
-    "SELECT * FROM users WHERE email = $1 OR username = $1 LIMIT 1",
+    "SELECT * FROM users WHERE email = $1 OR (username = $1 AND username IS NOT NULL) LIMIT 1",
     [identifier]
   );
   return rows[0] || null;
+}
+
+// ✅ UPDATED: checkIdentifier as Express Controller
+async function checkIdentifier(req, res) {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) return res.status(400).json({ ok: false, message: "Identifier required" });
+
+    const cleanIdentifier = identifier.trim().toLowerCase();
+    const user = await findUserByIdentifier(cleanIdentifier);
+
+    if (!user) {
+      return res.json({ ok: true, exists: false });
+    }
+
+    return res.json({
+      ok: true,
+      exists: true,
+      email: user.email,
+      provider: user.provider,
+      hasPassword: !!user.password_hash,
+    });
+  } catch (err) {
+    console.error("checkIdentifier error:", err);
+    return res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// ✅ UPDATED: loginRequestOtp - uses DB helper directly
+async function loginRequestOtp(req, res) {
+  try {
+    const result = emailSchema.safeParse(req.body.email);
+    if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+    
+    const email = result.data;
+
+    const user = await findUserByIdentifier(email);
+    
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "Account not found. Please sign up." });
+    }
+
+    const code = generateOtpCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await db.query(
+      `INSERT INTO otps (email, code, purpose, expires_at, used, attempts)
+       VALUES ($1, $2, 'login', $3, FALSE, 0)
+       ON CONFLICT (email, purpose)
+       DO UPDATE SET code = EXCLUDED.code,
+                     expires_at = EXCLUDED.expires_at,
+                     used = FALSE,
+                     attempts = 0,
+                     created_at = NOW()`,
+      [email, code, expiresAt]
+    );
+
+    await sendOtpEmail(
+      email,
+      "Your Hisaab-Kitaab login code",
+      `Your login code is ${code}. It will expire in 10 minutes.`
+    );
+
+    return res.json({
+      ok: true,
+      message: "Login OTP sent to your email",
+    });
+  } catch (err) {
+    console.error("loginRequestOtp error:", err);
+    return res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// ✅ NEW: loginVerifyOtp (exported)
+async function loginVerifyOtp(req, res) {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
+
+    const otpRow = await verifyOtpLogic(email, otp, "login");
+
+    const tempToken = jwt.sign(
+      { email: email.trim().toLowerCase(), purpose: "complete_login", otpId: otpRow.id },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.cookie("login_token", tempToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    return res.json({ ok: true, message: "Login code verified successfully" });
+  } catch (err) {
+    const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
+    return res.status(status).json({ ok: false, message: err.message });
+  }
 }
 
 // ✅ FIX S9: Enhanced OTP Verification with Brute Force Protection
@@ -57,14 +156,12 @@ async function verifyOtpLogic(email, otp, purpose) {
 
   // 2. Check Max Attempts (Brute Force Protection)
   if (otpRow.attempts >= 3) {
-    // Delete/Invalidate immediately if max attempts reached
     await db.query("DELETE FROM otps WHERE id = $1", [otpRow.id]);
     throw new Error("Too many failed attempts. Please request a new code.");
   }
 
   // 3. Verify Code
   if (otpRow.code !== otp) {
-    // Increment attempts
     await db.query("UPDATE otps SET attempts = attempts + 1 WHERE id = $1", [otpRow.id]);
     throw new Error("Invalid OTP code");
   }
@@ -75,21 +172,17 @@ async function verifyOtpLogic(email, otp, purpose) {
 // POST /api/auth/register/request-otp
 async function registerRequestOtp(req, res) {
   try {
-    // ✅ Use Shared Schema (Fix C5)
     const result = emailSchema.safeParse(req.body.email);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     
-    const email = result.data; // Already lowercased & trimmed
+    const email = result.data;
 
-    // Check if user exists
     const { rows } = await db.query("SELECT id FROM users WHERE email = $1", [email]);
     if (rows.length > 0) return res.status(400).json({ ok: false, message: "Email already registered" });
 
-    // Generate and Send OTP
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Insert/Update OTP (Including the new 'attempts' column)
     await db.query(
       `INSERT INTO otps (email, code, purpose, expires_at, used, attempts)
        VALUES ($1, $2, 'signup', $3, FALSE, 0)
@@ -112,7 +205,6 @@ async function registerRequestOtp(req, res) {
       ok: true,
       message: "OTP sent to your email address",
     });
-
   } catch (err) {
     console.error("registerRequestOtp error:", err);
     return res.status(500).json({ ok: false, message: "Server error" });
@@ -125,10 +217,8 @@ async function registerVerifyOtp(req, res) {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
 
-    // Use shared logic with brute force protection
     const otpRow = await verifyOtpLogic(email, otp, "signup");
 
-    // Success - Issue Token
     const tempToken = jwt.sign(
       { email: email.trim().toLowerCase(), purpose: "complete_signup", otpId: otpRow.id },
       process.env.JWT_SECRET,
@@ -144,81 +234,66 @@ async function registerVerifyOtp(req, res) {
 
     return res.json({ ok: true, message: "Email verified successfully" });
   } catch (err) {
-    // Return 400 for logic errors (invalid otp), 500 for system
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
     return res.status(status).json({ ok: false, message: err.message });
   }
 }
 
-// ✅ UPDATED FUNCTION: registerComplete with Transactions
+// ✅ UPDATED: registerComplete with AUTO-GENERATED USERNAME
 async function registerComplete(req, res) {
   try {
-    // ✅ Use Shared Schema
     const result = registerSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
 
-    const { realName, username, password } = result.data;
+    const { realName, password } = result.data;
     
     // 2. Verify signup token
     const signupToken = req.cookies.signup_token;
     if (!signupToken) {
-      return res.status(401).json({
-        ok: false,
-        message: "Email verification required. Please start over.",
-      });
+      return res.status(401).json({ ok: false, message: "Email verification required." });
     }
 
     let payload;
     try {
       payload = jwt.verify(signupToken, process.env.JWT_SECRET);
-      if (payload.purpose !== "complete_signup") {
-        throw new Error("Invalid token purpose");
-      }
+      if (payload.purpose !== "complete_signup") throw new Error();
     } catch {
-      return res.status(401).json({
-        ok: false,
-        message: "Invalid or expired verification. Please start over.",
-      });
+      return res.status(401).json({ ok: false, message: "Invalid verification." });
     }
 
     const email = payload.email;
     const otpId = payload.otpId;
-    const cleanUsername = username.trim().toLowerCase();
 
-    // =========================================================
-    // ✅ TRANSACTION START
-    // =========================================================
     await db.query("BEGIN");
 
     try {
-      // 3. Re-Check if OTP was already consumed (Safety Lock)
-      const { rows: otpCheck } = await db.query(
-        "SELECT used FROM otps WHERE id = $1 FOR UPDATE",
-        [otpId]
-      );
-      
+      const { rows: otpCheck } = await db.query("SELECT used FROM otps WHERE id = $1 FOR UPDATE", [otpId]);
       if (!otpCheck[0] || otpCheck[0].used) {
         await db.query("ROLLBACK");
-        return res.status(400).json({
-          ok: false,
-          message: "This verification link has already been used",
-        });
+        return res.status(400).json({ ok: false, message: "Link already used" });
       }
 
-      // 4. Check if email or username already exists
-      const { rows: existingRows } = await db.query(
-        "SELECT * FROM users WHERE email = $1 OR username = $2 LIMIT 1",
-        [email, cleanUsername]
-      );
-
+      const { rows: existingRows } = await db.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
       if (existingRows[0]) {
         await db.query("ROLLBACK");
-        return res
-          .status(400)
-          .json({ ok: false, message: "Email or username already in use" });
+        return res.status(400).json({ ok: false, message: "Email already in use" });
       }
 
-      // 5. Create User
+      // =========================================================
+      // 🟢 AUTO-GENERATE USERNAME (Logic from Google Login)
+      // =========================================================
+      const baseUsername = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+      let username = baseUsername;
+      let counter = 1;
+
+      // Ensure uniqueness
+      while (true) {
+        const { rows: uRows } = await db.query("SELECT 1 FROM users WHERE username = $1 LIMIT 1", [username]);
+        if (uRows.length === 0) break;
+        username = `${baseUsername}${counter++}`;
+      }
+      // =========================================================
+
       const passwordHash = await bcrypt.hash(password, 10);
       const now = new Date();
 
@@ -228,17 +303,13 @@ async function registerComplete(req, res) {
            google_id, needs_password, last_login_at)
          VALUES ($1, $2, $3, $4, 'local', NULL, FALSE, $5)
          RETURNING *`,
-        [realName, cleanUsername, email, passwordHash, now]
+        [realName, username, email, passwordHash, now]
       );
       const user = userRows[0];
 
-      // 6. Mark OTP as used
       await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
-
-      // ✅ COMMIT TRANSACTION
       await db.query("COMMIT");
 
-      // 7. Session Setup (After Commit)
       res.clearCookie("signup_token");
       const token = createToken({ userId: user.id.toString() });
       sendAuthCookie(res, token);
@@ -246,50 +317,67 @@ async function registerComplete(req, res) {
       return res.json({
         ok: true,
         message: "Account created successfully",
-        user: {
-          id: user.id,
-          realName: user.real_name,
-          username: user.username,
-          email: user.email,
-        },
+        user: { id: user.id, realName: user.real_name, username: user.username, email: user.email },
       });
 
     } catch (err) {
       await db.query("ROLLBACK");
       throw err;
     }
-
   } catch (err) {
     console.error("registerComplete error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in complete registration" });
+    return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
 
-// POST /api/auth/login
+// POST /api/auth/login (UPDATED: now uses OTP flow)
 async function login(req, res) {
   try {
-    // ✅ Use Shared Schema
-    const result = loginSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ ok: false, message: result.error.issues[0].message });
+    const loginToken = req.cookies.login_token;
+    if (!loginToken) {
+      return res.status(401).json({
+        ok: false,
+        message: "Login verification required. Please use OTP flow.",
+      });
     }
-    const { identifier, password } = result.data;
 
-    const rememberMe = !!req.body.rememberMe; 
+    let payload;
+    try {
+      payload = jwt.verify(loginToken, process.env.JWT_SECRET);
+      if (payload.purpose !== "complete_login") {
+        throw new Error("Invalid token purpose");
+      }
+    } catch {
+      return res.status(401).json({
+        ok: false,
+        message: "Invalid or expired login verification. Please start over.",
+      });
+    }
 
-    const cleanIdentifier = identifier.trim().toLowerCase();
+    const email = payload.email;
+    const otpId = payload.otpId;
 
-    const user = await findUserByIdentifier(cleanIdentifier);
+    const { rows: otpCheck } = await db.query(
+      "SELECT used FROM otps WHERE id = $1 FOR UPDATE",
+      [otpId]
+    );
+    
+    if (!otpCheck[0] || otpCheck[0].used) {
+      res.clearCookie("login_token");
+      return res.status(400).json({
+        ok: false,
+        message: "This login verification has already been used",
+      });
+    }
 
+    const user = await findUserByIdentifier(email);
     if (!user) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Invalid credentials" });
+      res.clearCookie("login_token");
+      return res.status(400).json({ ok: false, message: "User not found" });
     }
 
     if (user.needs_password) {
+      res.clearCookie("login_token");
       return res.status(400).json({
         ok: false,
         message: "Please set your password first.",
@@ -297,16 +385,8 @@ async function login(req, res) {
     }
 
     if (!user.password_hash) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Invalid credentials" });
-    }
-
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
-    if (!passwordMatch) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Invalid credentials" });
+      res.clearCookie("login_token");
+      return res.status(400).json({ ok: false, message: "Password not configured" });
     }
 
     const now = new Date();
@@ -315,6 +395,10 @@ async function login(req, res) {
       [now, user.id]
     );
 
+    await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
+    res.clearCookie("login_token");
+
+    const rememberMe = !!req.body.rememberMe;
     const token = createToken({ userId: user.id.toString() }, rememberMe);
     sendAuthCookie(res, token, rememberMe);
 
@@ -339,7 +423,7 @@ async function login(req, res) {
   }
 }
 
-// POST /api/auth/google
+// POST /api/auth/google (UPDATED: username now nullable)
 async function googleLogin(req, res) {
   try {
     const { idToken } = req.body;
@@ -376,28 +460,14 @@ async function googleLogin(req, res) {
 
     if (!user) {
       isNewUser = true;
-
-      const baseUsername = email.split("@")[0].toLowerCase();
-      let username = baseUsername;
-      let counter = 1;
-
-      while (true) {
-        const { rows: uRows } = await db.query(
-          "SELECT 1 FROM users WHERE username = $1 LIMIT 1",
-          [username]
-        );
-        if (uRows.length === 0) break;
-        username = `${baseUsername}${counter++}`;
-      }
-
       const now = new Date();
       const { rows: newUserRows } = await db.query(
         `INSERT INTO users
           (real_name, username, email, password_hash, provider,
            google_id, needs_password, last_login_at)
-         VALUES ($1, $2, $3, NULL, 'google', $4, FALSE, $5)
+         VALUES ($1, NULL, $2, NULL, 'google', $3, FALSE, $4)
          RETURNING *`,
-        [realName, username, email, googleId, now]
+        [realName, email, googleId, now]
       );
       user = newUserRows[0];
     } else {
@@ -496,19 +566,17 @@ async function setPassword(req, res) {
 // POST /api/auth/forgot/request-otp
 async function forgotRequestOtp(req, res) {
   try {
-    // ✅ Use Shared Schema
     const result = emailSchema.safeParse(req.body.email);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     
-    const email = result.data; // Already lowercased & trimmed
+    const email = result.data;
 
     const { rows: userRows } = await db.query(
       "SELECT * FROM users WHERE email = $1 LIMIT 1",
       [email]
     );
-    const user = userRows[0] || null;
 
-    if (!user) {
+    if (!userRows[0]) {
       return res.json({
         ok: true,
         message: "If this email exists, an OTP has been sent",
@@ -567,10 +635,8 @@ async function resetPassword(req, res) {
       });
     }
 
-    // 1. Verify OTP with attempts check
     const otpRow = await verifyOtpLogic(email, otp, "reset");
 
-    // 2. Reset Password
     const cleanEmail = email.trim().toLowerCase();
     const { rows: userRows } = await db.query(
       "SELECT * FROM users WHERE email = $1 LIMIT 1",
@@ -595,7 +661,6 @@ async function resetPassword(req, res) {
       [passwordHash, user.id]
     );
 
-    // 3. Mark OTP Used
     await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
 
     return res.json({
@@ -608,7 +673,7 @@ async function resetPassword(req, res) {
   }
 }
 
-// GET /api/auth/me
+// ✅ UPDATED: GET /api/auth/me with SLIDING WINDOW Token Refresh
 async function me(req, res) {
   try {
     const token = req.cookies.auth_token;
@@ -624,9 +689,23 @@ async function me(req, res) {
     }
 
     const user = await findUserById(payload.userId);
-
     if (!user) {
       return res.status(401).json({ ok: false, message: "User not found" });
+    }
+
+    // =========================================================
+    // ✅ SLIDING WINDOW: Auto-Refresh Session
+    // =========================================================
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const tokenAgeSeconds = nowUnix - payload.iat;
+    const refreshThreshold = 24 * 60 * 60; // 1 day (86400 seconds)
+
+    if (tokenAgeSeconds > refreshThreshold) {
+       const originalDuration = payload.exp - payload.iat;
+       const isRemembered = originalDuration > (86400 + 1000);
+
+       const newToken = createToken({ userId: user.id.toString() }, isRemembered);
+       sendAuthCookie(res, newToken, isRemembered);
     }
 
     return res.json({
@@ -642,9 +721,7 @@ async function me(req, res) {
     });
   } catch (err) {
     console.error("me error:", err);
-    return res
-      .status(500)
-      .json({ ok: false, message: "Server error in me" });
+    return res.status(500).json({ ok: false, message: "Server error in me" });
   }
 }
 
@@ -652,9 +729,7 @@ async function me(req, res) {
 // POST /api/auth/logout
 function logout(req, res) {
   try {
-    // ✅ FIX B12: Clean up all cookies
     clearAuthCookies(res);
-
     return res.json({ ok: true, message: "Logged out" });
   } catch (err) {
     console.error("logout error:", err);
@@ -663,6 +738,9 @@ function logout(req, res) {
 }
 
 module.exports = {
+  checkIdentifier,
+  loginRequestOtp,
+  loginVerifyOtp,
   registerRequestOtp,
   registerVerifyOtp,
   registerComplete,

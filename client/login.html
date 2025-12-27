@@ -20,6 +20,328 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+  <div class="bubble-container">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
+  <div class="brand-header">
+    <h1>Hisaab-Kitaab</h1>
+    <p>Your way of handling expenses</p>
+  </div>
+
+  <main id="main-content">
+    <div class="auth-wrapper">
+      <section class="auth-card" style="overflow: hidden; position: relative; min-height: 420px; transition: min-height 0.3s ease;">
+        
+        <div id="step-1" class="step-wrapper step-active">
+          <h1 class="auth-title">Welcome Back</h1>
+          <p class="auth-subtitle">Enter your email to continue</p>
+
+          <form id="form-identifier" onsubmit="handleIdentifierSubmit(event)">
+            <label>
+              Email address
+              <input type="text" name="identifier" id="input-identifier" required autocomplete="username" placeholder="name@example.com">
+            </label>
+            <button type="submit" class="btn-primary" id="btn-next">Continue</button>
+          </form>
+
+          <p style="margin-top: 20px; font-size: 0.9rem; color:#666;">
+            New here? <a href="signup.html">Create an account</a>
+          </p>
+        </div>
+
+        <div id="step-2" class="step-wrapper step-hidden-right">
+          <button type="button" class="btn-text" onclick="goToStep1()" style="margin-bottom: 10px;">← Back</button>
+          
+          <h1 class="auth-title" id="welcome-user">Welcome</h1>
+          <p class="auth-subtitle" id="auth-method-text">Choose how you want to sign in</p>
+
+          <form id="form-password" onsubmit="handlePasswordSubmit(event)" style="display:none;">
+            <label>
+              Password
+              <div class="password-wrapper">
+                <input type="password" name="password" id="input-password" autocomplete="current-password" placeholder="••••••••">
+                <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
+              </div>
+            </label>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+              <label style="display:flex; align-items:center; margin:0; cursor:pointer;">
+                <input type="checkbox" name="rememberMe" checked style="width:auto; margin-right:8px;">
+                <span style="font-weight:400; font-size:0.9rem;">Remember me</span>
+              </label>
+              <a href="forgot.html" style="font-size:0.85rem;">Forgot?</a>
+            </div>
+
+            <button type="submit" class="btn-primary" id="btn-login-pass">Log in</button>
+            
+            <div class="divider"><span>OR</span></div>
+            <button type="button" class="btn-secondary" onclick="switchToOtpMode()">Log in via OTP code</button>
+          </form>
+
+          <div id="otp-section" style="display:none;">
+            <div id="otp-request-state">
+              <p style="text-align:center; font-size:0.9rem; color:#888; margin-bottom:20px;">
+                We'll send a code to your email. No password needed.
+              </p>
+              <button type="button" class="btn-primary" onclick="requestLoginOtp()" id="btn-req-otp">Send Login Code</button>
+            </div>
+
+            <form id="form-otp" onsubmit="handleOtpSubmit(event)" style="display:none;">
+              <label>
+                Enter 6-digit Code
+                <input type="text" name="otp" id="input-otp" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6" style="letter-spacing: 4px; font-size: 1.2rem; text-align: center;">
+              </label>
+              <button type="submit" class="btn-primary" id="btn-verify-otp">Verify & Login</button>
+              <button type="button" class="btn-text" onclick="switchToOtpMode(true)" style="margin-top:10px; font-size:0.8rem;">Resend Code</button>
+            </form>
+
+             <button type="button" class="btn-text" id="btn-back-pass" onclick="switchToPasswordMode()" style="margin-top:15px; width:100%;">Use Password instead</button>
+          </div>
+
+          <div id="google-container" style="margin-top: 20px;">
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="100%"></div>
+          </div>
+
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <script src="js/main.js"></script>
+  <script>
+    // --- STATE MANAGEMENT ---
+    let userContext = {
+      identifier: '',
+      email: '',
+      provider: 'local', // 'local' or 'google'
+      hasPassword: false
+    };
+
+    const els = {
+      step1: document.getElementById('step-1'),
+      step2: document.getElementById('step-2'),
+      authCard: document.querySelector('.auth-card'),
+      inputIdentifier: document.getElementById('input-identifier'),
+      welcomeUser: document.getElementById('welcome-user'),
+      formPass: document.getElementById('form-password'),
+      otpSection: document.getElementById('otp-section'),
+      googleContainer: document.getElementById('google-container'),
+      btnBackPass: document.getElementById('btn-back-pass')
+    };
+
+    // --- INIT ---
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Check LocalStorage for saved user
+      const lastUser = localStorage.getItem('last_user');
+      if (lastUser) {
+        els.inputIdentifier.value = lastUser;
+      }
+      // 2. Init Password Toggles (from main.js)
+      if(window.initPasswordToggles) initPasswordToggles();
+    });
+
+    // --- STEP 1: IDENTIFIER SUBMIT ---
+    async function handleIdentifierSubmit(e) {
+      e.preventDefault();
+      const identifier = els.inputIdentifier.value.trim();
+      if (!identifier) return;
+
+      const btn = document.getElementById('btn-next');
+      setBtnLoading(btn, true);
+
+      try {
+        const res = await apiFetch('/auth/check-identifier', {
+          method: 'POST',
+          body: { identifier }
+        });
+
+        if (res.exists) {
+          // Success: Save context and move
+          userContext = { ...res, identifier };
+          localStorage.setItem('last_user', identifier); // Remember!
+          transitionToStep2();
+        } else {
+          // Fail: Shake and warn
+          showToast("Account not found. Please create an account.", "error");
+          els.authCard.classList.add('shake-card');
+          setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
+        }
+      } catch (err) {
+        showToast(err.message, "error");
+      } finally {
+        setBtnLoading(btn, false);
+      }
+    }
+
+    // --- TRANSITIONS ---
+    function transitionToStep2() {
+      // 1. Update Text
+      els.welcomeUser.textContent = `Hi, ${userContext.email.split('@')[0]}`; // "Hi, John"
+      
+      // 2. Configure UI based on Context
+      if (userContext.provider === 'google' || !userContext.hasPassword) {
+        // GOOGLE / NO-PASS USER
+        els.formPass.style.display = 'none';
+        els.otpSection.style.display = 'block';
+        switchToOtpMode(true); // Default to "Request OTP" state
+        els.googleContainer.style.display = 'block';
+        els.btnBackPass.style.display = 'none'; // Can't go back to password
+      } else {
+        // PASSWORD USER
+        els.formPass.style.display = 'block';
+        els.otpSection.style.display = 'none';
+        els.googleContainer.style.display = 'none'; // Hide google if they are pure local
+        
+        // Auto-focus password
+        setTimeout(() => document.getElementById('input-password').focus(), 400);
+      }
+
+      // 3. Animate
+      els.step1.classList.replace('step-active', 'step-hidden-left');
+      els.step2.classList.replace('step-hidden-right', 'step-active');
+    }
+
+    function goToStep1() {
+      els.step2.classList.replace('step-active', 'step-hidden-right');
+      els.step1.classList.replace('step-hidden-left', 'step-active');
+    }
+
+    // --- MODE SWITCHING (Pass vs OTP) ---
+    function switchToOtpMode(reset = true) {
+      els.formPass.style.display = 'none';
+      els.otpSection.style.display = 'block';
+      
+      if (reset) {
+        document.getElementById('otp-request-state').style.display = 'block';
+        document.getElementById('form-otp').style.display = 'none';
+      }
+    }
+
+    function switchToPasswordMode() {
+      els.otpSection.style.display = 'none';
+      els.formPass.style.display = 'block';
+      setTimeout(() => document.getElementById('input-password').focus(), 100);
+    }
+
+    // --- LOGIN: PASSWORD ---
+    async function handlePasswordSubmit(e) {
+      e.preventDefault();
+      const password = document.getElementById('input-password').value;
+      const rememberMe = document.querySelector('input[name="rememberMe"]').checked;
+      const btn = document.getElementById('btn-login-pass');
+
+      setBtnLoading(btn, true);
+
+      try {
+        const data = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: { identifier: userContext.identifier, password, rememberMe }
+        });
+        loginSuccess(data);
+      } catch (err) {
+        showToast("Incorrect password", "error");
+        els.authCard.classList.add('shake-card');
+        setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
+        document.getElementById('input-password').value = "";
+      } finally {
+        setBtnLoading(btn, false);
+      }
+    }
+
+    // --- LOGIN: OTP REQUEST ---
+    async function requestLoginOtp() {
+      const btn = document.getElementById('btn-req-otp');
+      setBtnLoading(btn, true);
+
+      try {
+        await apiFetch('/auth/login/otp-request', {
+          method: 'POST',
+          body: { email: userContext.email }
+        });
+        
+        // Switch to Entry Mode
+        document.getElementById('otp-request-state').style.display = 'none';
+        document.getElementById('form-otp').style.display = 'block';
+        
+        // Focus & Auto-Submit Logic
+        const otpInput = document.getElementById('input-otp');
+        setTimeout(() => otpInput.focus(), 100);
+        
+        otpInput.oninput = (e) => {
+          if (e.target.value.length === 6) {
+             document.getElementById('form-otp').requestSubmit();
+             otpInput.blur();
+          }
+        };
+
+      } catch (err) {
+        showToast(err.message, "error");
+      } finally {
+        setBtnLoading(btn, false);
+      }
+    }
+
+    // --- LOGIN: OTP VERIFY ---
+    async function handleOtpSubmit(e) {
+      e.preventDefault();
+      const otp = document.getElementById('input-otp').value;
+      const btn = document.getElementById('btn-verify-otp');
+      setBtnLoading(btn, true);
+
+      try {
+        const data = await apiFetch('/auth/login/otp-verify', {
+          method: 'POST',
+          body: { email: userContext.email, otp }
+        });
+        loginSuccess(data);
+      } catch (err) {
+        showToast(err.message || "Invalid Code", "error");
+        els.authCard.classList.add('shake-card');
+        setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
+      } finally {
+        setBtnLoading(btn, false);
+      }
+    }
+
+    // --- SHARED SUCCESS ---
+    function loginSuccess(data) {
+      if (data.sessionExpiresAt) {
+        localStorage.setItem("sessionExpiresAt", data.sessionExpiresAt);
+      }
+      // Haptic Success
+      if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
+      
+      window.location.href = "dashboard.html";
+    }
+  </script>
+</body>
+</html>
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Log in - Hisaab-Kitaab</title>
+  <link rel="icon" href="data:image/svg+xml,
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+  <text x='50%' y='65%' text-anchor='middle'
+        font-size='80'
+        fill='%23d000ff'
+        font-family='Arial, sans-serif'>₹</text>
+</svg>">
+
+  <link rel="stylesheet" href="css/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
   <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="bubble-container">
@@ -110,4 +432,4 @@
     }
   </script>
 </body>
-</html>
+</html> -->

@@ -31,10 +31,29 @@ app.use(logger);
 // =========================================
 // 2. CORS
 // =========================================
+// =========================================
+const allowedOrigins = [
+  process.env.CLIENT_URL,           // From .env (e.g. http://localhost:5500)
+  "http://localhost:5500",          // Explicit Localhost
+  "http://127.0.0.1:5500",          // Explicit IP
+  "https://hisaab-kitaab.onrender.com" // Production (Optional: Add your deployed URL)
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Check if the origin is in our allowed list
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.warn(`⚠️ CORS Blocked Origin: ${origin}`);
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // This is CRITICAL for cookies to work
   })
 );
 

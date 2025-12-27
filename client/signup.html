@@ -3,25 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <title>Sign up - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
-
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff' font-family='Arial, sans-serif'>₹</text></svg>">
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <a href="#main-content" class="skip-link">Skip to content</a>
-
   <div class="bubble-container">
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
@@ -34,194 +24,233 @@
 
   <main id="main-content">
     <div class="auth-wrapper">
-      <section class="auth-card">
-        <h1 class="auth-title">Create Account</h1>
+      <section class="auth-card" style="overflow: hidden; position: relative; min-height: 400px;">
+        
+        <div id="step-1" class="step-wrapper step-active">
+          <h1 class="auth-title">Create Account</h1>
+          <p class="auth-subtitle">Enter your email to get started</p>
 
-        <form id="step-email-form">
-          <label>
-            Email
-            <input type="email" name="email" required autocomplete="email" placeholder="john@example.com">
-          </label>
-          <button type="submit" class="btn-primary">Send OTP</button>
-        </form>
-
-        <div id="step-otp-wrapper" hidden>
-          <p style="margin-bottom:15px; color:#666;">
-            Enter the code sent to <span id="display-email" style="font-weight:bold;"></span>
-          </p>
-          <form id="step-otp-form">
+          <form id="form-email" onsubmit="handleEmailSubmit(event)">
             <label>
-              OTP
-              <input type="text" name="otp" required placeholder="123456" autocomplete="off" inputmode="numeric" pattern="[0-9]*">
+              Email address
+              <input type="email" name="email" id="input-email" required autocomplete="email" placeholder="john@example.com">
             </label>
-            <button type="submit" class="btn-primary">Verify Email</button>
+            <button type="submit" class="btn-primary" id="btn-email">Send Verification Code</button>
           </form>
-          <button type="button" id="btn-resend" class="btn-secondary">Resend code</button>
+
+          <div style="margin-top: 20px;">
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signup_with" data-size="large" data-logo_alignment="left" data-width="100%"></div>
+          </div>
+
+          <p style="margin-top:20px; font-size:0.9rem; color:#666;">
+            Already have an account? <a href="login.html">Log in</a>
+          </p>
         </div>
 
-        <div id="step-details-wrapper" hidden>
-          <p style="margin-bottom:15px; color:#666;">
-            Email verified! Finish setting up your account.
+        <div id="step-2" class="step-wrapper step-hidden-right">
+          <button type="button" class="btn-text" onclick="goBackToStep1()">← Back</button>
+          <h1 class="auth-title">Check your Inbox</h1>
+          <p class="auth-subtitle">We sent a code to <span id="display-email" style="font-weight:600"></span></p>
+
+          <form id="form-otp" onsubmit="handleOtpSubmit(event)">
+            <label>
+              Enter 6-digit Code
+              <input type="text" name="otp" id="input-otp" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6" style="letter-spacing: 4px; font-size: 1.2rem; text-align: center;">
+            </label>
+            <button type="submit" class="btn-primary" id="btn-otp">Verify Email</button>
+          </form>
+
+          <p style="text-align:center; margin-top:15px;">
+            <button type="button" id="btn-resend" class="btn-text" onclick="resendOtp()">Resend Code</button>
           </p>
-          <form id="step-details-form">
+        </div>
+
+        <div id="step-3" class="step-wrapper step-hidden-right">
+          <h1 class="auth-title">One Last Thing</h1>
+          <p class="auth-subtitle">Finish setting up your profile</p>
+
+          <form id="form-details" onsubmit="handleDetailsSubmit(event)">
             <label>
-              Real Name
-              <input type="text" name="realName" required autocomplete="name" placeholder="John Doe">
+              Full Name
+              <input type="text" name="realName" required autocomplete="name" placeholder="John Doe" id="input-name">
             </label>
             <label>
-              Username
-              <input type="text" name="username" required autocomplete="username" placeholder="johndoe123">
-            </label>
-            <label>
-              Password
+              Create Password
               <div class="password-wrapper">
                 <input type="password" name="password" required autocomplete="new-password" placeholder="••••••••">
-                <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">👁️</button>
+                <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
               </div>
-              <small class="password-hint">Password must be at least 8 characters</small>
             </label>
-            <button type="submit" class="btn-primary">Create Account</button>
+            <button type="submit" class="btn-primary" id="btn-finish">Create Account</button>
           </form>
         </div>
 
-        <p style="margin-top:20px; font-size:0.9rem; color:#666;">
-          Already have an account? <a href="login.html">Log in</a>
-        </p>
-
-        <!-- Google Sign In -->
-        <div class="g_id_signin"></div>
       </section>
     </div>
   </main>
 
   <script src="js/main.js"></script>
-
   <script>
-    // DOM Elements
-    const emailForm = document.getElementById("step-email-form");
-    const otpWrapper = document.getElementById("step-otp-wrapper");
-    const otpForm = document.getElementById("step-otp-form");
-    const detailsWrapper = document.getElementById("step-details-wrapper");
-    const detailsForm = document.getElementById("step-details-form");
-    const displayEmail = document.getElementById("display-email");
-    const resendBtn = document.getElementById("btn-resend");
-
-    // State
+    // --- STATE ---
     let signupEmail = "";
+    const els = {
+      step1: document.getElementById('step-1'),
+      step2: document.getElementById('step-2'),
+      step3: document.getElementById('step-3'),
+      inputEmail: document.getElementById('input-email'),
+      inputOtp: document.getElementById('input-otp'),
+      inputName: document.getElementById('input-name'),
+      displayEmail: document.getElementById('display-email'),
+      btnResend: document.getElementById('btn-resend')
+    };
 
-    /* =========================================
-       STEP 1: Request OTP
-       ========================================= */
-    emailForm.addEventListener("submit", async (e) => {
+    // --- INIT ---
+    document.addEventListener('DOMContentLoaded', () => {
+      if(window.initPasswordToggles) initPasswordToggles();
+      els.inputEmail.focus();
+    });
+
+    // --- STEP 1: EMAIL ---
+    async function handleEmailSubmit(e) {
       e.preventDefault();
-      const formData = new FormData(emailForm);
-      signupEmail = formData.get("email");
+      const email = els.inputEmail.value.trim();
+      const btn = document.getElementById('btn-email');
+
+      if(!email) return;
+      setBtnLoading(btn, true);
 
       try {
         await apiFetch("/auth/register/request-otp", {
-          method: "POST",
-          body: { email: signupEmail },
+            method: "POST",
+            body: { email }
         });
 
-        // UI Switch
-        emailForm.style.display = "none";
-        otpWrapper.hidden = false;
-        displayEmail.textContent = signupEmail;
-        alert("OTP sent to " + signupEmail);
-        startResendTimer(); // Start timer on first send
+        // Success -> Move to Step 2
+        signupEmail = email;
+        els.displayEmail.textContent = email;
+        
+        slide(els.step1, els.step2);
+        
+        // Auto-focus OTP
+        setTimeout(() => els.inputOtp.focus(), 400);
+        startResendTimer();
+
       } catch (err) {
-        alert(err.message || "Failed to send OTP");
+        showToast(err.message, "error");
+        document.querySelector('.auth-card').classList.add('shake-card');
+        setTimeout(() => document.querySelector('.auth-card').classList.remove('shake-card'), 500);
+      } finally {
+        setBtnLoading(btn, false);
+      }
+    }
+
+    // --- STEP 2: OTP ---
+    
+    // Auto-Submit Logic
+    els.inputOtp.addEventListener('input', (e) => {
+      if (e.target.value.length === 6) {
+        document.getElementById('form-otp').requestSubmit();
+        els.inputOtp.blur();
       }
     });
 
-    /* =========================================
-       STEP 2: Verify OTP
-       ========================================= */
-    otpForm.addEventListener("submit", async (e) => {
+    async function handleOtpSubmit(e) {
       e.preventDefault();
-      const formData = new FormData(otpForm);
-      const otpInput = formData.get("otp");
+      const otp = els.inputOtp.value;
+      const btn = document.getElementById('btn-otp');
+      setBtnLoading(btn, true);
 
       try {
-        // This call will set the 'signup_token' cookie if successful
         await apiFetch("/auth/register/verify-otp", {
           method: "POST",
-          body: { email: signupEmail, otp: otpInput },
+          body: { email: signupEmail, otp }
         });
 
-        // UI Switch
-        otpWrapper.hidden = true;
-        detailsWrapper.hidden = false;
+        // Success -> Move to Step 3
+        slide(els.step2, els.step3);
+        setTimeout(() => els.inputName.focus(), 400);
+
       } catch (err) {
-        alert(err.message || "Invalid OTP");
+        showToast("Invalid code", "error");
+        els.inputOtp.classList.add('shake-card'); // shake input
+        setTimeout(() => els.inputOtp.classList.remove('shake-card'), 500);
+        els.inputOtp.value = "";
+      } finally {
+        setBtnLoading(btn, false);
       }
-    });
+    }
 
-    /* =========================================
-       STEP 3: Complete Registration
-       ========================================= */
-    detailsForm.addEventListener("submit", async (e) => {
+    // --- STEP 3: DETAILS ---
+    async function handleDetailsSubmit(e) {
       e.preventDefault();
-      const formData = new FormData(detailsForm);
-
-      // Note: We do NOT send email/otp here. 
-      // The server reads them from the cookie set in Step 2.
-      const payload = {
-        realName: formData.get("realName"),
-        username: formData.get("username"),
-        password: formData.get("password")
-      };
+      const formData = new FormData(document.getElementById('form-details'));
+      const btn = document.getElementById('btn-finish');
+      setBtnLoading(btn, true);
 
       try {
         await apiFetch("/auth/register/complete", {
           method: "POST",
-          body: payload,
+          body: {
+            realName: formData.get("realName"),
+            password: formData.get("password")
+            // No username sent!
+          }
         });
 
-        alert("Account created successfully! Redirecting...");
+        if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
         window.location.href = "dashboard.html";
+
       } catch (err) {
-        alert(err.message || "Registration failed");
+        showToast(err.message, "error");
+      } finally {
+        setBtnLoading(btn, false);
       }
-    });
+    }
 
-    /* =========================================
-       Resend OTP Logic (With Cooldown)
-       ========================================= */
+    // --- UTILS ---
+    function slide(fromEl, toEl) {
+      fromEl.classList.replace('step-active', 'step-hidden-left');
+      toEl.classList.replace('step-hidden-right', 'step-active');
+    }
+
+    function goBackToStep1() {
+      els.step2.classList.replace('step-active', 'step-hidden-right');
+      els.step1.classList.replace('step-hidden-left', 'step-active');
+      setTimeout(() => els.inputEmail.focus(), 100);
+    }
+
     let resendTimer = null;
-    let countdown = 60;
-
     function startResendTimer() {
-      resendBtn.disabled = true;
-      countdown = 60;
-      resendBtn.textContent = `Resend in ${countdown}s`;
-
+      let count = 60;
+      els.btnResend.disabled = true;
+      els.btnResend.textContent = `Resend in ${count}s`;
+      
+      if(resendTimer) clearInterval(resendTimer);
+      
       resendTimer = setInterval(() => {
-        countdown--;
-        if (countdown <= 0) {
+        count--;
+        if(count <= 0) {
           clearInterval(resendTimer);
-          resendBtn.disabled = false;
-          resendBtn.textContent = "Resend code";
+          els.btnResend.disabled = false;
+          els.btnResend.textContent = "Resend Code";
         } else {
-          resendBtn.textContent = `Resend in ${countdown}s`;
+          els.btnResend.textContent = `Resend in ${count}s`;
         }
       }, 1000);
     }
 
-    resendBtn.addEventListener("click", async () => {
-      try {
-        await apiFetch("/auth/register/request-otp", {
-          method: "POST",
-          body: { email: signupEmail },
-        });
-        alert("OTP Resent!");
-        startResendTimer(); // Start the countdown
-      } catch(err) {
-        alert(err.message || "Failed to resend");
-        resendBtn.disabled = false; // Re-enable if it failed
-      }
-    });
+    async function resendOtp() {
+       try {
+         await apiFetch("/auth/register/request-otp", {
+            method: "POST",
+            body: { email: signupEmail }
+         });
+         showToast("Code resent!");
+         startResendTimer();
+       } catch(err) {
+         showToast(err.message, "error");
+       }
+    }
   </script>
-
 </body>
 </html>
