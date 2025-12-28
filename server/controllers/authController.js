@@ -14,10 +14,12 @@ const {
   normalizeEmail 
 } = require("../utils/validation"); // ✅ Import shared validation
 
+
 // helper: generate 6-digit OTP
 function generateOtpCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
 
 // helper: find user by id
 async function findUserById(id) {
@@ -28,6 +30,7 @@ async function findUserById(id) {
   return rows[0] || null;
 }
 
+
 // helper: find user by identifier (updated to handle nullable username)
 async function findUserByIdentifier(identifier) {
   const { rows } = await db.query(
@@ -36,6 +39,7 @@ async function findUserByIdentifier(identifier) {
   );
   return rows[0] || null;
 }
+
 
 // ✅ UPDATED: checkIdentifier as Express Controller
 async function checkIdentifier(req, res) {
@@ -62,6 +66,7 @@ async function checkIdentifier(req, res) {
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
+
 
 // ✅ UPDATED: loginRequestOtp - uses DB helper directly
 async function loginRequestOtp(req, res) {
@@ -108,6 +113,7 @@ async function loginRequestOtp(req, res) {
   }
 }
 
+
 // ✅ NEW: loginVerifyOtp (exported)
 async function loginVerifyOtp(req, res) {
   try {
@@ -135,6 +141,7 @@ async function loginVerifyOtp(req, res) {
     return res.status(status).json({ ok: false, message: err.message });
   }
 }
+
 
 // ✅ FIX S9: Enhanced OTP Verification with Brute Force Protection
 async function verifyOtpLogic(email, otp, purpose) {
@@ -168,6 +175,7 @@ async function verifyOtpLogic(email, otp, purpose) {
 
   return otpRow;
 }
+
 
 // POST /api/auth/register/request-otp
 async function registerRequestOtp(req, res) {
@@ -211,6 +219,7 @@ async function registerRequestOtp(req, res) {
   }
 }
 
+
 // ✅ FIX S9: UPDATED registerVerifyOtp with verifyOtpLogic
 async function registerVerifyOtp(req, res) {
   try {
@@ -238,6 +247,7 @@ async function registerVerifyOtp(req, res) {
     return res.status(status).json({ ok: false, message: err.message });
   }
 }
+
 
 // ✅ UPDATED: registerComplete with AUTO-GENERATED USERNAME
 async function registerComplete(req, res) {
@@ -330,6 +340,7 @@ async function registerComplete(req, res) {
   }
 }
 
+
 // POST /api/auth/login (Standard + Final OTP Step) - ✅ FIXED
 async function login(req, res) {
   try {
@@ -413,7 +424,8 @@ async function login(req, res) {
   }
 }
 
-// POST /api/auth/google (UPDATED: username now nullable)
+
+// POST /api/auth/google (UPDATED: username now nullable) ✅ UPDATED REMEMBER = TRUE
 async function googleLogin(req, res) {
   try {
     const { idToken } = req.body;
@@ -468,8 +480,10 @@ async function googleLogin(req, res) {
       );
     }
 
-    const token = createToken({ userId: user.id.toString() });
-    sendAuthCookie(res, token);
+    // ✅ CHANGE 1: Force rememberMe = true for Google login
+    const rememberMe = true;
+    const token = createToken({ userId: user.id.toString() }, rememberMe);
+    sendAuthCookie(res, token, rememberMe);
 
     return res.json({
       ok: true,
@@ -489,6 +503,7 @@ async function googleLogin(req, res) {
       .json({ ok: false, message: "Google login failed" });
   }
 }
+
 
 // POST /api/auth/set-password
 async function setPassword(req, res) {
@@ -548,10 +563,10 @@ async function setPassword(req, res) {
   } catch (err) {
     console.error("setPassword error:", err);
     return res
-      .status(500)
-      .json({ ok: false, message: "Server error in set-password" });
+      .status(500).json({ ok: false, message: "Server error in set-password" });
   }
 }
+
 
 // POST /api/auth/forgot/request-otp
 async function forgotRequestOtp(req, res) {
@@ -601,10 +616,10 @@ async function forgotRequestOtp(req, res) {
   } catch (err) {
     console.error("forgotRequestOtp error:", err);
     return res
-      .status(500)
-      .json({ ok: false, message: "Server error in forgot request-otp" });
+      .status(500).json({ ok: false, message: "Server error in forgot request-otp" });
   }
 }
+
 
 // ✅ FIX S9: UPDATED resetPassword with verifyOtpLogic
 async function resetPassword(req, res) {
@@ -663,6 +678,7 @@ async function resetPassword(req, res) {
   }
 }
 
+
 // ✅ UPDATED: GET /api/auth/me with SLIDING WINDOW Token Refresh
 async function me(req, res) {
   try {
@@ -688,7 +704,9 @@ async function me(req, res) {
     // =========================================================
     const nowUnix = Math.floor(Date.now() / 1000);
     const tokenAgeSeconds = nowUnix - payload.iat;
-    const refreshThreshold = 24 * 60 * 60; // 1 day (86400 seconds)
+
+    // ✅ CHANGE 2: Refresh if token older than 5 days
+    const refreshThreshold = 5 * 24 * 60 * 60; // 5 days in seconds
 
     if (tokenAgeSeconds > refreshThreshold) {
        const originalDuration = payload.exp - payload.iat;
@@ -714,6 +732,7 @@ async function me(req, res) {
     return res.status(500).json({ ok: false, message: "Server error in me" });
   }
 }
+
 
 // ✅ FIX B12: Clean up all cookies using helper
 // POST /api/auth/logout

@@ -1,11 +1,11 @@
 /* server/utils/jwt.js */
 const jwt = require("jsonwebtoken");
 
-const SHORT_AGE = "1d";
-const LONG_AGE = "30d";
+const SHORT_AGE = "15d"; // Increased from 1d
+const LONG_AGE = "90d";  // Increased from 30d (Standard for apps)
 
-const SHORT_MS = 24 * 60 * 60 * 1000;
-const LONG_MS = 30 * 24 * 60 * 60 * 1000;
+const SHORT_MS = 15 * 24 * 60 * 60 * 1000;
+const LONG_MS = 90 * 24 * 60 * 60 * 1000;
 
 function createToken(payload, remember = false) {
   const secret = process.env.JWT_SECRET;
