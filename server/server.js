@@ -16,6 +16,7 @@ const db = require("./config/db"); // Import DB to ensure validation runs
 const authRoutes = require("./routes/authRoutes");
 const chapterRoutes = require("./routes/chapterRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
+const friendRoutes = require("./routes/friendRoutes"); // <--- ADDED
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -31,7 +32,6 @@ app.use(logger);
 // =========================================
 // 2. CORS
 // =========================================
-// =========================================
 const allowedOrigins = [
   process.env.CLIENT_URL,           // From .env (e.g. http://localhost:5500)
   "http://localhost:5500",          // Explicit Localhost
@@ -44,7 +44,7 @@ app.use(
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
+
       // Check if the origin is in our allowed list
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
@@ -85,7 +85,7 @@ app.use(
 );
 
 // =========================================
-// 4. RATE LIMITING (ENHANCED)
+/* 4. RATE LIMITING (ENHANCED) */
 // =========================================
 const rateLimitHandler = (req, res, next, options) => {
   console.warn(`⚠️ Rate Limit: IP ${req.ip} -> ${req.originalUrl}`);
@@ -105,7 +105,7 @@ app.use(globalLimiter);
 
 // 2. Strict Auth Limiter (Login/OTP)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
+  windowMs: 15 * 60 * 1000,
   max: 30, // 30 attempts per 15 min
   standardHeaders: true,
   legacyHeaders: false,
@@ -165,13 +165,14 @@ app.get("/api/csrf-token", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/chapters", chapterRoutes);
 app.use("/api/expenses", expenseRoutes);
+app.use("/api/friends", friendRoutes); // <--- ADDED
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "System operational" });
 });
 
 // 404 API Handler
-app.use("/api", (req, res) => { 
+app.use("/api", (req, res) => {
   res.status(404).json({ ok: false, message: "API endpoint not found" });
 });
 

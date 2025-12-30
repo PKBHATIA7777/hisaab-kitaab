@@ -26,10 +26,13 @@
       <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
     </div>
 
+    <!-- Updated Header -->
     <div class="brand-header">
       <h1>Hisaab-Kitaab</h1>
       <div class="header-actions">
-        <button class="btn-secondary" id="logout-btn">Logout</button>
+        <div id="header-profile-icon" class="header-profile-btn" onclick="openProfileModal()" title="My Profile">
+          ?
+        </div>
       </div>
     </div>
 
@@ -89,6 +92,78 @@
           <button class="btn-primary" id="confirm-delete-btn" style="background: #ff1744; border:none;">
             Yes, Delete
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="modal-overlay" id="profile-modal">
+      <div class="modal-box" style="max-width: 420px; padding: 0;">
+        
+        <div style="padding: 20px; text-align: right;">
+          <button class="close-modal" aria-label="Close" onclick="closeProfileModal()">×</button>
+        </div>
+
+        <div style="padding: 0 30px 30px 30px; overflow-y: auto; max-height: 80vh;">
+          
+          <div class="profile-header-section">
+            <div id="profile-avatar" class="profile-avatar-large">?</div>
+            <h2 id="profile-realname" class="profile-name">Loading...</h2>
+            <p id="profile-username" class="profile-username">@...</p>
+          </div>
+
+          <div class="profile-section-title">
+            <span>My Friends</span>
+            <button id="btn-add-friend-mode" class="btn-small" onclick="openAddFriendMode()" style="background:#f0f0f0;">+ Add</button>
+          </div>
+          
+          <div id="friends-section-content" style="position: relative; min-height: 100px;">
+            
+            <div id="friends-list-view">
+              <div id="friends-list-container">
+              </div>
+              <div id="friends-empty-state" style="display:none; text-align:center; padding:20px; color:#999; font-size:0.85rem;">
+                No friends added yet.
+              </div>
+            </div>
+
+            <form id="friend-form" style="display: none; background: #f9f9f9; padding: 15px; border-radius: 12px; border: 1px solid #eee;">
+              <h4 id="friend-form-title" style="margin:0 0 15px 0; font-size:0.95rem; color:#333;">Add New Friend</h4>
+              
+              <input type="hidden" name="friendId">
+              <label style="font-size:0.8rem;">Full Name <span style="color:red">*</span></label>
+              <input type="text" name="name" required placeholder="e.g. Rahul Kumar" style="margin-bottom:10px; padding:8px;">
+
+              <label style="font-size:0.8rem;">Username (Unique) <span style="color:red">*</span></label>
+              <input type="text" name="username" required placeholder="e.g. rahul123" style="margin-bottom:10px; padding:8px;">
+
+              <label style="font-size:0.8rem;">Email <span style="color:red">*</span></label>
+              <input type="email" name="email" required placeholder="rahul@example.com" style="margin-bottom:10px; padding:8px;">
+
+              <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                  <label style="font-size:0.8rem;">Phone (Opt)</label>
+                  <input type="text" name="phone" placeholder="Landline" style="margin-bottom:10px; padding:8px;">
+                </div>
+                <div style="flex:1;">
+                  <label style="font-size:0.8rem;">Mobile (Opt)</label>
+                  <input type="text" name="mobile" placeholder="Mobile" style="margin-bottom:10px; padding:8px;">
+                </div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-top:5px;">
+                <button type="submit" class="btn-primary" style="padding:8px; font-size:0.9rem;">Save</button>
+                <button type="button" class="btn-secondary" onclick="cancelFriendEdit()" style="padding:8px; font-size:0.9rem; margin-top:0;">Cancel</button>
+              </div>
+            </form>
+
+          </div>
+
+          <div class="profile-section-title">Account</div>
+          <button type="button" class="btn-secondary" id="logout-btn-profile" style="color: #ff1744; border-color: #ffcdd2; background: #fff;">
+            Log Out
+          </button>
+
         </div>
       </div>
     </div>

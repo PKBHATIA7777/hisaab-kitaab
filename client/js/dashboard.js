@@ -1,18 +1,20 @@
 /* client/js/dashboard.js */
 
+
 const chaptersGrid = document.getElementById("chapters-grid");
 const createModal = document.getElementById("create-modal");
 const createForm = document.getElementById("create-chapter-form");
 const memberListContainer = document.getElementById("member-list-container");
-const logoutBtn = document.getElementById("logout-btn");
+
 
 // ==========================================
 // ✅ STATE MANAGEMENT
 // ==========================================
-let allChapters = []; 
-
+let allChapters = [];
 let isEditMode = false;
 let editChapterId = null;
+let currentUser = null; // ✅ NEW: Store global user
+
 
 // ✅ Updated skeleton loader: centered spinner
 function renderSkeletons() {
@@ -23,6 +25,7 @@ function renderSkeletons() {
     </div>
   `;
 }
+
 
 // ==========================================
 // HELPER FUNCTIONS
@@ -36,6 +39,7 @@ function getInitials(name) {
   return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
 }
 
+
 function getAvatarColor(name) {
   const colors = [
     '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', 
@@ -47,6 +51,7 @@ function getAvatarColor(name) {
   }
   return colors[Math.abs(hash) % colors.length];
 }
+
 
 function timeAgo(timestamp) {
   const now = new Date();
@@ -60,8 +65,10 @@ function timeAgo(timestamp) {
   return Math.floor(diff / 2592000000) + "mo ago";
 }
 
+
 document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons();
+
 
   // ==========================================
   // ✅ Inject Search & Sort Controls
@@ -101,6 +108,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ">✕</button>
       </div>
 
+
       <div style="min-width: 160px;">
         <select id="chapter-sort" style="
           width: 100%;
@@ -123,16 +131,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   chaptersGrid.insertAdjacentHTML('beforebegin', controlsHtml);
 
+
   // --- LOGIC ---
   const searchInput = document.getElementById('chapter-search');
   const clearBtn = document.getElementById('search-clear-btn');
   const sortSelect = document.getElementById('chapter-sort');
+
 
   // ✅ FIX P2: Enhanced runFilter with empty state handling & mobile optimization
   const runFilter = () => {
     const term = searchInput.value.toLowerCase().trim();
     const cards = document.querySelectorAll('.chapter-card.card-content');
     let visibleCount = 0;
+
 
     cards.forEach(card => {
       const name = card.querySelector('.chapter-name').textContent.toLowerCase();
@@ -143,6 +154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     // Toggle Clear Button
     if (clearBtn) clearBtn.style.display = term.length > 0 ? 'flex' : 'none';
+
 
     // ✅ FIX U8: Show "No Results" message
     const emptyState = document.querySelector('.empty-state-container');
@@ -172,6 +184,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
+
   // ✅ FIX P2: Debounce Search (Wait 300ms before filtering) - Uses global debounce from main.js
   if (searchInput) {
     searchInput.addEventListener('input', debounce(runFilter, 300));
@@ -186,6 +199,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       searchInput.focus();
     });
   }
+
 
   // Helper: Sort Data & Re-render
   const runSort = () => {
@@ -211,9 +225,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     runFilter(); 
   };
 
+
   if (sortSelect) {
     sortSelect.addEventListener('change', runSort);
   }
+
 
   // Keyboard Shortcut
   document.addEventListener('keydown', (e) => {
@@ -223,10 +239,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+
   // --- DATA FETCHING ---
   const slowNetworkTimeout = setTimeout(() => {
     showToast("Server is waking up...", "info");
   }, 2500);
+
 
   // ✅ FIX: Character Counters
   const nameInput = createForm.querySelector('input[name="name"]');
@@ -234,9 +252,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const nameCount = document.getElementById("name-count");
   const descCount = document.getElementById("desc-count");
 
+
   const updateCount = (input, display) => {
     display.textContent = input.value.length;
   };
+
 
   // Listeners
   if (nameInput && nameCount) {
@@ -246,6 +266,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     descInput.addEventListener("input", () => updateCount(descInput, descCount));
   }
 
+
   // SETUP VALIDATION FOR CREATE MODAL
   window.setupInlineValidation(nameInput, (value) => {
     if (!value.trim()) return "Chapter name is required.";
@@ -254,17 +275,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     return null;
   });
 
+
   try {
     const [authData, chaptersData] = await Promise.all([
       apiFetch("/auth/me"),
       apiFetch("/chapters")
     ]);
     
+    // ✅ NEW: Capture User Data & Render Profile Icon
+    currentUser = authData.user;
+    renderProfileIcon();
+
+
     clearTimeout(slowNetworkTimeout);
+
 
     // ✅ FIX: Store data globally
     allChapters = chaptersData.chapters;
     renderGrid(allChapters);
+
 
   } catch (err) {
     clearTimeout(slowNetworkTimeout);
@@ -282,27 +311,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// 2. Logout Logic
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", async () => {
-    try {
-      // ✅ FIX: Show spinner immediately
-      setBtnLoading(logoutBtn, true);
-
-      await apiFetch("/auth/logout", { method: "POST" });
-      showToast("Logged out successfully", "success");
-
-      // small delay to let them read the toast
-      setTimeout(() => window.location.href = "login.html", 500);
-    } catch(e) {
-      // Even if it fails, redirect
-      window.location.href = "login.html";
-    } finally {
-      // (Optional) Reset button if for some reason redirect didn't happen
-      setBtnLoading(logoutBtn, false);
-    }
-  });
-}
 
 // ==========================================
 // ✅ UNIFIED FORM SUBMISSION HANDLER
@@ -310,14 +318,17 @@ if (logoutBtn) {
 createForm.onsubmit = async (e) => {
   e.preventDefault();
 
+
   // 1. GET BUTTON & DATA
   const submitBtn = createForm.querySelector('button[type="submit"]');
   const formData = new FormData(createForm);
   const name = formData.get("name");
   const description = formData.get("description");
 
+
   try {
     setBtnLoading(submitBtn, true);
+
 
     if (isEditMode) {
       // --- UPDATE EXISTING ---
@@ -333,9 +344,11 @@ createForm.onsubmit = async (e) => {
         if(input.value.trim()) members.push(input.value.trim());
       });
 
+
       if(members.length === 0) {
         throw new Error("Please add at least one member.");
       }
+
 
       await apiFetch("/chapters", {
         method: "POST",
@@ -344,8 +357,10 @@ createForm.onsubmit = async (e) => {
       showToast("Chapter created successfully!", "success");
     }
 
+
     closeModal();
     await reloadChaptersGrid();
+
 
   } catch (err) {
     showToast(err.message || "Operation failed", "error");
@@ -353,6 +368,7 @@ createForm.onsubmit = async (e) => {
     setBtnLoading(submitBtn, false);
   }
 };
+
 
 // Helper to reload just the grid (used after creating a chapter)
 async function reloadChaptersGrid() {
@@ -376,11 +392,13 @@ async function reloadChaptersGrid() {
   }
 }
 
+
 // ==========================================
 // ✅ RENDERGRID FUNCTION
 // ==========================================
 function renderGrid(chapters) {
   chaptersGrid.innerHTML = "";
+
 
   // 1. SCENARIO A: No Chapters (SVG Empty State)
   if (!chapters || chapters.length === 0) {
@@ -402,7 +420,9 @@ function renderGrid(chapters) {
     return;
   }
 
+
   // 2. SCENARIO B: Has Chapters
+
 
   // "Add New" Card
   const addCard = document.createElement("div");
@@ -419,15 +439,18 @@ function renderGrid(chapters) {
   });
   chaptersGrid.appendChild(addCard);
 
+
   // User Chapters
   chapters.forEach((chapter) => {
     const card = document.createElement("div");
     card.className = "chapter-card card-content";
     card.style.position = "relative";
 
+
     const initials = getInitials(chapter.name);
     const color = getAvatarColor(chapter.name);
     const timeString = timeAgo(chapter.created_at);
+
 
     card.innerHTML = `
       <div class="card-header-row">
@@ -435,7 +458,9 @@ function renderGrid(chapters) {
           ${initials}
         </div>
 
+
         <button class="menu-btn" onclick="toggleMenu(event, '${chapter.id}')" aria-label="Open chapter menu">⋮</button>
+
 
         <div id="menu-${chapter.id}" class="menu-dropdown">
           <button class="menu-item" onclick="openEditModal('${chapter.id}', '${chapter.name}', '${chapter.description || ''}')">Edit</button>
@@ -443,7 +468,9 @@ function renderGrid(chapters) {
         </div>
       </div>
 
+
       <h3 class="chapter-name">${chapter.name}</h3>
+
 
       <div style="margin-top:auto; width:100%; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#888;">
         <span>${chapter.member_count} members</span>
@@ -451,44 +478,55 @@ function renderGrid(chapters) {
       </div>
     `;
 
+
     card.addEventListener("click", (e) => {
       if (e.target.tagName === "BUTTON" || e.target.closest(".menu-dropdown")) return;
       window.location.href = `chapter.html?id=${chapter.id}`;
     });
 
+
     chaptersGrid.appendChild(card);
   });
 }
 
+
 // ==========================================
 // ✅ MODAL FUNCTIONS
 // ==========================================
+
 
 // 1. Open for CREATING (Reset everything)
 window.openModal = function() {
   isEditMode = false;
   editChapterId = null;
 
+
   createForm.reset();
+
 
   // Show members section
   document.getElementById("member-list-container").style.display = "block";
   document.querySelector("button[type='button']").style.display = "inline-block";
 
+
   // Reset UI Text
   createModal.querySelector(".modal-header h2").textContent = "New Chapter";
   createForm.querySelector("button[type='submit']").textContent = "Create Chapter";
+
 
   // Reset member inputs to default (1 empty input)
   memberListContainer.innerHTML = "";
   addMemberInput();
 
+
   createModal.classList.add("active");
+
 
   // ✅ FIX: Focus the INPUT, not the box, for better accessibility
   setTimeout(() => {
     const firstInput = createForm.querySelector('input[name="name"]');
     if (firstInput) firstInput.focus();
+
 
     // Reset counters visually
     const nameCount = document.getElementById("name-count");
@@ -498,29 +536,36 @@ window.openModal = function() {
   }, 100);
 };
 
+
 // 2. Open for EDITING
 window.openEditModal = function(id, currentName, currentDesc) {
   isEditMode = true;
   editChapterId = id;
 
+
   // Populate form
   createForm.name.value = currentName;
   createForm.description.value = (currentDesc && currentDesc !== 'null') ? currentDesc : '';
+
 
   // Hide members section (Rename only)
   document.getElementById("member-list-container").style.display = "none";
   document.querySelector("button[type='button']").style.display = "none";
 
+
   // Update UI Text
   createModal.querySelector(".modal-header h2").textContent = "Edit Chapter";
   createForm.querySelector("button[type='submit']").textContent = "Save Changes";
 
+
   createModal.classList.add("active");
 };
+
 
 function closeModal() {
   createModal.classList.remove("active");
 }
+
 
 function addMemberInput() {
   const div = document.createElement("div");
@@ -532,9 +577,11 @@ function addMemberInput() {
   memberListContainer.appendChild(div);
 }
 
+
 /* ======================================
 MODAL ACCESSIBILITY
 ====================================== */
+
 
 // 1. Close on Escape Key
 document.addEventListener('keydown', (e) => {
@@ -543,6 +590,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+
 // 2. Close on Outside Click (Refined)
 createModal.addEventListener("click", (e) => {
   if (e.target === createModal) {
@@ -550,9 +598,11 @@ createModal.addEventListener("click", (e) => {
   }
 });
 
+
 // ======================================
 // EDIT & DELETE ACTIONS
 // ======================================
+
 
 // 1. Toggle the little menu
 window.toggleMenu = function(e, id) {
@@ -561,27 +611,33 @@ window.toggleMenu = function(e, id) {
     if (el.id !== `menu-${id}`) el.classList.remove('active');
   });
 
+
   const menu = document.getElementById(`menu-${id}`);
   menu.classList.toggle('active');
 };
+
 
 // Close menus when clicking anywhere else
 document.addEventListener('click', () => {
   document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
 });
 
+
 /* Delete Logic */
 let deleteTargetId = null;
 const deleteModal = document.getElementById("delete-modal");
 const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
 
+
 // 1. Open Modal
 window.confirmDelete = function(id) {
   document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
 
+
   deleteTargetId = id;
   deleteModal.classList.add("active");
 };
+
 
 // 2. Close Modal
 window.closeDeleteModal = function() {
@@ -589,21 +645,26 @@ window.closeDeleteModal = function() {
   deleteTargetId = null;
 };
 
+
 // 3. Handle "Yes, Delete" Click
 if (confirmDeleteBtn) {
   confirmDeleteBtn.addEventListener("click", () => {
     if (!deleteTargetId) return;
 
+
     const id = deleteTargetId;
     closeDeleteModal();
+
 
     performDeleteWithUndo(id);
   });
 }
 
+
 // 4. The "Undo" Logic
 function performDeleteWithUndo(id) {
   let isUndoClicked = false;
+
 
   showToast("Chapter deleted", "info", {
     label: "UNDO ↩️",
@@ -612,6 +673,7 @@ function performDeleteWithUndo(id) {
       showToast("Deletion cancelled", "success");
     }
   });
+
 
   setTimeout(async () => {
     if (!isUndoClicked) {
@@ -625,6 +687,7 @@ function performDeleteWithUndo(id) {
   }, 4000);
 }
 
+
 // ✅ NEW: Focus Trap for Modals
 function trapFocus(modal) {
   const focusableElements = modal.querySelectorAll(
@@ -632,8 +695,10 @@ function trapFocus(modal) {
   );
   if (focusableElements.length === 0) return;
 
+
   const firstElement = focusableElements[0];
   const lastElement = focusableElements[focusableElements.length - 1];
+
 
   modal.addEventListener('keydown', function(e) {
     if (e.key === 'Tab') {
@@ -652,8 +717,235 @@ function trapFocus(modal) {
   });
 }
 
+
 const originalOpenModal = window.openModal;
 window.openModal = function() {
   originalOpenModal();
   trapFocus(document.getElementById('create-modal'));
+};
+
+
+// ==========================================
+// ✅ PROFILE & LOGOUT LOGIC
+// ==========================================
+function renderProfileIcon() {
+  const iconEl = document.getElementById("header-profile-icon");
+  if (!iconEl || !currentUser) return;
+
+
+  const baseName = currentUser.realName || currentUser.username || "";
+  const initials = getInitials(baseName);
+  const color = getAvatarColor(baseName);
+  
+  iconEl.textContent = initials;
+  iconEl.style.background = color;
+  iconEl.style.boxShadow = `0 0 15px ${color}60`; // Glow effect
+}
+
+
+window.openProfileModal = function() {
+  const modal = document.getElementById("profile-modal");
+  if (!modal) return;
+
+  // Fill User Data
+  if (currentUser) {
+    document.getElementById("profile-realname").textContent = currentUser.realName;
+    document.getElementById("profile-username").textContent = `@${currentUser.username}`;
+    
+    const avatar = document.getElementById("profile-avatar");
+    avatar.textContent = getInitials(currentUser.realName);
+    avatar.style.background = getAvatarColor(currentUser.realName);
+  }
+
+  // ✅ NEW: Load Friends List
+  loadFriends();
+  // Ensure we start in list mode (not stuck in edit mode)
+  cancelFriendEdit(); 
+
+  modal.classList.add("active");
+};
+
+
+window.closeProfileModal = function() {
+  const modal = document.getElementById("profile-modal");
+  if (modal) modal.classList.remove("active");
+};
+
+
+// Re-bind Logout (since ID changed to logout-btn-profile)
+const profileLogoutBtn = document.getElementById("logout-btn-profile");
+if (profileLogoutBtn) {
+  profileLogoutBtn.addEventListener("click", async () => {
+    try {
+      setBtnLoading(profileLogoutBtn, true);
+      await apiFetch("/auth/logout", { method: "POST" });
+      showToast("Logged out successfully", "success");
+      setTimeout(() => window.location.href = "login.html", 500);
+    } catch(e) {
+      window.location.href = "login.html";
+    }
+  });
+}
+
+
+// ==========================================
+// ✅ FRIENDS MANAGEMENT LOGIC
+// ==========================================
+
+let myFriends = [];
+let isFriendEditMode = false;
+
+// 1. Load Friends when Profile Opens
+// (We hook into the existing openProfileModal function later)
+async function loadFriends() {
+  const listContainer = document.getElementById("friends-list-container");
+  const emptyState = document.getElementById("friends-empty-state");
+  
+  if(!listContainer) return;
+
+  listContainer.innerHTML = '<div class="spinner" style="margin: 20px auto; display:block;"></div>';
+  emptyState.style.display = "none";
+
+  try {
+    const data = await apiFetch("/friends");
+    myFriends = data.friends;
+    renderFriendsList();
+  } catch (err) {
+    listContainer.innerHTML = `<div style="color:red; text-align:center; padding:10px;">Failed to load friends</div>`;
+  }
+}
+
+// 2. Render List
+function renderFriendsList() {
+  const listContainer = document.getElementById("friends-list-container");
+  const emptyState = document.getElementById("friends-empty-state");
+  
+  listContainer.innerHTML = "";
+
+  if (myFriends.length === 0) {
+    emptyState.style.display = "block";
+    return;
+  }
+  
+  emptyState.style.display = "none";
+
+  myFriends.forEach(friend => {
+    const item = document.createElement("div");
+    item.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px solid #f5f5f5;";
+    
+    item.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="small-avatar" style="background:${getAvatarColor(friend.name)}">${getInitials(friend.name)}</div>
+        <div>
+          <div style="font-weight:600; font-size:0.9rem; color:#333;">${friend.name}</div>
+          <div style="font-size:0.8rem; color:#888;">@${friend.username}</div>
+        </div>
+      </div>
+      
+      <div style="display:flex; gap:5px;">
+        <button onclick="editFriend('${friend.id}')" style="border:none; background:none; cursor:pointer; font-size:1.1rem;" title="Edit">✏️</button>
+        <button onclick="deleteFriend('${friend.id}')" style="border:none; background:none; cursor:pointer; font-size:1.1rem; color:#ff1744;" title="Delete">🗑️</button>
+      </div>
+    `;
+    listContainer.appendChild(item);
+  });
+}
+
+// 3. UI Toggles
+window.openAddFriendMode = function() {
+  const form = document.getElementById("friend-form");
+  const list = document.getElementById("friends-list-view");
+  const addBtn = document.getElementById("btn-add-friend-mode");
+  
+  // Reset Form
+  form.reset();
+  form.querySelector('input[name="friendId"]').value = "";
+  document.getElementById("friend-form-title").textContent = "Add New Friend";
+  
+  // Switch Views
+  list.style.display = "none";
+  addBtn.style.display = "none";
+  form.style.display = "block";
+  
+  setTimeout(() => form.querySelector('input[name="name"]').focus(), 100);
+};
+
+window.cancelFriendEdit = function() {
+  document.getElementById("friend-form").style.display = "none";
+  document.getElementById("friends-list-view").style.display = "block";
+  document.getElementById("btn-add-friend-mode").style.display = "inline-block";
+};
+
+// 4. Edit Logic
+window.editFriend = function(id) {
+  const friend = myFriends.find(f => f.id == id);
+  if (!friend) return;
+
+  openAddFriendMode(); // Switch to form view
+  
+  const form = document.getElementById("friend-form");
+  document.getElementById("friend-form-title").textContent = "Edit Friend";
+  
+  // Fill inputs
+  form.querySelector('input[name="friendId"]').value = friend.id;
+  form.querySelector('input[name="name"]').value = friend.name;
+  form.querySelector('input[name="username"]').value = friend.username;
+  form.querySelector('input[name="email"]').value = friend.email;
+  form.querySelector('input[name="phone"]').value = friend.phone || "";
+  form.querySelector('input[name="mobile"]').value = friend.mobile || "";
+};
+
+// 5. Save (Create/Update)
+const friendForm = document.getElementById("friend-form");
+if (friendForm) {
+  friendForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = friendForm.querySelector('button[type="submit"]');
+    setBtnLoading(btn, true);
+
+    const formData = new FormData(friendForm);
+    const id = formData.get("friendId");
+    
+    const payload = {
+      name: formData.get("name"),
+      username: formData.get("username"),
+      email: formData.get("email"),
+      phone: formData.get("phone"),
+      mobile: formData.get("mobile")
+    };
+
+    try {
+      if (id) {
+        // UPDATE
+        await apiFetch(`/friends/${id}`, { method: "PUT", body: payload });
+        showToast("Friend updated", "success");
+      } else {
+        // CREATE
+        await apiFetch("/friends", { method: "POST", body: payload });
+        showToast("Friend added", "success");
+      }
+      
+      // Refresh & Go back to list
+      await loadFriends();
+      cancelFriendEdit();
+
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  };
+}
+
+// 6. Delete Logic
+window.deleteFriend = async function(id) {
+  if (!confirm("Are you sure you want to remove this friend?")) return;
+  
+  try {
+    await apiFetch(`/friends/${id}`, { method: "DELETE" });
+    showToast("Friend removed", "info");
+    loadFriends(); // Refresh list
+  } catch (err) {
+    showToast(err.message, "error");
+  }
 };
