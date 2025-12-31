@@ -864,7 +864,7 @@ async function loadFriends() {
 // RENDER FRIENDS LIST (With Settlements)
 // =========================================
 function renderFriendsList() {
-  const list = document.getElementById("friends-list");
+  const list = document.getElementById("friends-list-container");
   list.innerHTML = "";
 
   if (myFriends.length === 0) {
