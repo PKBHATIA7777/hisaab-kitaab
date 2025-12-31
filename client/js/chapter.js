@@ -12,6 +12,10 @@ let currentUser = null;
 let currentChapter = null;
 let currentMembers = [];
 let expenses = []; // ✅ Store expenses locally
+let cachedFriends = []; // ✅ Cache friends for autocomplete
+
+// 👇 NEW: Global variable for friends cache (as requested)
+let myFriendsCache = []; // Store friends locally to lookup IDs
 
 // Edit Mode State
 let isEditingExpense = false;
@@ -57,10 +61,8 @@ if(membersTrigger) {
     menuDropdown.classList.remove("active");
     
     // Toggle the existing member list dropdown
-    // We position it nicely relative to the top right
     if(memberDropdown) {
-        memberDropdown.style.display = "block"; // Ensure it's visible in DOM
-        // Allow a slight tick for display:block to apply before animating opacity
+        memberDropdown.style.display = "block";
         requestAnimationFrame(() => {
             memberDropdown.classList.toggle("active");
         });
@@ -76,6 +78,25 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// 👇 NEW FUNCTION: Fetch friends and populate datalist
+async function loadFriendsForAutocomplete() {
+  try {
+    const data = await apiFetch("/friends"); 
+    if (data.ok) {
+      myFriendsCache = data.friends;
+      
+      const dataList = document.getElementById("friends-datalist");
+      if (dataList) {
+        dataList.innerHTML = myFriendsCache
+          .map(f => `<option value="${f.name}">${f.username}</option>`)
+          .join("");
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load friends for autocomplete", err);
+  }
+}
+
 // --- INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -88,10 +109,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentChapter = chapterData.chapter;
     currentMembers = chapterData.members;
 
+    // ✅ Call new function to load friends for autocomplete
+    loadFriendsForAutocomplete();
+
     renderChapterInfo();
     renderMembers();
-
-    // ✅ FETCH EXPENSES
     loadExpenses();
 
   } catch (err) {
@@ -133,9 +155,10 @@ function renderChapterInfo() {
 function renderMembers() {
   memberListEl.innerHTML = "";
   currentMembers.forEach(m => {
+    const isMemberAdmin = (m.user_id === currentChapter.created_by);
+    
     const row = document.createElement("div");
     row.className = "dropdown-member-item";
-    const isMemberAdmin = (m.user_id === currentChapter.created_by);
     
     row.innerHTML = `
       <div class="small-avatar" style="background:${getAvatarColor(m.member_name)}">${getInitials(m.member_name)}</div>
@@ -162,7 +185,6 @@ function renderExpenses() {
     const card = document.createElement("div");
     card.className = "expense-card";
     
-    // Check if it's a temporary optimistic expense
     if (ex.isTemp) {
       card.style.opacity = "0.7";
       card.style.filter = "grayscale(1)";
@@ -186,10 +208,8 @@ function renderExpenses() {
 
 // --- HELPER: Render Payer and Split Options ---
 function renderPayerAndSplitOptions(selectedPayerId = null, selectedSplitIds = []) {
-  // Payers
   payerContainer.innerHTML = "";
   currentMembers.forEach((m, idx) => {
-    // If Editing: match ID. If Adding: match first index.
     const isSelected = selectedPayerId ? (m.id === selectedPayerId) : (idx === 0);
     
     const el = document.createElement("label");
@@ -205,9 +225,7 @@ function renderPayerAndSplitOptions(selectedPayerId = null, selectedSplitIds = [
     payerContainer.appendChild(el);
   });
 
-  // Splits
   splitContainer.innerHTML = "";
-  // Default to ALL checked if adding new, or match IDs if editing
   const isAddMode = selectedSplitIds.length === 0 && !isEditingExpense; 
   
   currentMembers.forEach(m => {
@@ -247,24 +265,20 @@ window.openEditExpenseModal = async function(id) {
   isEditingExpense = true;
   editingExpenseId = id;
   
-  // Show loading toast
   showToast("Loading details...", "info");
 
   try {
     const data = await apiFetch(`/expenses/${id}`);
     const { expense, involvedMemberIds } = data;
 
-    // Reset Form & Set Mode
     addExpenseForm.reset();
     document.getElementById("expense-modal-title").textContent = "Edit Expense";
     document.getElementById("btn-save-expense").textContent = "Update Expense";
-    document.getElementById("btn-delete-expense").style.display = "block"; // Show Delete
+    document.getElementById("btn-delete-expense").style.display = "block";
 
-    // Fill Basic Data
     addExpenseForm.querySelector("input[name='amount']").value = expense.amount;
     addExpenseForm.querySelector("input[name='description']").value = expense.description;
 
-    // Render Payers & Splits (Reuse logic but set checked status)
     renderPayerAndSplitOptions(expense.payer_member_id, involvedMemberIds);
 
     addExpenseModal.classList.add("active");
@@ -288,7 +302,6 @@ window.toggleSelectAll = function() {
   
   checkboxes.forEach(c => {
     c.checked = !allChecked;
-    // Trigger visual update
     const row = c.closest(".split-option");
     if (c.checked) row.classList.add("selected");
     else row.classList.remove("selected");
@@ -302,7 +315,7 @@ window.handleDeleteExpense = async function() {
     await apiFetch(`/expenses/${editingExpenseId}`, { method: "DELETE" });
     showToast("Expense deleted", "success");
     closeAddExpenseModal();
-    loadExpenses(); // Refresh list
+    loadExpenses();
   } catch(err) {
     showToast("Failed to delete", "error");
   }
@@ -313,16 +326,13 @@ addExpenseForm.onsubmit = async (e) => {
   e.preventDefault();
   const formData = new FormData(addExpenseForm);
   
-  // 1. Extract Data
   const amount = parseFloat(formData.get("amount"));
   const description = formData.get("description") || "";
   const payerId = parseInt(formData.get("payerMemberId"));
   
-  // Get all checked split IDs
   const involvedIds = [];
   splitContainer.querySelectorAll("input:checked").forEach(cb => involvedIds.push(parseInt(cb.value)));
 
-  // 2. Validation
   if (!amount || amount <= 0) {
     return showToast("Please enter a valid amount", "error");
   }
@@ -332,11 +342,10 @@ addExpenseForm.onsubmit = async (e) => {
 
   try {
     if (isEditingExpense) {
-      // --- UPDATE MODE ---
       await apiFetch(`/expenses/${editingExpenseId}`, {
         method: "PUT",
         body: {
-          chapterId: chapterId, // ✅ FIX: Added chapterId to fix 400 Bad Request
+          chapterId: chapterId,
           amount,
           description,
           payerMemberId: payerId,
@@ -345,7 +354,6 @@ addExpenseForm.onsubmit = async (e) => {
       });
       showToast("Expense updated", "success");
     } else {
-      // --- CREATE MODE (Optimistic UI) ---
       const payerName = currentMembers.find(m => m.id === payerId)?.member_name || "You";
       
       const tempExpense = {
@@ -357,7 +365,6 @@ addExpenseForm.onsubmit = async (e) => {
         isTemp: true
       };
 
-      // Optimistic update
       expenses.unshift(tempExpense);
       renderExpenses();
       
@@ -373,13 +380,12 @@ addExpenseForm.onsubmit = async (e) => {
       });
       
       showToast("Expense saved", "success");
-      loadExpenses(); // Replace temp with real data
+      loadExpenses();
     }
     
     closeAddExpenseModal();
   } catch (err) {
     if (!isEditingExpense) {
-      // Rollback optimistic update
       expenses = expenses.filter(ex => !ex.id.startsWith("temp-"));
       renderExpenses();
     }
@@ -394,8 +400,6 @@ const summaryGrandTotal = document.getElementById("summary-grand-total");
 
 window.openSummaryModal = async function() {
   summaryModal.classList.add("active");
-  
-  // Show loading state
   summaryList.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
   
   try {
@@ -415,7 +419,6 @@ function renderSummary(data) {
   summaryGrandTotal.textContent = `₹${grandTotal}`;
   summaryList.innerHTML = "";
 
-  // Calculate max for progress bars based on the higher of the two values
   const maxVal = Math.max(...summary.map(s => Math.max(parseFloat(s.total_spent), parseFloat(s.total_used))), 1);
 
   summary.forEach(item => {
@@ -423,9 +426,8 @@ function renderSummary(data) {
     const used = parseFloat(item.total_used);
     
     const row = document.createElement("div");
-    row.style.marginBottom = "20px"; // More spacing for double bars
+    row.style.marginBottom = "20px";
     
-    // UI: Name Row
     row.innerHTML = `
       <div class="summary-row" style="border:none; padding-bottom:5px;">
         <div class="summary-name">
@@ -493,29 +495,70 @@ window.openAddMemberModal = function() {
   if(!addMemberFormEl) return; 
   addMemberFormEl.reset();
   addMemberModal.classList.add("active");
-  setTimeout(() => addMemberFormEl.querySelector("input").focus(), 100);
+  const input = document.getElementById("new-member-name");
+  if (input) setTimeout(() => input.focus(), 100);
 };
 
 window.closeAddMemberModal = function() {
   if(addMemberModal) addMemberModal.classList.remove("active");
 };
 
+// ✅ REPLACED: New add-member form submit logic with friend lookup
 if(addMemberFormEl) {
-  addMemberFormEl.onsubmit = async (e) => {
+  addMemberFormEl.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = new FormData(addMemberFormEl).get("memberName");
+    
+    const nameInput = document.getElementById("new-member-name");
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    // LOOKUP: Check if the typed name matches a known friend
+    const matchedFriend = myFriendsCache.find(
+      f => f.name.toLowerCase() === name.toLowerCase() || 
+           f.username.toLowerCase() === name.toLowerCase()
+    );
+
+    const payload = {
+      memberName: matchedFriend ? matchedFriend.name : name,
+      friendId: matchedFriend ? matchedFriend.id : null
+    };
+
     try {
-      await apiFetch(`/chapters/${chapterId}/members`, { method: "POST", body: { memberName: name } });
-      showToast("Member added", "success");
-      closeAddMemberModal();
-      // Reload everything
-      const d = await apiFetch(`/chapters/${chapterId}`);
-      currentMembers = d.members;
-      renderMembers();
+      const data = await apiFetch(`/chapters/${chapterId}/members`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (data.ok) {
+        closeModal("add-member-modal");
+        nameInput.value = "";
+        showToast("Member added successfully");
+        loadChapterDetails(); // Refresh the list
+      } else {
+        showToast(data.message || "Failed to add member", "error");
+      }
     } catch (err) {
-      showToast(err.message, "error");
+      console.error(err);
+      showToast("Server error", "error");
     }
-  };
+  });
+}
+
+// Helper to close modals by ID (used above)
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.classList.remove("active");
+}
+
+// Reload chapter details (used after adding member)
+async function loadChapterDetails() {
+  try {
+    const data = await apiFetch(`/chapters/${chapterId}`);
+    currentMembers = data.members;
+    renderMembers();
+  } catch (err) {
+    console.error("Failed to reload chapter", err);
+  }
 }
 
 // Delete Member
@@ -528,7 +571,6 @@ window.deleteMember = async function(memberId) {
     });
     showToast("Member removed", "info");
     
-    // Refresh
     const data = await apiFetch(`/chapters/${chapterId}`);
     currentMembers = data.members;
     renderMembers();
@@ -538,7 +580,7 @@ window.deleteMember = async function(memberId) {
 };
 
 // =========================================================
-// ✅ NEW: SETTLEMENT LOGIC
+// ✅ SETTLEMENT LOGIC
 // =========================================================
 const settlementModal = document.getElementById("settlement-modal");
 const settlementList = document.getElementById("settlement-list");
@@ -548,7 +590,6 @@ const settlementEmpty = document.getElementById("settlement-empty");
 window.openSettlementModal = async function() {
   settlementModal.classList.add("active");
   
-  // Reset State
   settlementList.innerHTML = "";
   settlementList.style.display = "none";
   settlementEmpty.style.display = "none";
@@ -580,7 +621,6 @@ function renderSettlements(settlements) {
   settlementList.innerHTML = "";
 
   settlements.forEach(item => {
-    // Structure: From (Debtor) -> To (Creditor) : Amount
     const row = document.createElement("div");
     row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:15px 0; border-bottom:1px solid #f0f0f0;";
     
@@ -613,43 +653,35 @@ window.downloadReport = async function() {
   const btn = document.querySelector("button[onclick='downloadReport()']");
   
   try {
-    if (btn) setBtnLoading(btn, true); // Use existing helper
+    if (btn) setBtnLoading(btn, true);
     showToast("Generating report...", "info");
 
-    // 1. Get CSRF Token using the existing utility
-    // We need this because we are bypassing apiFetch for the binary download
     const { csrfToken } = await apiFetch("/csrf-token");
 
-    // 2. Request the Blob
     const response = await fetch(`${APP_CONFIG.API_BASE}/chapters/${chapterId}/export`, {
       method: "GET",
       headers: {
         "X-CSRF-Token": csrfToken
       },
-      credentials: "include" // Important: Sends auth cookies
+      credentials: "include"
     });
 
     if (!response.ok) {
-      // Try to parse error message if possible
       const errJson = await response.json().catch(() => ({}));
       throw new Error(errJson.message || "Export failed");
     }
 
-    // 3. Convert Response to Blob & Trigger Download
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     
-    // Create temporary link
     const a = document.createElement("a");
     a.href = url;
-    // Name the file: ChapterName_Timestamp.xlsx
     const cleanName = currentChapter.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     a.download = `hisaab_kitaab_${cleanName}_${Date.now()}.xlsx`;
     
     document.body.appendChild(a);
     a.click();
     
-    // Cleanup
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 

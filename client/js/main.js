@@ -36,7 +36,6 @@
   };
 
   window.APP_CONFIG = CONFIG;
-// ... rest of the file
 
   /* ======================================
      1. NETWORK STACK
@@ -443,3 +442,150 @@
   });
 
 })();
+
+
+/* ======================================
+   6. MEMBER AUTOCOMPLETE COMPONENT (NEW)
+   ====================================== */
+class MemberAutocomplete {
+  constructor(inputElement, options = {}) {
+    this.input = inputElement;
+    this.options = {
+      friends: [], // Array of friend objects
+      onSelect: null, // Callback({name, friendId})
+      allowGuest: true,
+      allowCreate: true,
+      ...options
+    };
+    
+    this.init();
+  }
+
+  init() {
+    // 1. Wrap Input
+    this.wrapper = document.createElement('div');
+    this.wrapper.className = 'autocomplete-wrapper';
+    this.input.parentNode.insertBefore(this.wrapper, this.input);
+    this.wrapper.appendChild(this.input);
+
+    // 2. Create Dropdown
+    this.dropdown = document.createElement('div');
+    this.dropdown.className = 'autocomplete-dropdown';
+    this.wrapper.appendChild(this.dropdown);
+
+    // 3. Events
+    this.input.addEventListener('input', () => this.handleInput());
+    this.input.addEventListener('focus', () => this.handleInput());
+    
+    // Hide on blur (delayed to allow click)
+    this.input.addEventListener('blur', () => {
+      setTimeout(() => this.dropdown.classList.remove('active'), 200);
+    });
+  }
+
+  handleInput() {
+    const term = this.input.value.trim().toLowerCase();
+    this.dropdown.innerHTML = '';
+    
+    if (!term) {
+      this.dropdown.classList.remove('active');
+      this.input.classList.remove('dropdown-open');
+      return;
+    }
+
+    let hasMatches = false;
+
+    // A. Filter Friends
+    const matches = this.options.friends.filter(f => 
+      f.name.toLowerCase().includes(term) || 
+      f.username.toLowerCase().includes(term)
+    );
+
+    matches.forEach(friend => {
+      hasMatches = true;
+      this.renderItem({
+        type: 'friend',
+        data: friend,
+        html: `
+          <div class="ac-avatar" style="background:${window.getAvatarColor(friend.name)}">
+            ${friend.name.charAt(0).toUpperCase()}
+          </div>
+          <div class="ac-info">
+            <div class="ac-name">${friend.name}</div>
+            <div class="ac-sub">@${friend.username}</div>
+          </div>
+        `
+      });
+    });
+
+    // B. "Add as Guest" Option (Always show if term exists)
+    // Only show if term doesn't perfectly match a friend's name
+    const exactMatch = matches.find(f => f.name.toLowerCase() === term);
+    
+    if (!exactMatch && this.options.allowGuest) {
+      hasMatches = true;
+      this.renderItem({
+        type: 'guest',
+        data: { name: this.input.value },
+        className: 'guest-option',
+        html: `
+          <div class="guest-icon">+</div>
+          <div class="ac-info">
+            <div class="ac-name">Add "${this.input.value}"</div>
+            <div class="ac-sub">Guest (Not in friends)</div>
+          </div>
+        `
+      });
+    }
+
+    // C. Show/Hide
+    if (hasMatches) {
+      this.dropdown.classList.add('active');
+      this.input.classList.add('dropdown-open');
+    } else {
+      this.dropdown.classList.remove('active');
+      this.input.classList.remove('dropdown-open');
+    }
+  }
+
+  renderItem({ type, data, html, className = '' }) {
+    const item = document.createElement('div');
+    item.className = `autocomplete-item ${className}`;
+    item.innerHTML = html;
+    
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // Prevent blur
+      this.selectItem(type, data);
+    });
+    
+    this.dropdown.appendChild(item);
+  }
+
+  selectItem(type, data) {
+    if (type === 'friend') {
+      this.input.value = data.name;
+      this.input.dataset.friendId = data.id; // Store ID
+      this.input.dataset.mode = 'friend';
+    } else {
+      // Guest
+      this.input.value = data.name; // Keep typed name
+      delete this.input.dataset.friendId; // Clear ID
+      this.input.dataset.mode = 'guest';
+    }
+
+    this.dropdown.classList.remove('active');
+    this.input.classList.remove('dropdown-open');
+
+    // Trigger Callback
+    if (this.options.onSelect) {
+      this.options.onSelect({ 
+        type, 
+        name: this.input.value, 
+        friendId: this.input.dataset.friendId 
+      });
+    }
+  }
+}
+
+// Make it global
+window.MemberAutocomplete = MemberAutocomplete;

@@ -1,6 +1,5 @@
 /* client/js/dashboard.js */
 
-
 const chaptersGrid = document.getElementById("chapters-grid");
 const createModal = document.getElementById("create-modal");
 const createForm = document.getElementById("create-chapter-form");
@@ -14,7 +13,11 @@ let allChapters = [];
 let isEditMode = false;
 let editChapterId = null;
 let currentUser = null; // ✅ NEW: Store global user
+let cachedFriends = []; // ✅ NEW: Cache friends
+let myFriends = [];     // ✅ Moved here for global access
 
+// ✅ NEW: Track who we are looking at in friend details
+let currentViewFriendId = null;
 
 // ✅ Updated skeleton loader: centered spinner
 function renderSkeletons() {
@@ -69,6 +72,11 @@ function timeAgo(timestamp) {
 document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons();
 
+  // ✅ NEW: Fetch Friends in background for autocomplete
+  try {
+    const fData = await apiFetch("/friends");
+    cachedFriends = fData.friends || [];
+  } catch(e) { console.warn("Failed to preload friends"); }
 
   // ==========================================
   // ✅ Inject Search & Sort Controls
@@ -340,19 +348,26 @@ createForm.onsubmit = async (e) => {
     } else {
       // --- CREATE NEW ---
       const members = [];
-      document.querySelectorAll('input[name="members[]"]').forEach(input => {
-        if(input.value.trim()) members.push(input.value.trim());
+      const inputs = memberListContainer.querySelectorAll('.member-input-smart');
+      
+      inputs.forEach(input => {
+        const name = input.value.trim();
+        if (name) {
+          const friendId = input.dataset.friendId ? parseInt(input.dataset.friendId) : null;
+          
+          // Push object instead of string
+          members.push({ 
+            name: name,
+            friendId: friendId 
+          });
+        }
       });
 
-
-      if(members.length === 0) {
-        throw new Error("Please add at least one member.");
-      }
-
+      if(members.length === 0) throw new Error("Add at least one member");
 
       await apiFetch("/chapters", {
         method: "POST",
-        body: { name, description, members }
+        body: { name, description, members } // Send objects
       });
       showToast("Chapter created successfully!", "success");
     }
@@ -567,15 +582,46 @@ function closeModal() {
 }
 
 
-function addMemberInput() {
+// ✅ UPDATED: Add Smart Input
+window.addMemberInput = function() {
   const div = document.createElement("div");
   div.className = "member-item";
-  div.innerHTML = `
-    <input type="text" name="members[]" placeholder="Member Name (e.g. Alice)" required>
-    <button type="button" onclick="this.parentElement.remove()" style="color:red; border:none; background:none; font-weight:bold; cursor:pointer;">✕</button>
-  `;
+  div.style.position = "relative"; // Context for dropdown
+  
+  // 1. Create the Input
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "member-input-smart"; // Marker class
+  input.placeholder = "Name (or select friend)";
+  input.required = true;
+  input.autocomplete = "off"; // Disable browser autocomplete
+
+  // 2. Delete Button
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.innerHTML = "✕";
+  btn.style.cssText = "color:red; border:none; background:none; font-weight:bold; cursor:pointer; position:absolute; right:10px; top:12px; z-index:10;";
+  btn.onclick = () => div.remove();
+
+  div.appendChild(input);
+  div.appendChild(btn);
   memberListContainer.appendChild(div);
-}
+
+  // 3. Attach Autocomplete
+  new MemberAutocomplete(input, {
+    friends: cachedFriends,
+    onSelect: (result) => {
+      // Optional: Add visual feedback (Green border if friend selected)
+      if (result.type === 'friend') {
+        input.style.borderColor = "#00e676";
+        input.dataset.friendId = result.id;
+      } else {
+        input.style.borderColor = "#eee";
+        delete input.dataset.friendId;
+      }
+    }
+  });
+};
 
 
 /* ======================================
@@ -792,7 +838,6 @@ if (profileLogoutBtn) {
 // ✅ FRIENDS MANAGEMENT LOGIC
 // ==========================================
 
-let myFriends = [];
 let isFriendEditMode = false;
 
 // 1. Load Friends when Profile Opens
@@ -815,41 +860,193 @@ async function loadFriends() {
   }
 }
 
-// 2. Render List
+// =========================================
+// RENDER FRIENDS LIST (With Settlements)
+// =========================================
 function renderFriendsList() {
-  const listContainer = document.getElementById("friends-list-container");
-  const emptyState = document.getElementById("friends-empty-state");
-  
-  listContainer.innerHTML = "";
+  const list = document.getElementById("friends-list");
+  list.innerHTML = "";
 
   if (myFriends.length === 0) {
-    emptyState.style.display = "block";
+    list.innerHTML = `
+      <div class="empty-state">
+        <p>You haven't added any friends yet.</p>
+      </div>`;
     return;
   }
-  
-  emptyState.style.display = "none";
 
-  myFriends.forEach(friend => {
-    const item = document.createElement("div");
-    item.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px solid #f5f5f5;";
+  myFriends.forEach((f) => {
+    const avatarColor = getAvatarColor(f.name); // Utility from main.js
     
+    // --- NEW: Settlement Logic ---
+    let balanceHtml = "";
+    if (f.total_balance && f.total_balance !== 0) {
+      const amount = Math.abs(f.total_balance / 100).toFixed(2);
+      if (f.total_balance > 0) {
+        // Positive: They owe you
+        balanceHtml = `
+          <div style="font-size: 0.85rem; color: #10b981; margin-top: 4px; font-weight: 500;">
+            owes you ₹${amount}
+          </div>`;
+      } else {
+        // Negative: You owe them
+        balanceHtml = `
+          <div style="font-size: 0.85rem; color: #ef4444; margin-top: 4px; font-weight: 500;">
+            you owe ₹${amount}
+          </div>`;
+      }
+    } else {
+        // Zero balance or undefined
+        balanceHtml = `<div style="font-size: 0.8rem; color: #6b7280; margin-top: 4px;">Settled up</div>`;
+    }
+    // -----------------------------
+
+    const item = document.createElement("div");
+    item.className = "friend-item";
     item.innerHTML = `
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="small-avatar" style="background:${getAvatarColor(friend.name)}">${getInitials(friend.name)}</div>
-        <div>
-          <div style="font-weight:600; font-size:0.9rem; color:#333;">${friend.name}</div>
-          <div style="font-size:0.8rem; color:#888;">@${friend.username}</div>
-        </div>
+      <div class="friend-avatar" style="background-color: ${avatarColor}">
+        ${f.name.charAt(0).toUpperCase()}
       </div>
-      
-      <div style="display:flex; gap:5px;">
-        <button onclick="editFriend('${friend.id}')" style="border:none; background:none; cursor:pointer; font-size:1.1rem;" title="Edit">✏️</button>
-        <button onclick="deleteFriend('${friend.id}')" style="border:none; background:none; cursor:pointer; font-size:1.1rem; color:#ff1744;" title="Delete">🗑️</button>
+      <div class="friend-info">
+        <div class="friend-name">${f.name}</div>
+        <div class="friend-username">@${f.username}</div>
+        ${balanceHtml} </div>
+      <div class="friend-actions">
+        <button class="btn-icon" onclick="editFriend(${f.id})">
+          <i class="fas fa-edit"></i>
+        </button>
+        <button class="btn-icon delete" onclick="deleteFriend(${f.id})">
+          <i class="fas fa-trash"></i>
+        </button>
       </div>
     `;
-    listContainer.appendChild(item);
+    list.appendChild(item);
   });
 }
+
+// ==========================================
+// ✅ NEW: FRIEND DETAILS LOGIC
+// ==========================================
+
+// A. Open the View
+window.openFriendDetails = function(id) {
+  const friend = myFriends.find(f => f.id == id);
+  if(!friend) return;
+
+  currentViewFriendId = id;
+
+  // 1. Populate Basic Info
+  document.getElementById("fd-name").textContent = friend.name;
+  document.getElementById("fd-username").textContent = `@${friend.username}`;
+  
+  const avatar = document.getElementById("fd-avatar");
+  avatar.textContent = getInitials(friend.name);
+  avatar.style.background = getAvatarColor(friend.name);
+
+  // 2. Open Modal
+  document.getElementById("friend-details-modal").classList.add("active");
+
+  // 3. Fetch Settlements
+  refreshFriendSettlements();
+};
+
+window.closeFriendDetails = function() {
+  document.getElementById("friend-details-modal").classList.remove("active");
+  currentViewFriendId = null;
+};
+
+// B. Fetch & Render Settlements
+window.refreshFriendSettlements = async function() {
+  if(!currentViewFriendId) return;
+
+  const totalEl = document.getElementById("fd-grand-total");
+  const labelEl = document.getElementById("fd-status-label");
+  const listEl = document.getElementById("fd-chapters-list");
+  
+  // Loading State
+  totalEl.innerHTML = '<div class="spinner" style="border-width:2px; border-color:#ccc; border-top-color:#333;"></div>';
+  listEl.innerHTML = '';
+  labelEl.textContent = "Checking...";
+
+  try {
+    // Call the new API from Step 2
+    const data = await apiFetch(`/friends/${currentViewFriendId}/settlements`);
+    
+    const grandTotal = parseFloat(data.grandTotal);
+    
+    // 1. Render Big Number
+    if (grandTotal > 0) {
+      totalEl.textContent = `₹${grandTotal.toFixed(2)}`;
+      totalEl.className = "settlement-amount-large text-green";
+      labelEl.textContent = "You get back";
+    } else if (grandTotal < 0) {
+      totalEl.textContent = `₹${Math.abs(grandTotal).toFixed(2)}`;
+      totalEl.className = "settlement-amount-large text-red";
+      labelEl.textContent = "You owe";
+    } else {
+      totalEl.textContent = "₹0.00";
+      totalEl.className = "settlement-amount-large text-gray";
+      labelEl.textContent = "Settled Up";
+    }
+
+    // 2. Render Chapters
+    if (data.chapters.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center; padding:20px; color:#999; font-size:0.85rem;">No shared expense history</div>';
+    } else {
+      data.chapters.forEach(ch => {
+        const bal = parseFloat(ch.balance);
+        let balHtml = "";
+        
+        if (bal > 0) balHtml = `<span class="text-green">+₹${bal.toFixed(0)}</span>`;
+        else if (bal < 0) balHtml = `<span class="text-red">-₹${Math.abs(bal).toFixed(0)}</span>`;
+        else balHtml = `<span class="text-gray">Settled</span>`;
+
+        const row = document.createElement("div");
+        row.className = "shared-chapter-row";
+        row.innerHTML = `
+          <div class="shared-chapter-name">${ch.chapterName}</div>
+          <div class="shared-chapter-balance">${balHtml}</div>
+        `;
+        listEl.appendChild(row);
+      });
+    }
+
+  } catch (err) {
+    totalEl.textContent = "Error";
+    totalEl.className = "settlement-amount-large text-gray";
+    listEl.innerHTML = `<div style="color:red; font-size:0.8rem; text-align:center;">${err.message}</div>`;
+  }
+};
+
+// ==========================================
+// ✅ NEW: FRIEND ACTIONS (EDIT/DELETE)
+// ==========================================
+
+window.openFriendActions = function() {
+  document.getElementById("friend-actions-modal").classList.add("active");
+};
+
+window.closeFriendActions = function() {
+  document.getElementById("friend-actions-modal").classList.remove("active");
+};
+
+window.triggerFriendEdit = function() {
+  closeFriendActions();
+  closeFriendDetails(); // Close details
+  // Use existing editFriend function
+  editFriend(currentViewFriendId);
+};
+
+window.triggerFriendDelete = function() {
+  closeFriendActions();
+  
+  if (!confirm("Are you sure? This removes them from your list but keeps chapter history.")) return;
+
+  // Use existing deleteFriend function
+  deleteFriend(currentViewFriendId).then(() => {
+    closeFriendDetails();
+  });
+};
 
 // 3. UI Toggles
 window.openAddFriendMode = function() {

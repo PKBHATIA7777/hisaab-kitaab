@@ -1,4 +1,4 @@
-/* server/routes/friendRoutes.js */
+/* s/* server/routes/friendRoutes.js */
 const express = require("express");
 const router = express.Router();
 const friendController = require("../controllers/friendController");
@@ -11,5 +11,8 @@ router.post("/", friendController.addFriend);
 router.get("/", friendController.getFriends);
 router.put("/:id", friendController.updateFriend);
 router.delete("/:id", friendController.deleteFriend);
+
+// ✅ NEW: Route for individual friend settlements
+router.get("/:friendId/settlements", friendController.getFriendSettlements);
 
 module.exports = router;

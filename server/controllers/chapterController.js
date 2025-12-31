@@ -1,17 +1,25 @@
 /* server/controllers/chapterController.js */
 const db = require("../config/db");
 const { z } = require("zod");
-const xss = require("xss"); // ✅ FIX S2: Import XSS library
+const xss = require("xss");
 
 // --- VALIDATION SCHEMAS ---
+
+// Updated: Members is now an array of objects { name, friendId }
 const createChapterSchema = z.object({
   name: z.string().min(1).max(100).trim(),
   description: z.string().max(50).optional().or(z.literal("")),
-  members: z.array(z.string().min(1).max(50).trim()).min(1),
+  members: z.array(
+    z.object({
+      name: z.string().min(1).max(50).trim(),
+      friendId: z.number().int().nullish() // Optional ID if picking from friends list
+    })
+  ).min(1),
 });
 
 const addMemberSchema = z.object({
   memberName: z.string().min(1, "Name is required").max(50, "Name too long").trim(),
+  friendId: z.number().int().nullish() // Optional: Link to friend
 });
 
 // =========================================
@@ -24,7 +32,7 @@ async function createChapter(req, res) {
 
     const name = xss(result.data.name);
     const description = xss(result.data.description || "");
-    const rawMembers = result.data.members;
+    const rawMembers = result.data.members; // Now an array of objects
     
     const userId = req.user.userId;
 
@@ -32,7 +40,7 @@ async function createChapter(req, res) {
     const { rows: userRows } = await db.query("SELECT real_name FROM users WHERE id = $1", [userId]);
     const creatorName = userRows[0]?.real_name || "Admin";
 
-    // 2. Normalize & Deduplicate Members Input (FIX B4)
+    // 2. Normalize & Deduplicate Members Input
     const uniqueMembers = new Set();
     const cleanMembers = [];
     
@@ -40,11 +48,17 @@ async function createChapter(req, res) {
     uniqueMembers.add(creatorName.toLowerCase());
 
     for (const m of rawMembers) {
-        const clean = xss(m).trim();
-        const lower = clean.toLowerCase();
+        const cleanName = xss(m.name).trim();
+        const lower = cleanName.toLowerCase();
+        
+        // Deduplicate based on Name (case-insensitive)
         if (!uniqueMembers.has(lower) && lower.length > 0) {
             uniqueMembers.add(lower);
-            cleanMembers.push(clean);
+            // Push object with cleaned name and friendId
+            cleanMembers.push({ 
+              name: cleanName, 
+              friendId: m.friendId || null 
+            });
         }
     }
 
@@ -73,11 +87,11 @@ async function createChapter(req, res) {
         [chapter.id, creatorName, userId]
       );
 
-      // 6. Insert Deduplicated Members
-      for (const memberName of cleanMembers) {
+      // 6. Insert Deduplicated Members (With friend_id if available)
+      for (const m of cleanMembers) {
         await db.query(
-          `INSERT INTO chapter_members (chapter_id, member_name) VALUES ($1, $2)`,
-          [chapter.id, memberName]
+          `INSERT INTO chapter_members (chapter_id, member_name, friend_id) VALUES ($1, $2, $3)`,
+          [chapter.id, m.name, m.friendId]
         );
       }
 
@@ -104,8 +118,8 @@ async function addMember(req, res) {
 
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     
-    // ✅ FIX S2: Sanitize Input
     const memberName = xss(result.data.memberName);
+    const friendId = result.data.friendId || null;
 
     // Verify Ownership
     const { rows: chap } = await db.query("SELECT id FROM chapters WHERE id = $1 AND created_by = $2", [id, userId]);
@@ -118,10 +132,10 @@ async function addMember(req, res) {
     );
     if (dup.length > 0) return res.status(400).json({ ok: false, message: "Member already exists" });
 
-    // Insert
+    // Insert (Now including friend_id)
     const { rows: newMember } = await db.query(
-      `INSERT INTO chapter_members (chapter_id, member_name) VALUES ($1, $2) RETURNING *`,
-      [id, memberName]
+      `INSERT INTO chapter_members (chapter_id, member_name, friend_id) VALUES ($1, $2, $3) RETURNING *`,
+      [id, memberName, friendId]
     );
 
     res.json({ ok: true, message: "Member added", member: newMember[0] });
@@ -211,7 +225,6 @@ async function updateChapter(req, res) {
       return res.status(400).json({ ok: false, message: "Name is required" });
     }
 
-    // ✅ FIX S2: Sanitize Inputs
     const sanitizedName = xss(name.trim());
     const sanitizedDescription = xss(description || "");
 

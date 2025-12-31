@@ -13,9 +13,9 @@
 
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com    ">
+  <link rel="preconnect" href="https://fonts.gstatic.com    " crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins    :wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
@@ -165,6 +165,50 @@
           </button>
 
         </div>
+      </div>
+    </div>
+
+    <!-- ✅ UPDATED FRIEND DETAILS MODAL (as per your request) -->
+    <div class="modal-overlay" id="friend-details-modal">
+      <div class="modal-box" style="max-width: 400px;">
+        
+        <div style="position: relative; margin-bottom: 10px;">
+          <button class="close-modal" onclick="closeFriendDetails()" style="position: absolute; left: 0; top: -10px;">←</button>
+          
+          <div style="text-align: right;">
+            <button onclick="openFriendActions()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; padding:5px;">⋮</button>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 10px;">
+          <div id="fd-avatar" class="profile-avatar-large" style="width:70px; height:70px; font-size:2rem; margin-bottom:10px;">?</div>
+          <h2 id="fd-name" style="margin:0; font-size:1.5rem; color:#333;">...</h2>
+          <p id="fd-username" style="color:#888; margin:0; font-size:0.9rem;">@...</p>
+        </div>
+
+        <div class="settlement-card">
+          <div class="settlement-label" id="fd-status-label">Net Balance</div>
+          <div class="settlement-amount-large" id="fd-grand-total">...</div>
+          
+          <button class="btn-refresh-small" onclick="refreshFriendSettlements()">
+            <span>🔄</span> Refresh
+          </button>
+        </div>
+
+        <h4 style="margin: 20px 0 10px 0; font-size: 0.9rem; color: #888; text-transform: uppercase;">Shared Chapters</h4>
+        <div id="fd-chapters-list" style="max-height: 200px; overflow-y: auto;">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ✅ UPDATED FRIEND ACTIONS MODAL (Action Sheet) -->
+    <div class="modal-overlay" id="friend-actions-modal" style="z-index: 2100;">
+      <div class="modal-box" style="max-width: 300px; padding: 20px; text-align: center;">
+        <h3 style="margin-top:0;">Manage Friend</h3>
+        <button class="btn-secondary" onclick="triggerFriendEdit()" style="margin-bottom: 10px;">Edit Details</button>
+        <button class="btn-secondary" onclick="triggerFriendDelete()" style="color: #ff1744; border-color: #ffcdd2;">Delete Friend</button>
+        <button class="btn-secondary" onclick="closeFriendActions()" style="margin-top: 10px; border:none; color:#666;">Cancel</button>
       </div>
     </div>
 

@@ -13,9 +13,9 @@
 
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com  ">
+  <link rel="preconnect" href="https://fonts.gstatic.com  " crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins  :wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
@@ -106,10 +106,25 @@
         </div>
         
         <form id="add-member-form">
-          <label>Member Name
-            <input type="text" name="memberName" required placeholder="e.g. Rahul" maxlength="50">
-          </label>
-          <button type="submit" class="btn-primary">Add to Group</button>
+          <div class="form-group">
+            <label for="new-member-name">Member Name</label>
+            
+            <input 
+              type="text" 
+              id="new-member-name" 
+              class="form-input" 
+              placeholder="Enter name or select friend..." 
+              list="friends-datalist" 
+              required
+            >
+            
+            <datalist id="friends-datalist"></datalist>
+          </div>
+          
+          <div class="modal-actions">
+            <button type="button" class="btn btn-text" onclick="closeModal('add-member-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
         </form>
       </div>
     </div>

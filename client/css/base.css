@@ -1994,3 +1994,384 @@ input:focus {
   border-radius: 12px;
   border: 1px dashed #ddd;
 }
+
+
+
+/* client/css/base.css */
+
+/* ... (Keep all existing styles) ... */
+
+/* =========================
+   22. AUTOCOMPLETE COMPONENT (NEW)
+   ========================= */
+   .autocomplete-wrapper {
+    position: relative;
+    width: 100%;
+  }
+  
+  .autocomplete-wrapper input {
+    margin-bottom: 0 !important; /* Dropdown sits flush */
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  
+  /* Restores radius if dropdown is closed */
+  .autocomplete-wrapper input:not(.dropdown-open) {
+    border-radius: var(--radius-input);
+    margin-bottom: 15px !important;
+  }
+  
+  .autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    border: 2px solid #eee;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    z-index: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+  }
+  
+  .autocomplete-dropdown.active {
+    display: block;
+  }
+  
+  .autocomplete-item {
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid #f9f9f9;
+  }
+  
+  .autocomplete-item:last-child {
+    border-bottom: none;
+  }
+  
+  .autocomplete-item:hover, .autocomplete-item.focused {
+    background: #f0f0f0;
+  }
+  
+  .ac-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  
+  .ac-info {
+    flex-grow: 1;
+  }
+  
+  .ac-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+    line-height: 1.2;
+  }
+  
+  .ac-sub {
+    font-size: 0.75rem;
+    color: #888;
+  }
+  
+  /* "Add Guest" Item Style */
+  .autocomplete-item.guest-option {
+    background: #fff8e1; /* Light yellow */
+  }
+  .autocomplete-item.guest-option:hover {
+    background: #ffecb3;
+  }
+  .guest-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #ffcc00;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+  
+  /* "Create Friend" Item Style */
+  .autocomplete-item.create-option {
+    background: #f3e5f5; /* Light purple */
+    border-top: 2px solid #fff;
+  }
+  .autocomplete-item.create-option:hover {
+    background: #e1bee7;
+  }
+  .create-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d000ff;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+
+
+
+  /* client/css/base.css - APPEND TO END */
+
+/* =========================
+   23. FRIEND DETAILS & SETTLEMENTS
+   ========================= */
+
+/* The List Item Arrow */
+.btn-chevron {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #ccc;
+  cursor: pointer;
+  padding: 10px;
+  transition: color 0.2s, transform 0.2s;
+}
+.friend-list-item:hover .btn-chevron {
+  color: #d000ff;
+  transform: translateX(3px);
+}
+
+/* Friend Details Modal Layout */
+.friend-details-header {
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.friend-details-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+/* The Big Balance Number */
+.settlement-card {
+  background: #f9f9f9;
+  border-radius: 20px;
+  padding: 20px;
+  text-align: center;
+  margin: 15px 0;
+  border: 1px solid #eee;
+}
+
+.settlement-amount-large {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 5px 0;
+}
+
+.settlement-label {
+  font-size: 0.9rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Colors for Debt/Credit */
+.text-green { color: #00e676; }
+.text-red { color: #ff1744; }
+.text-gray { color: #bbb; }
+
+/* Chapter Breakdown List */
+.shared-chapter-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px dashed #eee;
+}
+.shared-chapter-row:last-child { border-bottom: none; }
+
+.shared-chapter-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.shared-chapter-balance {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* Refresh Button */
+.btn-refresh-small {
+  font-size: 0.8rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  color: #555;
+}
+.btn-refresh-small:hover {
+  background: #f5f5f5;
+  color: #000;
+}
+
+
+/* client/css/base.css - APPEND TO END */
+/* client/css/base.css - APPEND THIS */
+
+/* =========================
+   23. FRIEND DETAILS & SETTLEMENTS
+   ========================= */
+
+/* The List Item Arrow */
+.btn-chevron {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #ccc;
+  cursor: pointer;
+  padding: 10px;
+  transition: color 0.2s, transform 0.2s;
+}
+.friend-list-item:hover .btn-chevron {
+  color: #d000ff;
+  transform: translateX(3px);
+}
+
+/* Friend Details Modal Layout */
+.friend-details-header {
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* The Big Balance Number */
+.settlement-card {
+  background: #f9f9f9;
+  border-radius: 20px;
+  padding: 20px;
+  text-align: center;
+  margin: 15px 0;
+  border: 1px solid #eee;
+}
+
+.settlement-amount-large {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 5px 0;
+}
+
+.settlement-label {
+  font-size: 0.9rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Colors for Debt/Credit */
+.text-green { color: #00e676; }
+.text-red { color: #ff1744; }
+.text-gray { color: #bbb; }
+
+/* Chapter Breakdown List */
+.shared-chapter-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px dashed #eee;
+}
+.shared-chapter-row:last-child { border-bottom: none; }
+
+.shared-chapter-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.shared-chapter-balance {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* Refresh Button */
+.btn-refresh-small {
+  font-size: 0.8rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  color: #555;
+}
+.btn-refresh-small:hover {
+  background: #f5f5f5;
+  color: #000;
+}
+/* Colors for Debt/Credit */
+.text-green { color: #00e676; }
+.text-red { color: #ff1744; }
+.text-gray { color: #bbb; }
+
+/* Chapter Breakdown List */
+.shared-chapter-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px dashed #eee;
+}
+.shared-chapter-row:last-child { border-bottom: none; }
+
+.shared-chapter-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.shared-chapter-balance {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* Refresh Button */
+.btn-refresh-small {
+  font-size: 0.8rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  color: #555;
+}
+.btn-refresh-small:hover {
+  background: #f5f5f5;
+  color: #000;
+}
