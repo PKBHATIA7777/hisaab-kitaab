@@ -326,17 +326,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 createForm.onsubmit = async (e) => {
   e.preventDefault();
 
-
   // 1. GET BUTTON & DATA
   const submitBtn = createForm.querySelector('button[type="submit"]');
   const formData = new FormData(createForm);
   const name = formData.get("name");
   const description = formData.get("description");
 
-
   try {
     setBtnLoading(submitBtn, true);
-
 
     if (isEditMode) {
       // --- UPDATE EXISTING ---
@@ -351,13 +348,25 @@ createForm.onsubmit = async (e) => {
       const inputs = memberListContainer.querySelectorAll('.member-input-smart');
       
       inputs.forEach(input => {
-        const name = input.value.trim();
-        if (name) {
-          const friendId = input.dataset.friendId ? parseInt(input.dataset.friendId) : null;
+        const nameVal = input.value.trim();
+        if (nameVal) {
+          let friendId = input.dataset.friendId ? parseInt(input.dataset.friendId) : null;
           
+          // 🟢 NEW FIX: Auto-link to friend if name matches exactly (and ID was missing)
+          if (!friendId && cachedFriends.length > 0) {
+             const match = cachedFriends.find(f => 
+               f.name.toLowerCase() === nameVal.toLowerCase() || 
+               f.username.toLowerCase() === nameVal.toLowerCase()
+             );
+             if (match) {
+               friendId = match.id;
+               console.log(`Auto-linked "${nameVal}" to Friend ID: ${friendId}`);
+             }
+          }
+
           // Push object instead of string
           members.push({ 
-            name: name,
+            name: nameVal,
             friendId: friendId 
           });
         }
@@ -372,10 +381,8 @@ createForm.onsubmit = async (e) => {
       showToast("Chapter created successfully!", "success");
     }
 
-
     closeModal();
     await reloadChaptersGrid();
-
 
   } catch (err) {
     showToast(err.message || "Operation failed", "error");
@@ -853,7 +860,13 @@ async function loadFriends() {
 
   try {
     const data = await apiFetch("/friends");
+    
+    // Update the profile list variable
     myFriends = data.friends;
+
+    // ✅ FIX: Update the autocomplete cache as well!
+    cachedFriends = data.friends; 
+
     renderFriendsList();
   } catch (err) {
     listContainer.innerHTML = `<div style="color:red; text-align:center; padding:10px;">Failed to load friends</div>`;
