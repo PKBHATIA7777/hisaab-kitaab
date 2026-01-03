@@ -1,4 +1,59 @@
 /* client/js/main.js */
+
+/* ======================================
+   LOADER QUESTIONS & ROTATION LOGIC (PHASE 2)
+   ====================================== */
+   const loaderQuestions = [
+    "Remember your favourite dish 🍕",
+    "Imagine you are dancing with your celebrity crush ✨",
+    "Which is your favourite movie? 🎬",
+    "Who is your best friend?",
+    "What was the last song that made you smile? 🎶",
+    "What’s your comfort food after a long day?",
+    "Imagine you’re at your favourite vacation spot right now 🌴",
+    "Who’s the first person you’d call with good news?",
+    "Remember the last time you laughed uncontrollably?",
+    "If today was a movie, what genre would it be?",
+    "What’s one small thing that made you happy recently?",
+    "If you could pause time, what would you do first?",
+    "Which place makes you feel instantly calm?",
+    "What’s your favourite childhood memory?",
+    "What’s something simple that always lifts your mood?"
+];
+
+let loaderInterval;
+
+function startLoaderRotation() {
+    const textElement = document.getElementById('loader-text');
+    if (!textElement) return;
+
+    // Pick random start
+    let index = Math.floor(Math.random() * loaderQuestions.length);
+    textElement.textContent = loaderQuestions[index];
+
+    loaderInterval = setInterval(() => {
+        // Fade out
+        textElement.classList.add('fade-out');
+        
+        setTimeout(() => {
+            // Change text (sequential)
+            index = (index + 1) % loaderQuestions.length;
+            textElement.textContent = loaderQuestions[index];
+            // Fade in
+            textElement.classList.remove('fade-out');
+        }, 500); // Wait for fade out
+        
+    }, 3000); // 3 seconds per question
+}
+
+function hideAppLoader() {
+    const loader = document.getElementById('app-loader');
+    if (loader) {
+        loader.classList.add('hidden');
+        if (loaderInterval) clearInterval(loaderInterval);
+    }
+}
+
 (function() { 
   
   /* ======================================
@@ -17,7 +72,7 @@
         // If you are on localhost, this becomes http://localhost:5001/api
         return this.isLocal
           ? `http://${window.location.hostname}:5001/api`
-          : "https://hisaab-kitaab-service-app.onrender.com/api"; 
+          : "https://hisaab-kitaab-service-app.onrender.com/api";
     },
     
     // ... rest of your config remains exactly the same ...
@@ -408,8 +463,28 @@
   /* ======================================
      5. INITIALIZATION
      ====================================== */
+
+  // NEW: Initialize app logic including loader
+  async function initializeApp() {
+    try {
+      await initCSRF(); // This fetches /csrf-token and sets up token
+      // ... you can add more setup here if needed ...
+    } catch (err) {
+      console.error("App initialization failed", err);
+    } finally {
+      // Hide loader whether success or failure
+      hideAppLoader();
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    initCSRF();       
+    // Start loader rotation immediately
+    startLoaderRotation();
+
+    // Initialize app (CSRF + hide loader)
+    initializeApp();
+
+    // Rest of your existing init
     initGoogleAuth(); 
     initSessionMonitor();
     initMobileTweaks();
