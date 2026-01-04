@@ -2,15 +2,17 @@
    1. FONTS & RESET
    ========================= */
    /* @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap'); */
-
-   :root {
+  
+  :root {
     --font-main: 'Poppins', sans-serif;
-    --color-primary: #000000; /* Black buttons */
-    --color-primary-hover: #333333;
-    --color-accent: #d000ff; /* Purple for text gradients */
-    --radius-card: 30px;
-    --radius-input: 12px;
+    --color-primary: #000000;
     --primary-color: #d000ff;
+    --bg-gradient: linear-gradient(180deg, #000000 0%, #1a0029 100%);
+    
+    /* Layout Variables */
+    --header-height-mobile: 60px;
+    --header-height-desktop: 80px;
+    --max-width-desktop: 1200px;
   }
   
   *, *::before, *::after {
@@ -20,31 +22,82 @@
   body {
     margin: 0;
     min-height: 100vh;
-    min-height: 100dvh;
+    /* Use dynamic viewport height for mobile browsers */
+    min-height: 100dvh; 
     font-family: var(--font-main);
-    background: linear-gradient(180deg, #000000 10%, #1a0029 100%);
+    background: var(--bg-gradient);
     color: #333;
+    
+    /* ✅ FIX 1: Remove 'justify-content: center' to stop vertical centering */
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: center; /* Centers items horizontally only */
+    justify-content: flex-start; /* Forces content to start from top */
+    
     overflow-x: hidden;
     position: relative;
   
-    /* 🔴 NEW: Disable Pull-to-Refresh & Text Selection */
+    /* ✅ FIX 2: Add breathing room from the top edge */
+    /* Mobile: Respect Notch */
+    padding-top: env(safe-area-inset-top); 
+    /* Laptop: Add default spacing (overridden later for Desktop Navbar) */
+    padding-bottom: 0;
+  
     overscroll-behavior-y: none; 
     user-select: none;
     -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent; /* Remove blue tap box on Android */
+    -webkit-tap-highlight-color: transparent;
   }
   input, textarea, .selectable {
     user-select: text;
     -webkit-user-select: text;
   }
+
+
+
+  #main-content {
+    width: 100%;
+    max-width: 100%;
+    /* Add side padding so text doesn't hit the screen edge */
+    padding: 10px 20px 100px 20px; 
+    z-index: 10;
+    flex: 1; /* Pushes footer down */
+  }
+  
+  /* Desktop Override (Laptop) */
+  @media (min-width: 1024px) {
+    body {
+      /* Reset padding on desktop since we will have a Navbar */
+      padding-top: 0; 
+    }
+  
+    #main-content {
+      /* Constrain width so it looks like a document, not a stretched banner */
+      max-width: var(--max-width-desktop);
+      margin-top: calc(var(--header-height-desktop) + 40px); /* Push down below fixed Navbar */
+      padding-bottom: 60px;
+    }
+  
+    /* Fix the Dashboard Grid Container explicitly */
+    .dashboard-container {
+      max-width: 100% !important; /* Let it fill the #main-content wrapper */
+      padding: 0 !important; /* Remove double padding */
+      text-align: left !important; /* Align text to left, not center */
+    }
+  }
+
   
   /* =========================
      2. BACKGROUND BUBBLES (OPTIMIZED)
      ========================= */
+
+
+
+
+
+
+
+
   .bubble-container {
     position: fixed; 
     top: 0;
@@ -2580,3 +2633,913 @@ input:focus {
        padding-bottom: calc(20px + env(safe-area-inset-bottom));
     }
   }
+
+
+
+
+  /* =========================
+   STEP 2: THE NAVIGATION BAR
+   ========================= */
+
+/* --- 1. Base Navbar Structure (Mobile First) --- */
+.app-navbar {
+  width: 100%;
+  height: var(--header-height-mobile, 60px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Mobile: It flows naturally, but we can stick it if needed */
+  position: relative; 
+  z-index: 100;
+  
+  /* Mobile Aesthetic: Minimal */
+  background: transparent;
+  padding: 0 20px;
+}
+
+.nav-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Pushes Title Left/Center, Profile Right */
+}
+
+/* Brand Title (Mobile) */
+.nav-brand h1 {
+  font-size: 1.5rem; /* Much smaller than 3rem! */
+  margin: 0;
+  background: linear-gradient(to right, #ffffff, #d000ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+}
+
+/* Center Section (Hidden on Mobile) */
+.nav-center-desktop {
+  display: none; 
+}
+
+/* Right Section (Profile) */
+.nav-right {
+  display: flex;
+  align-items: center;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.header-profile-btn {
+  /* Ensure it doesn't float away */
+  margin: 0; 
+  position: static; /* Reset absolute positioning */
+  width: 38px;
+  height: 38px;
+  font-size: 0.9rem;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.profile-name-desktop {
+  display: none; /* Hide name on mobile */
+}
+
+/* --- 2. Desktop Override (The Pro Look) --- */
+@media (min-width: 1024px) {
+  
+  .app-navbar {
+    position: fixed; /* Sticky top */
+    top: 0;
+    left: 0;
+    height: var(--header-height-desktop, 80px);
+    
+    /* Glassmorphism */
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .nav-content {
+    max-width: var(--max-width-desktop);
+    margin: 0 auto;
+    padding: 0 40px; /* Align with content */
+  }
+
+  .nav-brand h1 {
+    font-size: 1.8rem; /* Elegant size */
+  }
+
+  /* Reveal the Center Slot */
+  .nav-center-desktop {
+    display: block;
+    flex: 1; /* Takes up all available middle space */
+    max-width: 500px; /* Limits search bar width later */
+    margin: 0 40px;
+  }
+
+  /* Reveal Name */
+  .profile-name-desktop {
+    display: block;
+    color: #fff;
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  
+  .profile-trigger:hover .profile-name-desktop {
+    color: #d000ff;
+  }
+}
+
+
+
+/* =========================
+   STEP 3: DASHBOARD TOOLBAR
+   ========================= */
+
+   .dashboard-toolbar {
+    display: flex;
+    flex-direction: column; /* Default: Mobile Stack */
+    gap: 12px;
+    margin-bottom: 30px;
+    width: 100%;
+  }
+  
+  /* --- Search Input Styling --- */
+  .toolbar-search {
+    position: relative;
+    width: 100%;
+    flex-grow: 1;
+  }
+  
+  .toolbar-search input {
+    width: 100%;
+    padding: 12px 45px 12px 42px; /* Left padding for icon, Right for badge */
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.9);
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    color: #333;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 0 !important; /* Override global input margin */
+  }
+  
+  .toolbar-search input:focus {
+    background: #fff;
+    border-color: #d000ff;
+    box-shadow: 0 4px 15px rgba(208, 0, 255, 0.2);
+    outline: none;
+  }
+  
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    display: flex;
+    color: #666;
+  }
+  
+  /* Shortcut Badge (Ctrl K) - Hidden on Mobile */
+  .shortcut-badge {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    color: #666;
+    pointer-events: none;
+    display: none; 
+  }
+  
+  /* Hide badge when user starts typing */
+  .toolbar-search input:not(:placeholder-shown) ~ .shortcut-badge {
+    display: none;
+  }
+  
+  /* Clear Button */
+  .search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #eee;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: none; /* JS controls this */
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #555;
+    z-index: 2;
+  }
+  
+  /* --- Sort Dropdown Styling --- */
+  .toolbar-sort {
+    position: relative;
+    min-width: 180px;
+  }
+  
+  .toolbar-sort select {
+    width: 100%;
+    appearance: none; /* Remove default browser arrow */
+    padding: 12px 35px 12px 15px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.9);
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    cursor: pointer;
+    color: #333;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 0 !important;
+    transition: all 0.2s;
+  }
+  
+  .toolbar-sort select:hover {
+    background: #fff;
+  }
+  
+  .sort-arrow {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: #666;
+    pointer-events: none;
+  }
+  
+  /* --- DESKTOP OVERRIDE (The Fix) --- */
+  @media (min-width: 1024px) {
+    .dashboard-toolbar {
+      flex-direction: row; /* Align side-by-side */
+      align-items: center;
+    }
+    
+    .toolbar-search {
+      max-width: 400px; /* Stop it from being infinitely wide */
+    }
+    
+    .shortcut-badge {
+      display: block; /* Show Ctrl+K only on Desktop */
+    }
+  }
+
+
+
+
+  /* =========================
+   STEP 4: GRID & CARDS (DENSE MODE)
+   ========================= */
+
+/* --- 1. The Grid Container --- */
+#chapters-grid {
+  display: grid;
+  width: 100%;
+  padding-bottom: 80px; /* Space for FAB/Footer */
+  
+  /* Mobile Default: Single Column */
+  grid-template-columns: 1fr; 
+  gap: 15px;
+}
+
+/* --- 2. Card Styling (Mobile First) --- */
+.chapter-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 16px;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  
+  /* Layout: Vertical Flex */
+  display: flex;
+  flex-direction: column;
+  
+  /* ✅ FIX: Force compact height on mobile */
+  height: 130px; 
+  min-height: 130px;
+  
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+/* Card Header */
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.chapter-initials {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.menu-btn {
+  width: 32px; /* Smaller touch target for corner */
+  height: 32px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  color: #999;
+}
+
+/* Card Name */
+.chapter-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: #333;
+  
+  /* Truncate long names on mobile */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card Footer */
+.card-footer {
+  margin-top: auto; /* Pushes to bottom */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #888;
+  font-weight: 500;
+}
+
+/* --- 3. "Add New" Card Styling --- */
+.card-add {
+  background: rgba(255, 255, 255, 0.08); /* Darker glass */
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.card-add .plus-icon {
+  font-size: 1.5rem;
+  background: rgba(255,255,255,0.1);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.card-add div:last-child {
+  color: rgba(255,255,255,0.7) !important;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+/* --- 4. DESKTOP OVERRIDES (Laptop Mode) --- */
+@media (min-width: 1024px) {
+  #chapters-grid {
+    /* ✅ FIX: 4 Columns Strict Grid */
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 20px;
+    padding-bottom: 40px;
+  }
+
+  .chapter-card {
+    /* Taller on Desktop for better breathing room */
+    height: 180px; 
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+  
+  .chapter-initials {
+    width: 44px;
+    height: 44px;
+    font-size: 1rem;
+    border-radius: 12px;
+  }
+  
+  .chapter-name {
+    font-size: 1.25rem;
+    margin-top: 12px;
+    white-space: normal; /* Allow text wrapping */
+    line-height: 1.3;
+  }
+  
+  .card-footer {
+    font-size: 0.85rem;
+  }
+
+  /* Hover Effects (Only on Desktop) */
+  .chapter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+    border-color: rgba(255, 255, 255, 0.9);
+    z-index: 2;
+  }
+  
+  .card-add:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: #d000ff;
+    transform: translateY(-5px);
+  }
+}
+
+
+
+
+
+/* =========================
+   CORRECTION PATCH (Fixing Size & Alignment)
+   ========================= */
+
+/* 1. FIX HEADER SIZE */
+.nav-brand h1 {
+  /* Increase size significantly */
+  font-size: 1.8rem !important; /* Mobile */
+  letter-spacing: -0.5px;
+}
+
+@media (min-width: 1024px) {
+  .nav-brand h1 {
+    font-size: 2.2rem !important; /* Desktop */
+  }
+}
+
+/* 2. FIX CARD ALIGNMENT (The "Distortion" Fix) */
+.chapter-card {
+  /* Use space-between to push Header up, Footer down, Name middle */
+  justify-content: space-between !important; 
+  padding: 18px !important; /* Little more breathing room */
+}
+
+.chapter-name {
+  /* Force the name to sit in the visual center */
+  margin: 0 !important;
+  text-align: center; /* Center horizontally */
+  flex-grow: 1; /* Allows it to take up all available middle space */
+  display: flex;
+  align-items: center; /* Center vertically */
+  justify-content: center;
+  
+  /* Typography bump */
+  font-size: 1.25rem !important;
+  line-height: 1.2;
+}
+
+/* 3. FIX "CREATE NEW" CARD (The "Glow Up") */
+.card-add {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 2px dashed rgba(208, 0, 255, 0.5) !important; /* Purple tint border */
+  box-shadow: 0 0 15px rgba(208, 0, 255, 0.1) inset; /* Inner purple glow */
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Add a shiny "sheen" animation */
+.card-add::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    to right, 
+    transparent, 
+    rgba(255, 255, 255, 0.1), 
+    transparent
+  );
+  transform: skewX(-25deg);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% { left: -100%; }
+  20% { left: 200%; }
+  100% { left: 200%; }
+}
+
+.card-add .plus-icon {
+  background: linear-gradient(135deg, #d000ff, #8a2be2) !important; /* Gradient Button */
+  box-shadow: 0 5px 15px rgba(208, 0, 255, 0.4);
+  width: 48px !important;
+  height: 48px !important;
+  font-size: 1.8rem !important;
+}
+
+.card-add div:last-child {
+  color: #d000ff !important; /* Purple text */
+  font-weight: 600 !important;
+  margin-top: 5px;
+}
+
+/* 4. FIX FOOTER ALIGNMENT */
+.card-footer {
+  width: 100%;
+  border-top: 1px solid rgba(0,0,0,0.05); /* Subtle separator */
+  padding-top: 8px;
+  margin-top: 0 !important; /* Reset margin since flex handles it */
+}
+
+
+
+
+
+
+/* =========================
+   FINAL POLISH: FIXING ALIGNMENT & SIMPLICITY
+   ========================= */
+
+/* --- 1. Header Size Fix --- */
+.nav-brand h1 {
+  font-size: 1.8rem !important; /* Bigger on Mobile */
+  letter-spacing: -0.5px;
+}
+
+@media (min-width: 1024px) {
+  .nav-brand h1 {
+    font-size: 2.2rem !important; /* Much Bigger on Laptop */
+  }
+}
+
+/* --- 2. "Create Chapter" Card (Clean Look) --- */
+.card-add {
+  /* Remove the purple tint & shine */
+  background: transparent !important;
+  box-shadow: none !important;
+  
+  /* The User Request: "Black and White dotted outline" */
+  /* We use white with 30% opacity so it looks good on dark bg */
+  border: 2px dashed rgba(255, 255, 255, 0.3) !important; 
+  
+  /* Center content */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Disable the shine animation we added earlier */
+.card-add::after {
+  display: none !important;
+}
+
+/* Keep the button shiny/purple as requested */
+.card-add .plus-icon {
+  background: linear-gradient(135deg, #d000ff, #8a2be2) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(208, 0, 255, 0.3);
+  border: none !important;
+}
+
+.card-add div:last-child {
+  color: rgba(255, 255, 255, 0.9) !important; /* White text */
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  letter-spacing: 0.5px;
+}
+
+/* --- 3. Chapter Card (True Centering & Distortion Fix) --- */
+.chapter-card {
+  position: relative !important; /* Essential for absolute centering */
+  padding: 16px !important;
+  
+  /* Increase Mobile Height to prevent distortion */
+  height: 150px !important; 
+  min-height: 150px !important;
+  
+  /* Reset Flex alignment since we use absolute positioning now */
+  display: block !important; 
+}
+
+/* The Header (Initials + Menu) - Stick to Top */
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  margin-bottom: 0 !important;
+}
+
+/* The Name - Force Dead Center */
+.chapter-name {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* The Magic Centering Trick */
+  
+  width: 90%; /* Prevent touching edges */
+  text-align: center;
+  margin: 0 !important;
+  
+  font-size: 1.2rem !important;
+  line-height: 1.3;
+  z-index: 1; /* Ensure it sits above background */
+}
+
+/* The Footer (Members + Date) - Stick to Bottom */
+.card-footer {
+  position: absolute;
+  bottom: 16px; /* Match padding */
+  left: 16px;
+  right: 16px;
+  
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  
+  font-size: 0.75rem !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+  margin-top: 0 !important;
+}
+
+/* Desktop Adjustment */
+@media (min-width: 1024px) {
+  .chapter-card {
+    height: 180px !important; /* Taller on Laptop */
+    padding: 24px !important;
+  }
+  .card-footer {
+    bottom: 24px;
+    left: 24px;
+    right: 24px;
+  }
+}
+
+
+
+
+/* =========================
+   FINAL REPAIR: DISTORTION-FREE LAYOUT
+   ========================= */
+
+/* --- 1. Header Size (Confirmed) --- */
+.nav-brand h1 {
+  font-size: 1.8rem !important; /* Mobile */
+  letter-spacing: -0.5px;
+}
+
+@media (min-width: 1024px) {
+  .nav-brand h1 {
+    font-size: 2.2rem !important; /* Laptop */
+  }
+}
+
+/* --- 2. Chapter Card (Safe-Flow Architecture) --- */
+.chapter-card {
+  /* Reset: Go back to Flexbox (Safer than Absolute) */
+  display: flex !important;
+  flex-direction: column !important;
+  
+  /* Spacing: Add breathing room inside the card */
+  padding: 18px 20px !important; 
+  
+  /* Height: Use MIN-height. This prevents "squishing" distortion. */
+  /* If content is large, the card grows naturally. */
+  min-height: 160px !important; 
+  height: auto !important; 
+  
+  /* Reset positioning */
+  position: relative !important;
+  justify-content: flex-start !important;
+}
+
+/* A. The Header (Initials + Menu) */
+.card-header-row {
+  flex-shrink: 0 !important; /* Never shrink this */
+  width: 100%;
+  margin-bottom: 10px !important;
+}
+
+/* B. The Name (Perfectly Centered & Safe) */
+.chapter-name {
+  /* Reset Absolute Positioning */
+  position: static !important;
+  transform: none !important;
+  
+  /* Flex Magic: Take up all available empty space */
+  flex-grow: 1 !important; 
+  
+  /* Alignment */
+  display: flex !important;
+  align-items: center !important; /* Vertical Center */
+  justify-content: center !important; /* Horizontal Center */
+  text-align: center !important;
+  
+  /* Safety Margins */
+  margin: 10px 0 !important;
+  width: 100% !important;
+  
+  /* Typography */
+  font-size: 1.2rem !important;
+  line-height: 1.3;
+  z-index: 1;
+}
+
+/* C. The Footer (Grey & Anchored) */
+.card-footer {
+  /* Reset Absolute Positioning */
+  position: static !important;
+  
+  /* Push to bottom safely */
+  margin-top: auto !important; 
+  flex-shrink: 0 !important; /* Never shrink this */
+  
+  width: 100% !important;
+  
+  /* Visibility Fix: Grey Text */
+  color: #666 !important; 
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+  padding-top: 10px !important;
+}
+
+/* --- 3. Create Chapter Card (Clean & Centered) --- */
+.card-add {
+  /* Outline: White Dotted (Clean Look) */
+  background: transparent !important;
+  border: 2px dashed rgba(255, 255, 255, 0.4) !important;
+  box-shadow: none !important;
+  
+  /* Layout: Center Everything */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  
+  padding: 0 !important;
+}
+
+/* Disable the shine animation */
+.card-add::after {
+  display: none !important;
+}
+
+/* Plus Icon: Centered & Purple */
+.card-add .plus-icon {
+  background: linear-gradient(135deg, #d000ff, #8a2be2) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(208, 0, 255, 0.3);
+  border: none !important;
+  margin: 0 0 10px 0 !important; /* Spacing below icon */
+}
+
+/* Text: White */
+.card-add div:last-child {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  margin: 0 !important;
+}
+
+/* --- 4. Desktop Adjustments --- */
+@media (min-width: 1024px) {
+  .chapter-card {
+    min-height: 200px !important; /* Taller on Laptop */
+    padding: 24px !important;
+  }
+}
+
+
+/* =========================
+   VISUAL TWEAK: OPTICAL CENTERING
+   ========================= */
+
+/* 1. Shift Name UP (By adding invisible weight to the bottom) */
+.chapter-name {
+  /* Existing styles... */
+  flex-grow: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  
+  /* TWEAK: Push text upwards */
+  padding-bottom: 15px !important; 
+}
+
+/* 2. Shift Footer DOWN (Pull it closer to the bottom edge) */
+.card-footer {
+  /* Existing styles... */
+  margin-top: auto !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+  padding-top: 10px !important;
+  color: #666 !important;
+  
+  /* TWEAK: Pull closer to bottom edge */
+  margin-bottom: -5px !important; 
+}
+
+
+
+
+
+/* =========================
+   FINAL STEP: GEN-Z MESH GRADIENT VIBE
+   ========================= */
+
+/* 1. Container: Sits behind everything */
+.mesh-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1; /* Behind content */
+  overflow: hidden;
+  background: #05000a; /* Deepest black-purple base */
+}
+
+/* 2. The Orbs: Glowing patches of color */
+.mesh-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px); /* The "Mesh" effect comes from high blur */
+  opacity: 0.6;
+  animation: floatMesh 10s infinite alternate ease-in-out;
+}
+
+/* Orb 1: The Primary Brand (Neon Purple) */
+.orb-1 {
+  width: 60vh;
+  height: 60vh;
+  background: #d000ff;
+  top: -10%;
+  left: -10%;
+  animation-duration: 12s;
+}
+
+/* Orb 2: The Contrast (Deep Cyan/Blue) */
+.orb-2 {
+  width: 50vh;
+  height: 50vh;
+  background: #00e5ff; /* Cyan adds Gen-Z contrast */
+  bottom: -5%;
+  right: -5%;
+  animation-duration: 15s;
+  animation-delay: -2s;
+}
+
+/* Orb 3: The Accent (Hot Pink/Red) */
+.orb-3 {
+  width: 40vh;
+  height: 40vh;
+  background: #ff0055;
+  top: 40%;
+  left: 40%;
+  opacity: 0.4;
+  animation-duration: 18s;
+  animation-delay: -5s;
+}
+
+/* 3. The Animation: Organic Breathing Movement */
+@keyframes floatMesh {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, 40px) scale(1.1);
+  }
+  100% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+/* 4. Mobile Optimization (Reduce Load) */
+@media (max-width: 768px) {
+  .mesh-orb {
+    filter: blur(60px); /* Less blur for performance */
+    opacity: 0.5;
+  }
+  .orb-1 { width: 80vw; height: 80vw; }
+  .orb-2 { width: 70vw; height: 70vw; }
+  .orb-3 { display: none; } /* Hide 3rd orb on phones to save battery */
+}

@@ -13,28 +13,41 @@
 
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="preconnect" href="https://fonts.googleapis.com    ">
-  <link rel="preconnect" href="https://fonts.gstatic.com    " crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins    :wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
 
   <main id="main-content">
-    <div class="bubble-container">
-      <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-      <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <!-- Replaced old bubbles with new mesh background -->
+    <div class="mesh-background">
+      <div class="mesh-orb orb-1"></div>
+      <div class="mesh-orb orb-2"></div>
+      <div class="mesh-orb orb-3"></div>
     </div>
 
     <!-- Updated Header -->
-    <div class="brand-header">
-      <h1>Hisaab-Kitaab</h1>
-      <div class="header-actions">
-        <div id="header-profile-icon" class="header-profile-btn" onclick="openProfileModal()" title="My Profile">
-          ?
+    <header class="app-navbar">
+      <div class="nav-content">
+        
+        <div class="nav-brand">
+          <h1>Hisaab-Kitaab</h1>
         </div>
+
+        <div class="nav-center-desktop">
+        </div>
+
+        <div class="nav-right">
+          <div class="profile-trigger" onclick="openProfileModal()" title="My Profile">
+            <div id="header-profile-icon" class="header-profile-btn">?</div>
+            <span class="profile-name-desktop" id="desktop-profile-name">My Profile</span>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </header>
 
     <div class="dashboard-container">
       <h2 class="section-title">Create your expense chapter</h2>
@@ -215,8 +228,6 @@
     <script src="js/main.js"></script>
     <script src="js/dashboard.js"></script> 
   </main>
-
-
 
   <footer class="app-footer">
     <div class="footer-content">

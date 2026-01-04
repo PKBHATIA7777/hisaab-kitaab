@@ -79,60 +79,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch(e) { console.warn("Failed to preload friends"); }
 
   // ==========================================
-  // ✅ Inject Search & Sort Controls
+  // ✅ STEP 3: Professional Toolbar Injection (UPDATED)
   // ==========================================
   const controlsHtml = `
-    <div style="
-      display: flex; 
-      gap: 15px; 
-      margin-bottom: 25px; 
-      flex-wrap: wrap; 
-      align-items: center;
-      width: 100%;
-    ">
-      <div style="position: relative; flex-grow: 1; min-width: 240px;">
-        <span style="
-          position: absolute; left: 15px; top: 50%; transform: translateY(-50%); 
-          opacity: 0.5; font-size: 1.1rem; pointer-events: none;
-        ">🔍</span>
+    <div class="dashboard-toolbar">
+      <div class="toolbar-search">
+        <span class="search-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
         
-        <input type="text" id="chapter-search" placeholder="Find a chapter... (Ctrl + K)" 
-        style="
-          width: 100%;
-          padding: 12px 40px 12px 45px;
-          border-radius: 12px; 
-          border: 2px solid #eee; 
-          font-family: var(--font-main);
-          font-size: 0.95rem;
-          background: #fff;
-          transition: all 0.2s;
-        ">
+        <input type="text" id="chapter-search" placeholder="Search chapters..." autocomplete="off">
         
-        <button id="search-clear-btn" style="
-          position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-          background: #eee; border: none; border-radius: 50%; width: 24px; height: 24px;
-          cursor: pointer; display: none; align-items: center; justify-content: center;
-          font-size: 0.8rem; color: #666;
-        ">✕</button>
+        <span class="shortcut-badge">Ctrl K</span>
+        
+        <button id="search-clear-btn" class="search-clear" aria-label="Clear search">✕</button>
       </div>
 
-
-      <div style="min-width: 160px;">
-        <select id="chapter-sort" style="
-          width: 100%;
-          padding: 12px 15px;
-          border-radius: 12px;
-          border: 2px solid #eee;
-          background: #fff;
-          font-family: var(--font-main);
-          font-size: 0.95rem;
-          cursor: pointer;
-        ">
-          <option value="newest">📅 Newest First</option>
-          <option value="oldest">📅 Oldest First</option>
+      <div class="toolbar-sort">
+        <select id="chapter-sort">
+          <option value="newest">📅 Newest</option>
+          <option value="oldest">📅 Oldest</option>
           <option value="az">🔤 Name (A-Z)</option>
-          <option value="members">👥 Most Members</option>
+          <option value="members">👥 Size</option>
         </select>
+        <span class="sort-arrow">▼</span>
       </div>
     </div>
   `;
@@ -476,13 +446,13 @@ function renderGrid(chapters) {
 
     card.innerHTML = `
       <div class="card-header-row">
-        <div class="chapter-initials" style="background: ${color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); box-shadow: 0 5px 15px ${color}40;">
+        <div class="chapter-initials" style="background: ${color}; color: #fff; box-shadow: 0 5px 15px ${color}40;">
           ${initials}
         </div>
 
-
-        <button class="menu-btn" onclick="toggleMenu(event, '${chapter.id}')" aria-label="Open chapter menu">⋮</button>
-
+        <button class="menu-btn" onclick="toggleMenu(event, '${chapter.id}')" aria-label="Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+        </button>
 
         <div id="menu-${chapter.id}" class="menu-dropdown">
           <button class="menu-item" onclick="openEditModal('${chapter.id}', '${chapter.name}', '${chapter.description || ''}')">Edit</button>
@@ -490,11 +460,9 @@ function renderGrid(chapters) {
         </div>
       </div>
 
-
       <h3 class="chapter-name">${chapter.name}</h3>
 
-
-      <div style="margin-top:auto; width:100%; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#888;">
+      <div class="card-footer">
         <span>${chapter.member_count} members</span>
         <span>${timeString}</span>
       </div>
