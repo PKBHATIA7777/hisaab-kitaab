@@ -5,7 +5,6 @@ const createModal = document.getElementById("create-modal");
 const createForm = document.getElementById("create-chapter-form");
 const memberListContainer = document.getElementById("member-list-container");
 
-
 // ==========================================
 // ✅ STATE MANAGEMENT
 // ==========================================
@@ -19,6 +18,15 @@ let myFriends = [];     // ✅ Moved here for global access
 // ✅ NEW: Track who we are looking at in friend details
 let currentViewFriendId = null;
 
+// 👇 NEW: Placeholder Animation State
+let placeholderInterval = null;
+const placeholderSuggestions = [
+  "e.g. College Friends Group",  // 1. Suggest Long-term Group
+  "e.g. Goa Trip 2025",          // 2. Suggest Event
+  "e.g. Flatmates 404",          // 3. Suggest Household
+  "e.g. Office Lunch Crew"       // 4. Suggest Daily Life
+];
+
 // ✅ Updated skeleton loader: centered spinner
 function renderSkeletons() {
   const grid = document.getElementById("chapters-grid");
@@ -28,7 +36,6 @@ function renderSkeletons() {
     </div>
   `;
 }
-
 
 // ==========================================
 // HELPER FUNCTIONS
@@ -42,7 +49,6 @@ function getInitials(name) {
   return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
 }
 
-
 function getAvatarColor(name) {
   const colors = [
     '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', 
@@ -55,7 +61,6 @@ function getAvatarColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-
 function timeAgo(timestamp) {
   const now = new Date();
   const date = new Date(timestamp);
@@ -67,7 +72,6 @@ function timeAgo(timestamp) {
   if (diff < 2592000000) return Math.floor(diff / 86400000) + "d ago";
   return Math.floor(diff / 2592000000) + "mo ago";
 }
-
 
 document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons();
@@ -109,19 +113,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   chaptersGrid.insertAdjacentHTML('beforebegin', controlsHtml);
 
-
   // --- LOGIC ---
   const searchInput = document.getElementById('chapter-search');
   const clearBtn = document.getElementById('search-clear-btn');
   const sortSelect = document.getElementById('chapter-sort');
-
 
   // ✅ FIX P2: Enhanced runFilter with empty state handling & mobile optimization
   const runFilter = () => {
     const term = searchInput.value.toLowerCase().trim();
     const cards = document.querySelectorAll('.chapter-card.card-content');
     let visibleCount = 0;
-
 
     cards.forEach(card => {
       const name = card.querySelector('.chapter-name').textContent.toLowerCase();
@@ -132,7 +133,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     // Toggle Clear Button
     if (clearBtn) clearBtn.style.display = term.length > 0 ? 'flex' : 'none';
-
 
     // ✅ FIX U8: Show "No Results" message
     const emptyState = document.querySelector('.empty-state-container');
@@ -162,7 +162,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-
   // ✅ FIX P2: Debounce Search (Wait 300ms before filtering) - Uses global debounce from main.js
   if (searchInput) {
     searchInput.addEventListener('input', debounce(runFilter, 300));
@@ -177,7 +176,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       searchInput.focus();
     });
   }
-
 
   // Helper: Sort Data & Re-render
   const runSort = () => {
@@ -203,11 +201,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     runFilter(); 
   };
 
-
   if (sortSelect) {
     sortSelect.addEventListener('change', runSort);
   }
-
 
   // Keyboard Shortcut
   document.addEventListener('keydown', (e) => {
@@ -217,12 +213,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-
   // --- DATA FETCHING ---
   const slowNetworkTimeout = setTimeout(() => {
     showToast("Server is waking up...", "info");
   }, 2500);
-
 
   // ✅ FIX: Character Counters
   const nameInput = createForm.querySelector('input[name="name"]');
@@ -230,11 +224,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const nameCount = document.getElementById("name-count");
   const descCount = document.getElementById("desc-count");
 
-
   const updateCount = (input, display) => {
     display.textContent = input.value.length;
   };
-
 
   // Listeners
   if (nameInput && nameCount) {
@@ -244,7 +236,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     descInput.addEventListener("input", () => updateCount(descInput, descCount));
   }
 
-
   // SETUP VALIDATION FOR CREATE MODAL
   window.setupInlineValidation(nameInput, (value) => {
     if (!value.trim()) return "Chapter name is required.";
@@ -252,7 +243,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (/[<>]/.test(value)) return "HTML characters (< >) are not allowed.";
     return null;
   });
-
 
   try {
     const [authData, chaptersData] = await Promise.all([
@@ -264,14 +254,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentUser = authData.user;
     renderProfileIcon();
 
-
     clearTimeout(slowNetworkTimeout);
-
 
     // ✅ FIX: Store data globally
     allChapters = chaptersData.chapters;
     renderGrid(allChapters);
-
 
   } catch (err) {
     clearTimeout(slowNetworkTimeout);
@@ -288,7 +275,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 });
-
 
 // ==========================================
 // ✅ UNIFIED FORM SUBMISSION HANDLER
@@ -361,7 +347,6 @@ createForm.onsubmit = async (e) => {
   }
 };
 
-
 // Helper to reload just the grid (used after creating a chapter)
 async function reloadChaptersGrid() {
   renderSkeletons();
@@ -384,13 +369,11 @@ async function reloadChaptersGrid() {
   }
 }
 
-
 // ==========================================
 // ✅ RENDERGRID FUNCTION
 // ==========================================
 function renderGrid(chapters) {
   chaptersGrid.innerHTML = "";
-
 
   // 1. SCENARIO A: No Chapters (SVG Empty State)
   if (!chapters || chapters.length === 0) {
@@ -412,9 +395,7 @@ function renderGrid(chapters) {
     return;
   }
 
-
   // 2. SCENARIO B: Has Chapters
-
 
   // "Add New" Card
   const addCard = document.createElement("div");
@@ -431,18 +412,15 @@ function renderGrid(chapters) {
   });
   chaptersGrid.appendChild(addCard);
 
-
   // User Chapters
   chapters.forEach((chapter) => {
     const card = document.createElement("div");
     card.className = "chapter-card card-content";
     card.style.position = "relative";
 
-
     const initials = getInitials(chapter.name);
     const color = getAvatarColor(chapter.name);
     const timeString = timeAgo(chapter.created_at);
-
 
     card.innerHTML = `
       <div class="card-header-row">
@@ -468,94 +446,98 @@ function renderGrid(chapters) {
       </div>
     `;
 
-
     card.addEventListener("click", (e) => {
       if (e.target.tagName === "BUTTON" || e.target.closest(".menu-dropdown")) return;
       window.location.href = `chapter.html?id=${chapter.id}`;
     });
 
-
     chaptersGrid.appendChild(card);
   });
 }
 
-
 // ==========================================
-// ✅ MODAL FUNCTIONS
+// ✅ MODAL FUNCTIONS (UPDATED WITH PLACEHOLDER)
 // ==========================================
-
 
 // 1. Open for CREATING (Reset everything)
 window.openModal = function() {
   isEditMode = false;
   editChapterId = null;
 
-
   createForm.reset();
-
 
   // Show members section
   document.getElementById("member-list-container").style.display = "block";
   document.querySelector("button[type='button']").style.display = "inline-block";
 
-
   // Reset UI Text
   createModal.querySelector(".modal-header h2").textContent = "New Chapter";
   createForm.querySelector("button[type='submit']").textContent = "Create Chapter";
-
 
   // Reset member inputs to default (1 empty input)
   memberListContainer.innerHTML = "";
   addMemberInput();
 
-
   createModal.classList.add("active");
 
+  // 👇 START PLACEHOLDER ANIMATION
+  const input = createForm.querySelector('input[name="name"]');
+  if (input) {
+    let index = 0;
+    input.setAttribute("placeholder", placeholderSuggestions[0]);
+    
+    // Clear any existing interval
+    if (placeholderInterval) clearInterval(placeholderInterval);
+    
+    placeholderInterval = setInterval(() => {
+      index = (index + 1) % placeholderSuggestions.length;
+      input.setAttribute("placeholder", placeholderSuggestions[index]);
+    }, 2500);
 
-  // ✅ FIX: Focus the INPUT, not the box, for better accessibility
-  setTimeout(() => {
-    const firstInput = createForm.querySelector('input[name="name"]');
-    if (firstInput) firstInput.focus();
+    setTimeout(() => {
+      input.focus();
 
-
-    // Reset counters visually
-    const nameCount = document.getElementById("name-count");
-    const descCount = document.getElementById("desc-count");
-    if (nameCount) nameCount.textContent = "0";
-    if (descCount) descCount.textContent = "0";
-  }, 100);
+      // Reset counters visually
+      const nameCount = document.getElementById("name-count");
+      const descCount = document.getElementById("desc-count");
+      if (nameCount) nameCount.textContent = "0";
+      if (descCount) descCount.textContent = "0";
+    }, 100);
+  }
 };
-
 
 // 2. Open for EDITING
 window.openEditModal = function(id, currentName, currentDesc) {
   isEditMode = true;
   editChapterId = id;
 
+  // Stop animation if running
+  if (placeholderInterval) clearInterval(placeholderInterval);
 
   // Populate form
   createForm.name.value = currentName;
   createForm.description.value = (currentDesc && currentDesc !== 'null') ? currentDesc : '';
-
+  createForm.name.setAttribute("placeholder", "Chapter Name"); // Reset to static
 
   // Hide members section (Rename only)
   document.getElementById("member-list-container").style.display = "none";
   document.querySelector("button[type='button']").style.display = "none";
 
-
   // Update UI Text
   createModal.querySelector(".modal-header h2").textContent = "Edit Chapter";
   createForm.querySelector("button[type='submit']").textContent = "Save Changes";
 
-
   createModal.classList.add("active");
 };
 
-
 function closeModal() {
   createModal.classList.remove("active");
+  // 👇 Stop Animation on Close
+  if (placeholderInterval) {
+    clearInterval(placeholderInterval);
+    placeholderInterval = null;
+  }
 }
-
 
 // ✅ UPDATED: Add Smart Input
 window.addMemberInput = function() {
@@ -598,11 +580,9 @@ window.addMemberInput = function() {
   });
 };
 
-
 /* ======================================
 MODAL ACCESSIBILITY
 ====================================== */
-
 
 // 1. Close on Escape Key
 document.addEventListener('keydown', (e) => {
@@ -611,7 +591,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-
 // 2. Close on Outside Click (Refined)
 createModal.addEventListener("click", (e) => {
   if (e.target === createModal) {
@@ -619,11 +598,9 @@ createModal.addEventListener("click", (e) => {
   }
 });
 
-
 // ======================================
 // EDIT & DELETE ACTIONS
 // ======================================
-
 
 // 1. Toggle the little menu
 window.toggleMenu = function(e, id) {
@@ -632,33 +609,27 @@ window.toggleMenu = function(e, id) {
     if (el.id !== `menu-${id}`) el.classList.remove('active');
   });
 
-
   const menu = document.getElementById(`menu-${id}`);
   menu.classList.toggle('active');
 };
-
 
 // Close menus when clicking anywhere else
 document.addEventListener('click', () => {
   document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
 });
 
-
 /* Delete Logic */
 let deleteTargetId = null;
 const deleteModal = document.getElementById("delete-modal");
 const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
 
-
 // 1. Open Modal
 window.confirmDelete = function(id) {
   document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
 
-
   deleteTargetId = id;
   deleteModal.classList.add("active");
 };
-
 
 // 2. Close Modal
 window.closeDeleteModal = function() {
@@ -666,26 +637,21 @@ window.closeDeleteModal = function() {
   deleteTargetId = null;
 };
 
-
 // 3. Handle "Yes, Delete" Click
 if (confirmDeleteBtn) {
   confirmDeleteBtn.addEventListener("click", () => {
     if (!deleteTargetId) return;
 
-
     const id = deleteTargetId;
     closeDeleteModal();
-
 
     performDeleteWithUndo(id);
   });
 }
 
-
 // 4. The "Undo" Logic
 function performDeleteWithUndo(id) {
   let isUndoClicked = false;
-
 
   showToast("Chapter deleted", "info", {
     label: "UNDO ↩️",
@@ -694,7 +660,6 @@ function performDeleteWithUndo(id) {
       showToast("Deletion cancelled", "success");
     }
   });
-
 
   setTimeout(async () => {
     if (!isUndoClicked) {
@@ -708,7 +673,6 @@ function performDeleteWithUndo(id) {
   }, 4000);
 }
 
-
 // ✅ NEW: Focus Trap for Modals
 function trapFocus(modal) {
   const focusableElements = modal.querySelectorAll(
@@ -716,10 +680,8 @@ function trapFocus(modal) {
   );
   if (focusableElements.length === 0) return;
 
-
   const firstElement = focusableElements[0];
   const lastElement = focusableElements[focusableElements.length - 1];
-
 
   modal.addEventListener('keydown', function(e) {
     if (e.key === 'Tab') {
@@ -738,13 +700,11 @@ function trapFocus(modal) {
   });
 }
 
-
 const originalOpenModal = window.openModal;
 window.openModal = function() {
   originalOpenModal();
   trapFocus(document.getElementById('create-modal'));
 };
-
 
 // ==========================================
 // ✅ PROFILE & LOGOUT LOGIC
@@ -752,7 +712,6 @@ window.openModal = function() {
 function renderProfileIcon() {
   const iconEl = document.getElementById("header-profile-icon");
   if (!iconEl || !currentUser) return;
-
 
   const baseName = currentUser.realName || currentUser.username || "";
   const initials = getInitials(baseName);
@@ -762,7 +721,6 @@ function renderProfileIcon() {
   iconEl.style.background = color;
   iconEl.style.boxShadow = `0 0 15px ${color}60`; // Glow effect
 }
-
 
 window.openProfileModal = function() {
   const modal = document.getElementById("profile-modal");
@@ -786,12 +744,10 @@ window.openProfileModal = function() {
   modal.classList.add("active");
 };
 
-
 window.closeProfileModal = function() {
   const modal = document.getElementById("profile-modal");
   if (modal) modal.classList.remove("active");
 };
-
 
 // Re-bind Logout (since ID changed to logout-btn-profile)
 const profileLogoutBtn = document.getElementById("logout-btn-profile");
@@ -807,7 +763,6 @@ if (profileLogoutBtn) {
     }
   });
 }
-
 
 // ==========================================
 // ✅ FRIENDS MANAGEMENT LOGIC

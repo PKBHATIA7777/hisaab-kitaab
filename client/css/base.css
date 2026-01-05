@@ -3543,3 +3543,48 @@ input:focus {
   .orb-2 { width: 70vw; height: 70vw; }
   .orb-3 { display: none; } /* Hide 3rd orb on phones to save battery */
 }
+
+
+
+/* client/css/base.css - Append this */
+
+/* --- EVENT PILLS (Horizontal Tabs) --- */
+.event-pill {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(255,255,255,0.8);
+  color: #555;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.event-pill:hover {
+  background: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* Active State (Your Brand Purple) */
+.event-pill.active {
+  background: #d000ff;
+  color: white;
+  border-color: #d000ff;
+  box-shadow: 0 5px 15px rgba(208, 0, 255, 0.3);
+}
+
+/* New Event Button (Special Style) */
+.event-pill.new {
+  border: 1px dashed #d000ff;
+  color: #d000ff;
+  background: rgba(208, 0, 255, 0.05);
+}
+
+.event-pill.new:hover {
+  background: #d000ff;
+  color: white;
+}

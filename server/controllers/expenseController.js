@@ -3,9 +3,10 @@ const db = require("../config/db");
 const { z } = require("zod");
 const xss = require("xss"); // Secure input (Phase 1)
 
-// --- VALIDATION SCHEMA ---
+// --- VALIDATION SCHEMA (Updated with eventId) ---
 const addExpenseSchema = z.object({
   chapterId: z.string().or(z.number()),
+  eventId: z.string().or(z.number()).nullish(), // ✅ Optional Event ID
   amount: z.number().positive("Amount must be greater than 0"),
   description: z.string().max(100, "Description too long").optional(),
   payerMemberId: z.string().or(z.number()),
@@ -30,7 +31,8 @@ async function addExpense(req, res) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
 
-    const { chapterId, amount, payerMemberId, involvedMemberIds, customSplits } = result.data;
+    // ✅ Extract eventId
+    const { chapterId, eventId, amount, payerMemberId, involvedMemberIds, customSplits } = result.data;
     const description = xss(result.data.description || ""); // Sanitized
     const userId = req.user.userId;
 
@@ -87,12 +89,12 @@ async function addExpense(req, res) {
     await db.query("BEGIN");
 
     try {
-      // A. Insert Main Expense
+      // A. Insert Main Expense (✅ Now with event_id)
       const { rows: expenseRows } = await db.query(
-        `INSERT INTO expenses (chapter_id, payer_member_id, amount, description, expense_date)
-         VALUES ($1, $2, $3, $4, NOW())
+        `INSERT INTO expenses (chapter_id, event_id, payer_member_id, amount, description, expense_date)
+         VALUES ($1, $2, $3, $4, $5, NOW())
          RETURNING id, created_at`,
-        [chapterId, payerMemberId, amount, description]
+        [chapterId, eventId || null, payerMemberId, amount, description]
       );
       const expenseId = expenseRows[0].id;
 
@@ -112,6 +114,7 @@ async function addExpense(req, res) {
         message: "Expense added", 
         expense: { 
           id: expenseId, 
+          eventId: eventId || null,
           amount, 
           description, 
           date: expenseRows[0].created_at 
@@ -129,10 +132,11 @@ async function addExpense(req, res) {
   }
 }
 
-// Get Expenses for a Chapter (Simple List) - UNCHANGED
+// Get Expenses for a Chapter (✅ Filtering added)
 async function getChapterExpenses(req, res) {
   try {
     const { chapterId } = req.params;
+    const { eventId } = req.query; // ✅ Read query param
     const userId = req.user.userId;
 
     // Verify Access
@@ -142,15 +146,23 @@ async function getChapterExpenses(req, res) {
     );
     if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
 
-    // Fetch Expenses with Payer Name
-    const { rows } = await db.query(
-      `SELECT e.id, e.amount, e.description, e.expense_date, cm.member_name as payer_name
+    // ✅ Dynamic Query Construction
+    let queryText = `
+       SELECT e.id, e.amount, e.description, e.expense_date, e.event_id, cm.member_name as payer_name
        FROM expenses e
        JOIN chapter_members cm ON e.payer_member_id = cm.id
        WHERE e.chapter_id = $1
-       ORDER BY e.expense_date DESC`,
-      [chapterId]
-    );
+    `;
+    const params = [chapterId];
+
+    if (eventId) {
+      queryText += ` AND e.event_id = $2`;
+      params.push(eventId);
+    }
+
+    queryText += ` ORDER BY e.expense_date DESC`;
+
+    const { rows } = await db.query(queryText, params);
 
     res.json({ ok: true, expenses: rows });
   } catch (err) {
@@ -184,10 +196,11 @@ async function deleteExpense(req, res) {
   }
 }
 
-// Get Expense Summary - UNCHANGED
+// Get Expense Summary (✅ Filtering added)
 async function getExpenseSummary(req, res) {
   try {
     const { chapterId } = req.params;
+    const { eventId } = req.query; // ✅ Read query param
     const userId = req.user.userId;
 
     // Verify Access
@@ -197,17 +210,22 @@ async function getExpenseSummary(req, res) {
     );
     if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
 
-    // New Query: Calculates both Spent (Payer) and Used (Consumer)
+    // ✅ Updated CTE with Event Filter
+    // Note: ($2::int IS NULL OR ...) allows selecting ALL if eventId is missing
     const queryText = `
       WITH spent_cte AS (
         SELECT payer_member_id, SUM(amount) as total
-        FROM expenses WHERE chapter_id = $1 GROUP BY payer_member_id
+        FROM expenses 
+        WHERE chapter_id = $1 
+        AND ($2::int IS NULL OR event_id = $2::int)
+        GROUP BY payer_member_id
       ),
       used_cte AS (
         SELECT es.member_id, SUM(es.amount_owed) as total
         FROM expense_splits es
         JOIN expenses e ON es.expense_id = e.id
         WHERE e.chapter_id = $1
+        AND ($2::int IS NULL OR e.event_id = $2::int)
         GROUP BY es.member_id
       )
       SELECT 
@@ -222,7 +240,7 @@ async function getExpenseSummary(req, res) {
       ORDER BY total_spent DESC, total_used DESC
     `;
 
-    const { rows } = await db.query(queryText, [chapterId]);
+    const { rows } = await db.query(queryText, [chapterId, eventId || null]);
 
     // Calculate Grand Total (Spent should equal Used theoretically)
     const grandTotal = rows.reduce((acc, row) => acc + parseFloat(row.total_spent), 0);
@@ -239,7 +257,7 @@ async function getExpenseSummary(req, res) {
   }
 }
 
-// Get Single Expense Details - UNCHANGED
+// Get Single Expense Details (✅ Return eventId)
 async function getExpenseDetails(req, res) {
   try {
     const { id } = req.params; // expenseId
@@ -271,7 +289,7 @@ async function getExpenseDetails(req, res) {
   }
 }
 
-// Update Expense - UPDATED WITH INTEGER MATH
+// Update Expense - UPDATED WITH INTEGER MATH AND eventId
 async function updateExpense(req, res) {
   try {
     const { id } = req.params; 
@@ -280,7 +298,8 @@ async function updateExpense(req, res) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
 
-    const { chapterId, amount, payerMemberId, involvedMemberIds, customSplits } = result.data;
+    // ✅ Extract eventId
+    const { chapterId, eventId, amount, payerMemberId, involvedMemberIds, customSplits } = result.data;
     const description = xss(result.data.description || "");
     const userId = req.user.userId;
 
@@ -330,12 +349,12 @@ async function updateExpense(req, res) {
     await db.query("BEGIN");
 
     try {
-      // Update Main Expense
+      // ✅ Update Main Expense (including event_id)
       await db.query(
         `UPDATE expenses 
-         SET amount = $1, description = $2, payer_member_id = $3, chapter_id = $4
-         WHERE id = $5`,
-        [amount, description, payerMemberId, chapterId, id]
+         SET amount = $1, description = $2, payer_member_id = $3, chapter_id = $4, event_id = $5
+         WHERE id = $6`,
+        [amount, description, payerMemberId, chapterId, eventId || null, id]
       );
 
       // Delete Old Splits
@@ -417,10 +436,11 @@ function calculateSettlements(balances) {
   return settlements;
 }
 
-// Get Chapter Settlements - UPDATED TO USE NEW INTEGER MATH
+// Get Chapter Settlements (✅ Filtering added)
 async function getChapterSettlements(req, res) {
   try {
     const { chapterId } = req.params;
+    const { eventId } = req.query; // ✅ Read query param
     const userId = req.user.userId;
 
     // Verify Access
@@ -430,17 +450,21 @@ async function getChapterSettlements(req, res) {
     );
     if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
 
-    // New Query: Calculates both Spent (Payer) and Used (Consumer)
+    // ✅ Updated CTE with Event Filter
     const queryText = `
       WITH spent_cte AS (
         SELECT payer_member_id, SUM(amount) as total
-        FROM expenses WHERE chapter_id = $1 GROUP BY payer_member_id
+        FROM expenses 
+        WHERE chapter_id = $1 
+        AND ($2::int IS NULL OR event_id = $2::int)
+        GROUP BY payer_member_id
       ),
       used_cte AS (
         SELECT es.member_id, SUM(es.amount_owed) as total
         FROM expense_splits es
         JOIN expenses e ON es.expense_id = e.id
         WHERE e.chapter_id = $1
+        AND ($2::int IS NULL OR e.event_id = $2::int)
         GROUP BY es.member_id
       )
       SELECT 
@@ -454,7 +478,7 @@ async function getChapterSettlements(req, res) {
       WHERE cm.chapter_id = $1
     `;
 
-    const { rows } = await db.query(queryText, [chapterId]);
+    const { rows } = await db.query(queryText, [chapterId, eventId || null]);
 
     // Prepare Balances
     const memberBalances = rows.map(row => ({

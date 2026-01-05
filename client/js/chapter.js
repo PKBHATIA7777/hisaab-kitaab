@@ -11,11 +11,13 @@ if (!chapterId) {
 let currentUser = null;
 let currentChapter = null;
 let currentMembers = [];
-let expenses = []; // ✅ Store expenses locally
-let cachedFriends = []; // ✅ Cache friends for autocomplete
+let expenses = []; 
+let cachedFriends = []; 
+let myFriendsCache = []; 
 
-// 👇 NEW: Global variable for friends cache (as requested)
-let myFriendsCache = []; // Store friends locally to lookup IDs
+// ✅ NEW: Event State
+let events = [];
+let currentEventId = null; // null means "All"
 
 // Edit Mode State
 let isEditingExpense = false;
@@ -30,12 +32,14 @@ const adminActions = document.getElementById("admin-actions");
 const expenseListEl = document.getElementById("expense-list-container");
 const emptyStateEl = document.getElementById("chapter-empty-state");
 const fabBtn = document.querySelector(".fab-btn");
+const eventsContainer = document.getElementById("events-strip-container"); // ✅ New Container
 
 // Modals
 const addExpenseModal = document.getElementById("add-expense-modal");
 const addExpenseForm = document.getElementById("add-expense-form");
 const payerContainer = document.getElementById("payer-selection-container");
 const splitContainer = document.getElementById("split-selection-container");
+const createEventModal = document.getElementById("create-event-modal"); // ✅ New Modal
 
 // --- NEW MENU LOGIC ---
 const menuBtn = document.getElementById("chapter-menu-btn");
@@ -114,7 +118,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     renderChapterInfo();
     renderMembers();
-    loadExpenses();
+    
+    // ✅ NEW: Load Events -> Then Expenses
+    await loadEvents(); 
+    loadExpenses(); // Now uses currentEventId
 
   } catch (err) {
     console.error(err);
@@ -123,14 +130,114 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+// ✅ NEW: Load Events
+async function loadEvents() {
+  try {
+    const data = await apiFetch(`/chapters/${chapterId}/events`);
+    events = data.events || [];
+    renderEventTabs();
+  } catch (err) {
+    console.warn("Failed to load events", err);
+  }
+}
+
+// ✅ NEW: Render Tabs (Pills)
+function renderEventTabs() {
+  if (!eventsContainer) return;
+  
+  // 1. "All" Pill
+  let html = `
+    <button class="event-pill ${currentEventId === null ? 'active' : ''}" 
+      onclick="switchEvent(null)">
+      All
+    </button>
+  `;
+
+  // 2. Event Pills
+  events.forEach(ev => {
+    html += `
+      <button class="event-pill ${currentEventId === ev.id ? 'active' : ''}" 
+        onclick="switchEvent(${ev.id})">
+        ${ev.name}
+      </button>
+    `;
+  });
+
+  // 3. "+ New" Pill
+  html += `
+    <button class="event-pill new" onclick="openCreateEventModal()">
+      + New
+    </button>
+  `;
+
+  eventsContainer.innerHTML = html;
+}
+
+// ✅ NEW: Switch Logic
+window.switchEvent = function(eventId) {
+  if (currentEventId === eventId) return; // No change
+  currentEventId = eventId;
+  
+  // Re-render tabs to highlight active
+  renderEventTabs();
+  
+  // Reload data filtered by this event
+  expenseListEl.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
+  loadExpenses();
+};
+
+// --- UPDATED: Load Expenses (Accepts Event Filter) ---
 async function loadExpenses() {
   try {
-    const data = await apiFetch(`/expenses/chapter/${chapterId}`);
+    // Append eventId if selected
+    let url = `/expenses/chapter/${chapterId}`;
+    if (currentEventId) url += `?eventId=${currentEventId}`;
+
+    const data = await apiFetch(url);
     expenses = data.expenses;
     renderExpenses();
   } catch (err) {
     console.error("Failed to load expenses");
+    expenseListEl.innerHTML = '<div style="color:red; text-align:center;">Error loading expenses</div>';
   }
+}
+
+// --- UPDATED: Render Expenses ---
+function renderExpenses() {
+  expenseListEl.innerHTML = "";
+  
+  if (expenses.length === 0) {
+    // Custom Empty State for Events
+    if (currentEventId) {
+       emptyStateEl.querySelector('p').textContent = "No expenses in this event yet.";
+    } else {
+       emptyStateEl.querySelector('p').textContent = "No expenses yet. Tap + to add one.";
+    }
+    emptyStateEl.style.display = "block";
+    return;
+  }
+  
+  emptyStateEl.style.display = "none";
+
+  expenses.forEach(ex => {
+    const card = document.createElement("div");
+    card.className = "expense-card";
+    if (ex.isTemp) card.style.opacity = "0.7";
+
+    card.innerHTML = `
+      <div class="expense-info">
+        <h4>${ex.description || "Untitled Expense"}</h4>
+        <p>paid by <strong>${ex.payer_name || "Unknown"}</strong> • ${timeAgo(ex.expense_date)}</p>
+      </div>
+      <div style="text-align:right;">
+        <div class="expense-amount">₹${ex.amount}</div>
+        <button onclick="openEditExpenseModal('${ex.id}')" style="background:none; border:none; color:#d000ff; font-size:0.8rem; cursor:pointer; margin-top:5px; padding:0;">
+          View / Edit
+        </button>
+      </div>
+    `;
+    expenseListEl.appendChild(card);
+  });
 }
 
 // --- RENDER FUNCTIONS ---
@@ -168,41 +275,6 @@ function renderMembers() {
       </div>
     `;
     memberListEl.appendChild(row);
-  });
-}
-
-function renderExpenses() {
-  expenseListEl.innerHTML = "";
-  
-  if (expenses.length === 0) {
-    emptyStateEl.style.display = "block";
-    return;
-  }
-  
-  emptyStateEl.style.display = "none";
-
-  expenses.forEach(ex => {
-    const card = document.createElement("div");
-    card.className = "expense-card";
-    
-    if (ex.isTemp) {
-      card.style.opacity = "0.7";
-      card.style.filter = "grayscale(1)";
-    }
-
-    card.innerHTML = `
-      <div class="expense-info">
-        <h4>${ex.description || "Untitled Expense"}</h4>
-        <p>paid by <strong>${ex.payer_name || "Unknown"}</strong> • ${timeAgo(ex.expense_date)}</p>
-      </div>
-      <div style="text-align:right;">
-        <div class="expense-amount">₹${ex.amount}</div>
-        <button onclick="openEditExpenseModal('${ex.id}')" style="background:none; border:none; color:#d000ff; font-size:0.8rem; cursor:pointer; margin-top:5px; padding:0;">
-          View / Edit
-        </button>
-      </div>
-    `;
-    expenseListEl.appendChild(card);
   });
 }
 
@@ -322,6 +394,7 @@ window.handleDeleteExpense = async function() {
 };
 
 // --- FORM SUBMIT (Handles Both Add & Edit) ---
+// --- Updated to include eventId ---
 addExpenseForm.onsubmit = async (e) => {
   e.preventDefault();
   const formData = new FormData(addExpenseForm);
@@ -340,17 +413,21 @@ addExpenseForm.onsubmit = async (e) => {
     return showToast("Select at least one person to split with", "error");
   }
 
+  // ✅ NEW: Auto-tag Event ID if a tab is selected
+  const payload = {
+    chapterId: chapterId,
+    eventId: currentEventId, // <--- THE MAGIC
+    amount,
+    description,
+    payerMemberId: payerId,
+    involvedMemberIds: involvedIds
+  };
+
   try {
     if (isEditingExpense) {
       await apiFetch(`/expenses/${editingExpenseId}`, {
         method: "PUT",
-        body: {
-          chapterId: chapterId,
-          amount,
-          description,
-          payerMemberId: payerId,
-          involvedMemberIds: involvedIds
-        }
+        body: payload
       });
       showToast("Expense updated", "success");
     } else {
@@ -370,13 +447,7 @@ addExpenseForm.onsubmit = async (e) => {
       
       await apiFetch("/expenses", {
         method: "POST",
-        body: {
-          chapterId: chapterId,
-          amount: amount,
-          description: description,
-          payerMemberId: payerId,
-          involvedMemberIds: involvedIds
-        }
+        body: payload
       });
       
       showToast("Expense saved", "success");
@@ -398,12 +469,22 @@ const summaryModal = document.getElementById("summary-modal");
 const summaryList = document.getElementById("summary-list");
 const summaryGrandTotal = document.getElementById("summary-grand-total");
 
+// --- UPDATED: Summary Modal (Use currentEventId) ---
 window.openSummaryModal = async function() {
   summaryModal.classList.add("active");
   summaryList.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
   
+  // ✅ Update Title based on Context
+  const title = currentEventId 
+    ? events.find(e => e.id === currentEventId)?.name + " Summary"
+    : "Chapter Summary";
+  summaryModal.querySelector("h2").textContent = title;
+
   try {
-    const data = await apiFetch(`/expenses/chapter/${chapterId}/summary`);
+    let url = `/expenses/chapter/${chapterId}/summary`;
+    if (currentEventId) url += `?eventId=${currentEventId}`; // Filter!
+
+    const data = await apiFetch(url);
     renderSummary(data);
   } catch (err) {
     summaryList.innerHTML = '<div style="color:red; text-align:center;">Failed to load summary</div>';
@@ -455,6 +536,187 @@ function renderSummary(data) {
     summaryList.appendChild(row);
   });
 }
+
+// =========================================================
+// ✅ SETTLEMENT LOGIC (Updated)
+// =========================================================
+const settlementModal = document.getElementById("settlement-modal");
+const settlementList = document.getElementById("settlement-list");
+const settlementLoading = document.getElementById("settlement-loading");
+const settlementEmpty = document.getElementById("settlement-empty");
+
+// --- UPDATED: Settlements Modal (Use currentEventId) ---
+window.openSettlementModal = async function() {
+  settlementModal.classList.add("active");
+  
+  settlementList.innerHTML = "";
+  settlementList.style.display = "none";
+  settlementEmpty.style.display = "none";
+  settlementLoading.style.display = "block";
+
+  // ✅ Update Title
+  const title = currentEventId 
+    ? "Settle Up: " + events.find(e => e.id === currentEventId)?.name
+    : "Who Pays Whom?";
+  settlementModal.querySelector("h2").textContent = title;
+
+  try {
+    let url = `/expenses/chapter/${chapterId}/settlements`;
+    if (currentEventId) url += `?eventId=${currentEventId}`; // Filter!
+
+    const data = await apiFetch(url);
+    renderSettlements(data.settlements);
+  } catch (err) {
+    console.error(err);
+    settlementList.innerHTML = `<div style="color:red; text-align:center;">Failed to calculate settlements</div>`;
+    settlementList.style.display = "block";
+  } finally {
+    settlementLoading.style.display = "none";
+  }
+};
+
+window.closeSettlementModal = function() {
+  settlementModal.classList.remove("active");
+};
+
+function renderSettlements(settlements) {
+  if (!settlements || settlements.length === 0) {
+    settlementEmpty.style.display = "block";
+    return;
+  }
+
+  settlementList.style.display = "block";
+  settlementList.innerHTML = "";
+
+  settlements.forEach(item => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:15px 0; border-bottom:1px solid #f0f0f0;";
+    
+    row.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px; flex:1;">
+        <div class="small-avatar" style="background:${getAvatarColor(item.from)}">
+          ${getInitials(item.from)}
+        </div>
+        
+        <div style="font-size:0.9rem; line-height:1.3;">
+          <span style="font-weight:600; color:#333;">${item.from}</span>
+          <div style="color:#888; font-size:0.8rem;">pays <span style="font-weight:600;">${item.to}</span></div>
+        </div>
+      </div>
+
+      <div style="text-align:right;">
+        <div style="font-weight:700; font-size:1.1rem; color:#d000ff;">₹${item.amount}</div>
+        <div style="font-size:0.7rem; color:#ccc;">➔</div>
+      </div>
+    `;
+
+    settlementList.appendChild(row);
+  });
+};
+
+// ==========================================
+// ✅ EXCEL EXPORT LOGIC (Unchanged)
+// ==========================================
+window.downloadReport = async function() {
+  const btn = document.querySelector("button[onclick='downloadReport()']");
+  
+  try {
+    if (btn) setBtnLoading(btn, true);
+    
+    // UI Feedback: Show what we are downloading
+    const label = currentEventId 
+      ? "Generating Event Report..." 
+      : "Generating Full Report...";
+    showToast(label, "info");
+
+    const { csrfToken } = await apiFetch("/csrf-token");
+
+    // ✅ Append eventId if selected
+    let url = `${APP_CONFIG.API_BASE}/chapters/${chapterId}/export`;
+    if (currentEventId) {
+      url += `?eventId=${currentEventId}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-CSRF-Token": csrfToken
+      },
+      credentials: "include"
+    });
+
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.message || "Export failed");
+    }
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    
+    // Filename is set by the Content-Disposition header in the backend, 
+    // but we can set a fallback here.
+    const cleanName = currentChapter.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.download = `hisaab_kitaab_${cleanName}.xlsx`;
+    
+    document.body.appendChild(a);
+    a.click();
+    
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
+
+    showToast("Report downloaded successfully", "success");
+
+  } catch (err) {
+    console.error("Download error:", err);
+    showToast(err.message || "Failed to download report", "error");
+  } finally {
+    if (btn) setBtnLoading(btn, false);
+  }
+};
+
+// ✅ NEW: Create Event Logic
+const createEventForm = document.getElementById("create-event-form");
+
+window.openCreateEventModal = function() {
+  createEventForm.reset();
+  createEventModal.classList.add("active");
+  setTimeout(() => createEventForm.querySelector("input").focus(), 100);
+};
+
+window.closeCreateEventModal = function() {
+  createEventModal.classList.remove("active");
+};
+
+createEventForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = createEventForm.querySelector("button[type='submit']");
+  const name = createEventForm.name.value.trim();
+  
+  if(!name) return;
+
+  try {
+    setBtnLoading(btn, true);
+    const data = await apiFetch(`/chapters/${chapterId}/events`, {
+      method: "POST",
+      body: { name }
+    });
+    
+    showToast("Event created!", "success");
+    closeCreateEventModal();
+    
+    // Refresh events and auto-switch to new event
+    await loadEvents();
+    switchEvent(data.event.id);
+
+  } catch(err) {
+    showToast(err.message || "Failed to create event", "error");
+  } finally {
+    setBtnLoading(btn, false);
+  }
+};
 
 // --- UTILS ---
 function getInitials(name) {
@@ -576,121 +838,5 @@ window.deleteMember = async function(memberId) {
     renderMembers();
   } catch (err) {
     showToast(err.message || "Failed to remove member", "error");
-  }
-};
-
-// =========================================================
-// ✅ SETTLEMENT LOGIC
-// =========================================================
-const settlementModal = document.getElementById("settlement-modal");
-const settlementList = document.getElementById("settlement-list");
-const settlementLoading = document.getElementById("settlement-loading");
-const settlementEmpty = document.getElementById("settlement-empty");
-
-window.openSettlementModal = async function() {
-  settlementModal.classList.add("active");
-  
-  settlementList.innerHTML = "";
-  settlementList.style.display = "none";
-  settlementEmpty.style.display = "none";
-  settlementLoading.style.display = "block";
-
-  try {
-    const data = await apiFetch(`/expenses/chapter/${chapterId}/settlements`);
-    renderSettlements(data.settlements);
-  } catch (err) {
-    console.error(err);
-    settlementList.innerHTML = `<div style="color:red; text-align:center;">Failed to calculate settlements</div>`;
-    settlementList.style.display = "block";
-  } finally {
-    settlementLoading.style.display = "none";
-  }
-};
-
-window.closeSettlementModal = function() {
-  settlementModal.classList.remove("active");
-};
-
-function renderSettlements(settlements) {
-  if (!settlements || settlements.length === 0) {
-    settlementEmpty.style.display = "block";
-    return;
-  }
-
-  settlementList.style.display = "block";
-  settlementList.innerHTML = "";
-
-  settlements.forEach(item => {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:15px 0; border-bottom:1px solid #f0f0f0;";
-    
-    row.innerHTML = `
-      <div style="display:flex; align-items:center; gap:10px; flex:1;">
-        <div class="small-avatar" style="background:${getAvatarColor(item.from)}">
-          ${getInitials(item.from)}
-        </div>
-        
-        <div style="font-size:0.9rem; line-height:1.3;">
-          <span style="font-weight:600; color:#333;">${item.from}</span>
-          <div style="color:#888; font-size:0.8rem;">pays <span style="font-weight:600;">${item.to}</span></div>
-        </div>
-      </div>
-
-      <div style="text-align:right;">
-        <div style="font-weight:700; font-size:1.1rem; color:#d000ff;">₹${item.amount}</div>
-        <div style="font-size:0.7rem; color:#ccc;">➔</div>
-      </div>
-    `;
-
-    settlementList.appendChild(row);
-  });
-};
-
-// ==========================================
-// ✅ EXCEL EXPORT LOGIC
-// ==========================================
-window.downloadReport = async function() {
-  const btn = document.querySelector("button[onclick='downloadReport()']");
-  
-  try {
-    if (btn) setBtnLoading(btn, true);
-    showToast("Generating report...", "info");
-
-    const { csrfToken } = await apiFetch("/csrf-token");
-
-    const response = await fetch(`${APP_CONFIG.API_BASE}/chapters/${chapterId}/export`, {
-      method: "GET",
-      headers: {
-        "X-CSRF-Token": csrfToken
-      },
-      credentials: "include"
-    });
-
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || "Export failed");
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    const cleanName = currentChapter.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    a.download = `hisaab_kitaab_${cleanName}_${Date.now()}.xlsx`;
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-
-    showToast("Report downloaded successfully", "success");
-
-  } catch (err) {
-    console.error("Download error:", err);
-    showToast(err.message || "Failed to download report", "error");
-  } finally {
-    if (btn) setBtnLoading(btn, false);
   }
 };

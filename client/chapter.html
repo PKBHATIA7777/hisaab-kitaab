@@ -14,9 +14,9 @@
 
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="preconnect" href="https://fonts.googleapis.com  ">
-  <link rel="preconnect" href="https://fonts.gstatic.com  " crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins  :wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
@@ -84,6 +84,18 @@
         <div class="chapter-icon-large" id="chapter-icon-display">?</div>
         <h1 id="chapter-title"></h1>
         <p id="chapter-desc"></p>
+      </div>
+
+      <!-- ✅ EVENTS STRIP CONTAINER -->
+      <div id="events-strip-container" style="
+        margin: 20px -20px 10px -20px; 
+        padding: 0 20px; 
+        overflow-x: auto; 
+        display: flex; 
+        gap: 10px; 
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Hide scrollbar Firefox */
+      ">
       </div>
 
       <div id="expense-list-container" class="expense-list">
@@ -215,6 +227,31 @@
           <h3 style="margin:10px 0 5px 0;">All Settled Up!</h3>
           <p style="color:#888; font-size:0.9rem;">No one owes anything to anyone.</p>
         </div>
+      </div>
+    </div>
+
+    <!-- ✅ CREATE EVENT MODAL -->
+    <div class="modal-overlay" id="create-event-modal">
+      <div class="modal-box" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2>New Event</h2>
+          <button class="close-modal" aria-label="Close Modal" onclick="closeCreateEventModal()">×</button>
+        </div>
+        
+        <form id="create-event-form">
+          <p style="color:#666; font-size:0.9rem; margin-bottom:20px; line-height:1.5;">
+            Events are sub-folders inside this chapter (like "Goa Trip" or "Diwali Party"). 
+            <br><br>
+            <strong>Note:</strong> All chapter members are automatically included.
+          </p>
+
+          <label>Event Name <span style="color:red">*</span></label>
+          <input type="text" name="name" required placeholder="e.g. Weekend Getaway" maxlength="50">
+
+          <div style="margin-top: 25px;">
+            <button type="submit" class="btn-primary">Create Event</button>
+          </div>
+        </form>
       </div>
     </div>
 
