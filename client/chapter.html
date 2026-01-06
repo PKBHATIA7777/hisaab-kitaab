@@ -4,13 +4,7 @@
   <meta charset="UTF-8">
   <meta name="theme-color" content="#000000">
   <title>Chapter Details - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff' font-family='Arial, sans-serif'>₹</text></svg>">
 
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -27,33 +21,42 @@
       <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
     </div>
 
-    <nav class="chapter-nav">
-      <a href="dashboard.html" class="nav-icon-btn" aria-label="Back">
-        ←
-      </a>
+    <!-- ✅ POLISHED MOBILE HEADER -->
+    <nav class="chapter-nav" style="
+      backdrop-filter: blur(20px); 
+      background: rgba(0,0,0,0.7); 
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    ">
+      <a href="dashboard.html" class="nav-icon-btn" style="font-size: 1.5rem;" aria-label="Back">‹</a>
       
-      <div class="nav-title-placeholder"></div>
+      <div class="nav-header-center">
+        <span id="nav-chapter-name" style="font-weight: 600; font-size: 0.95rem; color: #fff;"></span>
+      </div>
 
       <div class="nav-actions">
         <button id="chapter-menu-btn" class="nav-icon-btn">⋮</button>
-        
-        <div id="chapter-menu-dropdown" class="nav-dropdown">
-          <button onclick="openSummaryModal()">
-            <span>📊</span> Summary
-          </button>
-          <button onclick="openSettlementModal()">
-            <span>🤝</span> Settle Up
-          </button>
-          <button onclick="downloadReport()">
-            <span>📥</span> Export Report
-          </button>
-          <hr>
-          <button id="nav-members-trigger">
-            <span>👥</span> Members
-          </button>
-        </div>
       </div>
     </nav>
+
+    <!-- Dropdown remains in DOM but hidden until JS shows it -->
+    <div id="chapter-menu-dropdown" class="nav-dropdown" style="display:none; position: absolute; right: 15px; top: 50px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1001; width: 200px;">
+      <button onclick="openSummaryModal()">
+        <span>📊</span> Summary
+      </button>
+      <button onclick="openSettlementModal()">
+        <span>🤝</span> Settle Up
+      </button>
+      <button onclick="downloadReport()">
+        <span>📥</span> Export Report
+      </button>
+      <hr>
+      <button id="nav-members-trigger">
+        <span>👥</span> Members
+      </button>
+    </div>
 
     <div id="member-dropdown" class="member-dropdown" style="display:none;">
       <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
@@ -86,16 +89,33 @@
         <p id="chapter-desc"></p>
       </div>
 
-      <!-- ✅ EVENTS STRIP CONTAINER -->
-      <div id="events-strip-container" style="
-        margin: 20px -20px 10px -20px; 
-        padding: 0 20px; 
-        overflow-x: auto; 
-        display: flex; 
-        gap: 10px; 
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none; /* Hide scrollbar Firefox */
-      ">
+      <!-- ✅ INSERTED SETTLEMENT HERO SECTION HERE -->
+      <section class="settlement-hero" id="settlement-hero-section">
+        <div class="hero-card" id="hero-summary-card">
+          <div class="hero-main-info">
+            <div class="hero-label" style="color: #d000ff; font-weight: 600; font-size: 0.75rem;">Current Settlement</div>
+            <div id="hero-status-amount" class="hero-amount">Loading...</div>
+          </div>
+          <button class="hero-toggle-btn" id="hero-expand-btn" aria-label="Toggle Details">
+            <span class="chevron">▼</span>
+          </button>
+        </div>
+
+        <div class="hero-details-collapse" id="hero-details-content">
+          <div class="hero-details-header">
+            <span>Who pays whom?</span>
+            <button class="refresh-mini-btn" onclick="refreshSettlements()" aria-label="Refresh">
+              <span class="refresh-icon">↻</span>
+            </button>
+          </div>
+          <div id="hero-settlement-list" class="mini-settlement-list">
+          </div>
+        </div>
+      </section>
+
+      <!-- ✅ HIGH-FIDELITY EVENTS STRIP -->
+      <div class="section-label" style="padding: 0 20px; margin-top: 10px; color: #888; font-size: 0.75rem; text-transform: uppercase;">Categories</div>
+      <div id="events-strip-container" class="events-scroll-snap">
       </div>
 
       <div id="expense-list-container" class="expense-list">

@@ -75,13 +75,31 @@ if(membersTrigger) {
 }
 
 // 3. Close everything when clicking outside
-document.addEventListener("click", (e) => {
-  if (menuDropdown) menuDropdown.classList.remove("active");
-  if (memberDropdown && !e.target.closest("#member-dropdown")) {
-    memberDropdown.classList.remove("active");
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const [authData, chapterData] = await Promise.all([
+      apiFetch("/auth/me"),
+      apiFetch(`/chapters/${chapterId}`)
+    ]);
+    
+    currentUser = authData.user;
+    currentChapter = chapterData.chapter;
+    currentMembers = chapterData.members;
+
+    loadFriendsForAutocomplete();
+    renderChapterInfo();
+    renderMembers();
+    
+    // Load Events first, then trigger unified data load
+    await loadEvents(); 
+    loadExpenses(); // This now handles expenses AND settlements
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to load chapter");
+    window.location.href = "dashboard.html";
   }
 });
-
 // 👇 NEW FUNCTION: Fetch friends and populate datalist
 async function loadFriendsForAutocomplete() {
   try {
@@ -189,13 +207,18 @@ window.switchEvent = function(eventId) {
 // --- UPDATED: Load Expenses (Accepts Event Filter) ---
 async function loadExpenses() {
   try {
-    // Append eventId if selected
     let url = `/expenses/chapter/${chapterId}`;
     if (currentEventId) url += `?eventId=${currentEventId}`;
 
+    // Show loading state in Hero and List
+    document.getElementById('hero-status-amount').innerHTML = '<span class="spinner-small"></span>';
+    
     const data = await apiFetch(url);
     expenses = data.expenses;
+    
+    // Sync UI components
     renderExpenses();
+    loadHeroSettlements(); // Sync the Hero section with new data
   } catch (err) {
     console.error("Failed to load expenses");
     expenseListEl.innerHTML = '<div style="color:red; text-align:center;">Error loading expenses</div>';
@@ -366,6 +389,13 @@ window.closeAddExpenseModal = function() {
   addExpenseModal.classList.remove("active");
   isEditingExpense = false;
   editingExpenseId = null;
+  
+  // Re-enable the save button in case it was disabled during a failed attempt
+  const saveBtn = document.getElementById("btn-save-expense");
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
+  }
 };
 
 window.toggleSelectAll = function() {
@@ -397,31 +427,52 @@ window.handleDeleteExpense = async function() {
 // --- Updated to include eventId ---
 addExpenseForm.onsubmit = async (e) => {
   e.preventDefault();
+  
+  const saveBtn = document.getElementById("btn-save-expense");
   const formData = new FormData(addExpenseForm);
   
   const amount = parseFloat(formData.get("amount"));
   const description = formData.get("description") || "";
   const payerId = parseInt(formData.get("payerMemberId"));
-  
   const involvedIds = [];
   splitContainer.querySelectorAll("input:checked").forEach(cb => involvedIds.push(parseInt(cb.value)));
 
-  if (!amount || amount <= 0) {
-    return showToast("Please enter a valid amount", "error");
-  }
-  if (involvedIds.length === 0) {
-    return showToast("Select at least one person to split with", "error");
-  }
+  // --- Validation ---
+  if (!amount || amount <= 0) return showToast("Please enter a valid amount", "error");
+  if (involvedIds.length === 0) return showToast("Select at least one person to split with", "error");
 
-  // ✅ NEW: Auto-tag Event ID if a tab is selected
+  // --- STEP 1: PREVENT DOUBLE CLICK & INSTANT FEEDBACK ---
+  saveBtn.disabled = true; // Physically prevent second click
+  saveBtn.innerHTML = `<span class="spinner-small"></span> Saving...`; // Visual feedback
+
   const payload = {
     chapterId: chapterId,
-    eventId: currentEventId, // <--- THE MAGIC
+    eventId: currentEventId,
     amount,
     description,
     payerMemberId: payerId,
     involvedMemberIds: involvedIds
   };
+
+  // --- OPTIMISTIC UI: Add to list immediately if creating new ---
+  let tempId = "temp-" + Date.now();
+  if (!isEditingExpense) {
+    const payerName = currentMembers.find(m => m.id === payerId)?.member_name || "You";
+    const tempExpense = {
+      id: tempId,
+      amount: amount,
+      description: description,
+      expense_date: new Date().toISOString(),
+      payer_name: payerName,
+      isTemp: true // CSS will make this look slightly faded
+    };
+
+    expenses.unshift(tempExpense);
+    renderExpenses();
+    
+    // CLOSE MODAL INSTANTLY for better UX
+    addExpenseModal.classList.remove("active"); 
+  }
 
   try {
     if (isEditingExpense) {
@@ -430,36 +481,29 @@ addExpenseForm.onsubmit = async (e) => {
         body: payload
       });
       showToast("Expense updated", "success");
+      closeAddExpenseModal(); // Close after update (since we don't optimistic update edits yet)
     } else {
-      const payerName = currentMembers.find(m => m.id === payerId)?.member_name || "You";
-      
-      const tempExpense = {
-        id: "temp-" + Date.now(),
-        amount: amount,
-        description: description,
-        expense_date: new Date().toISOString(),
-        payer_name: payerName,
-        isTemp: true
-      };
-
-      expenses.unshift(tempExpense);
-      renderExpenses();
-      
       await apiFetch("/expenses", {
         method: "POST",
         body: payload
       });
-      
-      showToast("Expense saved", "success");
-      loadExpenses();
+      // No need to call showToast here if we want "silent" success, or do it anyway:
+      // showToast("Expense saved", "success");
     }
     
-    closeAddExpenseModal();
+    // Refresh to replace optimistic data with real server data
+    loadExpenses(); 
+
   } catch (err) {
+    // --- ROLLBACK: If server fails, remove the fake entry and re-open/enable ---
     if (!isEditingExpense) {
-      expenses = expenses.filter(ex => !ex.id.startsWith("temp-"));
+      expenses = expenses.filter(ex => ex.id !== tempId);
       renderExpenses();
+      addExpenseModal.classList.add("active"); // Re-open so user doesn't lose data
     }
+    
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
     showToast(err.message || "Failed to save expense", "error");
   }
 };
@@ -840,3 +884,113 @@ window.deleteMember = async function(memberId) {
     showToast(err.message || "Failed to remove member", "error");
   }
 };
+
+
+/* client/js/chapter.js - Settlement Hero Logic */
+
+// 1. Toggle Functionality
+document.getElementById('hero-summary-card').addEventListener('click', () => {
+  const content = document.getElementById('hero-details-content');
+  const btn = document.getElementById('hero-expand-btn');
+  content.classList.toggle('active');
+  btn.classList.toggle('active');
+});
+
+// 2. Settlement Refresh
+window.refreshSettlements = async function() {
+  const amountEl = document.getElementById('hero-status-amount');
+  const listEl = document.getElementById('hero-settlement-list');
+  
+  amountEl.style.opacity = '0.5';
+  await loadHeroSettlements();
+  amountEl.style.opacity = '1';
+  showToast("Settlements updated", "info");
+};
+
+// 3. Data Loading (Modified from openSettlementModal logic)
+async function loadHeroSettlements() {
+  try {
+      let url = `/expenses/chapter/${chapterId}/settlements`;
+      if (currentEventId) url += `?eventId=${currentEventId}`;
+
+      const data = await apiFetch(url);
+      renderHeroSettlements(data.settlements);
+  } catch (err) {
+      console.error("Hero Settlement Error:", err);
+  }
+}
+
+/* client/js/chapter.js - Tactile Feedback */
+
+/* client/js/chapter.js - UI Label Fixes */
+
+function renderHeroSettlements(settlements) {
+  const amountEl = document.getElementById('hero-status-amount');
+  const listEl = document.getElementById('hero-settlement-list');
+  const content = document.getElementById('hero-details-content');
+  const btn = document.getElementById('hero-expand-btn');
+
+  // 1. Force Expand by Default
+  content.classList.add('active');
+  content.style.maxHeight = "1000px"; // Ensure it's not cut off
+  btn.classList.add('active');
+
+  if (!settlements || settlements.length === 0) {
+      amountEl.textContent = "All Settled! 🎉";
+      listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No pending payments.</div>';
+      return;
+  }
+
+  // 2. Logic for "You Owe/Get"
+  const myName = currentUser.real_name;
+  let myOwes = 0;
+  let myGets = 0;
+
+  settlements.forEach(s => {
+      if (s.from === myName) myOwes += parseFloat(s.amount);
+      if (s.to === myName) myGets += parseFloat(s.amount);
+  });
+
+  const net = myGets - myOwes;
+  if (net > 0) {
+      amountEl.textContent = `You'll get ₹${net.toFixed(0)}`;
+      amountEl.style.color = "#00e676";
+  } else if (net < 0) {
+      amountEl.textContent = `You owe ₹${Math.abs(net).toFixed(0)}`;
+      amountEl.style.color = "#ff5252";
+  } else {
+      amountEl.textContent = "Balanced";
+  }
+
+  // 3. Render List + "n payments pending" at the bottom
+  let listHtml = settlements.map(item => `
+      <div class="mini-settle-item" style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+          <div style="display:flex; align-items:center; gap:10px;">
+              <div class="small-avatar" style="width:28px; height:28px; font-size:0.75rem; background:${getAvatarColor(item.from)}">
+                  ${getInitials(item.from)}
+              </div>
+              <span style="font-size:0.85rem;"><strong>${item.from}</strong> → <strong>${item.to}</strong></span>
+          </div>
+          <span style="font-weight:600; color:#d000ff;">₹${item.amount}</span>
+      </div>
+  `).join('');
+
+  // Append the footer line
+  listHtml += `
+      <div style="margin-top:15px; font-size:0.75rem; color:#888; text-align:center; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+          ${settlements.length} payment${settlements.length > 1 ? 's' : ''} pending
+      </div>
+  `;
+
+  listEl.innerHTML = listHtml;
+}
+
+
+function initializeHeroState() {
+  const content = document.getElementById('hero-details-content');
+  const btn = document.getElementById('hero-expand-btn');
+  
+  // Set to expanded by default
+  content.classList.add('active', 'init-expanded');
+  btn.classList.add('active');
+}
