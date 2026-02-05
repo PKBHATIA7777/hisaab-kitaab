@@ -962,16 +962,16 @@ function renderHeroSettlements(settlements) {
       amountEl.textContent = "Balanced";
   }
 
-  // 3. Render List + "n payments pending" at the bottom
+  // 3. Render List using the new clean structure
   let listHtml = settlements.map(item => `
-      <div class="mini-settle-item" style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-          <div style="display:flex; align-items:center; gap:10px;">
-              <div class="small-avatar" style="width:28px; height:28px; font-size:0.75rem; background:${getAvatarColor(item.from)}">
+      <div class="mini-settle-item">
+          <div class="settle-info">
+              <div class="small-avatar" style="background:${getAvatarColor(item.from)}">
                   ${getInitials(item.from)}
               </div>
-              <span style="font-size:0.85rem;"><strong>${item.from}</strong> → <strong>${item.to}</strong></span>
+              <span><strong>${item.from}</strong> <span class="settle-arrow">→</span> <strong>${item.to}</strong></span>
           </div>
-          <span style="font-weight:600; color:#d000ff;">₹${item.amount}</span>
+          <span class="settle-amount">₹${item.amount}</span>
       </div>
   `).join('');
 

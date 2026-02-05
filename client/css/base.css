@@ -3595,4 +3595,344 @@ input:focus {
 
 
 
+/* --- CHAPTER UI REPAIR: STEP 1 --- */
 
+/* 1. Global Container to center the entire page content */
+.chapter-container {
+  max-width: 600px;         /* Standard mobile-first width */
+  margin: 0 auto;           /* Centers the container horizontally */
+  padding: 0 20px;          /* Adds a 20px 'Safe Zone' on left and right */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* 2. Force all major sections to be centered */
+.chapter-header, 
+.stats-container, 
+.expense-list-section,
+.member-list-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;      /* Centers children items (buttons, text) */
+  text-align: center;       /* Centers the text itself */
+}
+
+/* 3. Fix the Back Button position */
+.top-nav {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start; /* Keeps back button on the left */
+  padding: 15px 0;
+  margin-bottom: 10px;
+}
+
+
+
+
+
+
+
+/* --- CHAPTER UI REPAIR: STEP 2 --- */
+
+/* 1. Create a clear 'Card' look for sections */
+.chapter-card-section {
+  background: rgba(255, 255, 255, 0.05); /* Very subtle glass effect */
+  border: 1px solid rgba(212, 175, 55, 0.3); /* Subtle Gold border */
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px; /* Essential: Gives breathing room between sections */
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+/* 2. Fix Heading Spacing */
+.chapter-header h1 {
+  margin-bottom: 8px;   /* Space between Title and Description */
+  font-size: 1.8rem;
+  color: #D4AF37;       /* Gold Theme */
+}
+
+.chapter-header p {
+  margin-bottom: 20px;  /* Space below the description */
+  color: #bbb;
+  line-height: 1.5;     /* Prevents words from feeling squashed */
+}
+
+/* 3. Space out the Expense Items */
+.expense-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.expense-item:last-child {
+  border-bottom: none; /* Clean look for the last item */
+}
+
+/* 4. Improve Section Title margins */
+.section-title {
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 15px;
+  color: #D4AF37;
+  text-align: left;    /* Align titles to the left of the card */
+  width: 100%;
+}
+
+
+
+
+
+/* --- CHAPTER UI REPAIR: STEP 3 --- */
+
+/* 1. Style the Back Button as a professional icon button */
+.btn-back {
+  background: rgba(212, 175, 55, 0.1); /* Subtle gold tint background */
+  border: 1px solid rgba(212, 175, 55, 0.4); /* Gold border */
+  color: #D4AF37; /* Gold text/icon */
+  width: 40px;
+  height: 40px;
+  border-radius: 50%; /* Makes it circular */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1.2rem;
+  padding: 0;
+  line-height: 1;
+}
+
+/* 2. Hover/Active effect for feedback */
+.btn-back:hover {
+  background: rgba(212, 175, 55, 0.2);
+  transform: translateX(-3px); /* Subtle nudge to the left */
+}
+
+.btn-back:active {
+  transform: scale(0.95);
+}
+
+/* 3. Refine the Top Nav spacing */
+.top-nav {
+  display: flex;
+  align-items: center;
+  padding: 20px 0;
+  width: 100%;
+  /* Ensures the header doesn't jump up too high */
+  margin-bottom: 5px; 
+}
+
+
+
+
+/* --- CHAPTER UI REPAIR: STEP 4 --- */
+
+/* 1. Container for the stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Two equal columns */
+  gap: 15px;
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* 2. Individual Stat Box */
+.stat-box {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 3. The Label (e.g., Total Spent) */
+.stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #888;
+  letter-spacing: 0.5px;
+  margin-bottom: 5px;
+}
+
+/* 4. The Value (e.g., ₹5000) */
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 5. Highlight for 'Your Balance' */
+.stat-value.positive {
+  color: #4CAF50; /* Green for 'You are owed' */
+}
+
+.stat-value.negative {
+  color: #FF5252; /* Red for 'You owe' */
+}
+
+/* 6. A full-width 'Total' highlight */
+.stat-box.full-width {
+  grid-column: span 2;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(0, 0, 0, 0) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+
+
+
+/* --- CHAPTER UI REPAIR: STEP 5 --- */
+
+/* 1. Standardize List Containers */
+#expense-list, #member-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Space between each row */
+  margin-top: 10px;
+}
+
+/* 2. Modern Expense Row */
+.expense-item {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between; /* Pushes text to left, amount to right */
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: transform 0.2s ease;
+}
+
+.expense-info {
+  text-align: left; /* Essential: keeps text aligned even if container is centered */
+}
+
+.expense-title {
+  font-weight: 600;
+  color: #fff;
+  display: block;
+  font-size: 1rem;
+}
+
+.expense-meta {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.expense-amount {
+  font-weight: 700;
+  color: #D4AF37; /* Gold */
+  font-size: 1.1rem;
+}
+
+/* 3. Member Avatars/Rows */
+.member-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.member-avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: #D4AF37;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+
+
+
+
+
+
+
+/* --- SETTLEMENT UI REPAIR --- */
+.settlement-card {
+  background: rgba(212, 175, 55, 0.05);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 15px 0;
+}
+
+.mini-settle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settle-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settle-arrow {
+  color: #D4AF37;
+  font-weight: bold;
+}
+
+.settle-amount {
+  font-weight: 700;
+  color: #d000ff; /* Keeping your branding purple */
+  font-size: 1.1rem;
+}
+
+
+
+
+/* --- SETTLEMENT UI READABILITY FIX --- */
+
+/* Force names and main text to white */
+.mini-settle-item span, 
+.mini-settle-item strong {
+    color: #ffffff !important; 
+    font-size: 0.9rem;
+}
+
+/* Force the arrow to your theme gold for visibility */
+.settle-arrow {
+    color: #D4AF37 !important;
+    margin: 0 8px;
+}
+
+/* Force the amount to white as requested */
+.settle-amount {
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-left: auto; /* Pushes amount to the far right */
+}
+
+/* Ensure the row container is spaced correctly */
+.mini-settle-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.05); /* Subtle background for contrast */
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.1);
+}
