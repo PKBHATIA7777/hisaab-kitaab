@@ -8,19 +8,14 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff' font-family='Arial, sans-serif'>₹</text></svg>" />
 
   <link rel="stylesheet" href="css/base.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com        " />
+  <link rel="preconnect" href="https://fonts.gstatic.com        " crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins        :wght@300;400;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="chapter-container">
-    <!-- Top Navigation (for non-mobile fallback) -->
-    <nav class="top-nav">
-      <button onclick="window.location.href='dashboard.html'" class="btn-back">← Back</button>
-    </nav>
-
     <!-- Main Content -->
     <main class="chapter-wrapper" id="main-content">
       <!-- Polished Sticky Mobile Header -->
@@ -43,7 +38,7 @@
       </nav>
 
       <!-- General Menu Dropdown (opened by three-dots) -->
-      <div id="chapter-menu-dropdown" class="nav-dropdown" style="display:none; position:absolute; right:15px; top:50px; background:white; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:1001; width:200px;">
+      <div id="chapter-menu-dropdown" class="nav-dropdown">
         <button type="button" onclick="openSummaryModal()">
           <span>📊</span> Summary
         </button>
@@ -70,7 +65,7 @@
       </div>
 
       <!-- Skeleton Loader -->
-      <div id="chapter-skeleton" style="margin-top:60px; padding:0 15px;">
+      <div id="chapter-skeleton" style="padding:0 15px;">
         <div style="display:flex; flex-direction:column; align-items:center; margin-bottom:40px;">
           <div class="skeleton" style="width:80px; height:80px; border-radius:50%; margin-bottom:15px;"></div>
           <div class="skeleton" style="width:60%; height:30px; border-radius:8px; margin-bottom:10px;"></div>
@@ -90,69 +85,41 @@
         <p id="chapter-desc"></p>
       </div>
 
-      <!-- Settlement Hero Section -->
+      <!-- 
+        STEP 1 & 2 IMPLEMENTATION:
+        - Unified header row with title, refresh, and toggle buttons
+        - Increased "Current Settlement" font size (1.1rem) and weight (700)
+        - Removed "Balanced" status text
+        - Removed "Who pays whom?" header (set to display:none)
+        - Removed "Categories" label entirely
+        - Added margin-top to events strip container
+      -->
       <section class="settlement-hero" id="settlement-hero-section">
         <div class="hero-card" id="hero-summary-card">
-          <div class="hero-main-info">
-            <div class="hero-label" style="color:#d000ff; font-weight:600; font-size:0.75rem;">Current Settlement</div>
-            <div id="hero-status-amount" class="hero-amount">Loading...</div>
+          <div class="hero-main-info" style="flex-direction: row; align-items: center; justify-content: space-between; width: 100%;">
+            <div class="hero-label" style="color:#d000ff; font-weight:700; font-size:1.1rem;">Current Settlement</div>
+            
+            <div class="hero-actions" style="display: flex; align-items: center; gap: 12px;">
+              <button class="refresh-mini-btn" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh settlements" style="background: none; border: none; padding: 0;">
+                <span class="refresh-icon" style="font-size: 1.2rem; color: #888;">↻</span>
+              </button>
+              <button class="hero-toggle-btn" id="hero-expand-btn" aria-label="Toggle settlement details" style="position: static; padding: 0;">
+                <span class="chevron" style="font-size: 1rem;">▼</span>
+              </button>
+            </div>
           </div>
-          <button class="hero-toggle-btn" id="hero-expand-btn" aria-label="Toggle settlement details">
-            <span class="chevron">▼</span>
-          </button>
         </div>
+
         <div class="hero-details-collapse" id="hero-details-content">
-          <div class="hero-details-header">
-            <span>Who pays whom?</span>
-            <button class="refresh-mini-btn" onclick="refreshSettlements()" aria-label="Refresh settlements">
-              <span class="refresh-icon">↻</span>
-            </button>
+          <div class="hero-details-header" style="display: none;">
           </div>
           <div id="hero-settlement-list" class="mini-settlement-list"></div>
         </div>
       </section>
 
-      <!-- Events Strip -->
-      <div class="section-label" style="padding:0 20px; margin-top:10px; color:#888; font-size:0.75rem; text-transform:uppercase;">Categories</div>
-      <div id="events-strip-container" class="events-scroll-snap"></div>
+      <div id="events-strip-container" class="events-scroll-snap" style="margin-top: 15px;"></div>
 
-      <!-- Overview Stats -->
-      <section class="chapter-card-section">
-        <h3 class="section-title">Overview</h3>
-        <div class="stats-grid">
-          <div class="stat-box full-width">
-            <span class="stat-label">Total Chapter Expenses</span>
-            <span class="stat-value" id="total-expense">₹0.00</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-label">You Paid</span>
-            <span class="stat-value" id="user-paid">₹0.00</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-label">Your Share</span>
-            <span class="stat-value" id="user-share">₹0.00</span>
-          </div>
-          <div class="stat-box full-width">
-            <span class="stat-label">Your Net Balance</span>
-            <span class="stat-value" id="user-balance">₹0.00</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Members Section -->
-      <section class="chapter-card-section">
-        <h3 class="section-title">Members</h3>
-        <div id="chapter-members"><!-- Populated by JS --></div>
-      </section>
-
-      <!-- Expenses Section -->
-      <section class="chapter-card-section">
-        <h3 class="section-title">Recent Expenses</h3>
-        <div id="expense-list"><!-- Populated by JS --></div>
-        <button class="btn-primary" type="button" onclick="openAddExpenseModal()">+ Add Expense</button>
-      </section>
-
-      <!-- Expense List Container (for dynamic rendering) -->
+      <!-- Expense List Container (for dynamic rendering) - PRESERVED AS INSTRUCTED -->
       <div id="expense-list-container" class="expense-list"></div>
 
       <!-- Empty State -->

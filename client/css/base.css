@@ -680,6 +680,8 @@
   
   /* Header Card Style */
   .chapter-wrapper {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
@@ -1551,6 +1553,8 @@
 
 /* 1. App Bar Layout */
 .chapter-nav {
+  top: 0;
+    margin-top: 0;
   padding: 15px 20px; /* More breathing room */
   display: flex;
   align-items: center;
@@ -1588,46 +1592,43 @@
 .nav-actions {
   position: relative;
 }
-
+/* The base state for the menu */
 .nav-dropdown {
+  display: none; /* Keep it hidden */
   position: absolute;
+  right: 15px;
   top: 55px;
-  right: 0;
-  width: 220px;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 8px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px) scale(0.95);
-  transform-origin: top right;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 200;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  z-index: 1100; /* Higher than sticky header */
+  width: 200px;
+  padding: 8px 0;
+  border: 1px solid #eee;
 }
 
+/* When the JS toggles the active class */
 .nav-dropdown.active {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0) scale(1);
+  display: block !important;
+  animation: slideDown 0.2s ease-out;
 }
 
 /* 4. Dropdown Items */
 .nav-dropdown button {
   width: 100%;
+  padding: 12px 15px;
+  text-align: left;
+  background: none;
+  border: none;
+  font-size: 0.95rem;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border: none;
-  background: transparent;
-  color: #333;
-  font-size: 0.95rem;
-  font-weight: 500;
-  text-align: left;
-  border-radius: 8px;
+  gap: 10px;
   cursor: pointer;
-  font-family: var(--font-main);
+}
+
+.nav-dropdown button:active {
+  background: #f5f5f5;
 }
 
 .nav-dropdown button:hover {
@@ -3935,4 +3936,67 @@ input:focus {
     border-radius: 8px;
     margin-bottom: 8px;
     border: 1px solid rgba(212, 175, 55, 0.1);
+}
+
+
+
+
+
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+
+
+
+/* Ensure the hero header is a clean single line */
+#hero-summary-card {
+  padding: 15px 20px;
+  cursor: pointer;
+}
+
+/* Heading style */
+.hero-label {
+  margin: 0;
+  line-height: 1;
+}
+
+/* Rotation for the toggle button */
+.hero-toggle-btn .chevron {
+  transition: transform 0.3s ease;
+  display: inline-block;
+  color: #888;
+}
+
+.hero-toggle-btn.active .chevron {
+  transform: rotate(180deg);
+}
+
+/* Smooth collapse for the details */
+.hero-details-collapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  padding: 0 20px;
+}
+
+.hero-details-collapse.active {
+  max-height: 1000px; /* Large enough for any list */
+  padding-bottom: 20px;
+}
+
+
+.hero-main-info {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+
+/* Ensure buttons don't have default browser margins */
+.hero-actions button {
+  margin: 0 !important;
+  line-height: 1;
 }

@@ -50,9 +50,10 @@ const memberDropdown = document.getElementById("member-dropdown");
 // 1. Toggle Main Menu
 if(menuBtn) {
   menuBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevents immediate closing by the document listener
     menuDropdown.classList.toggle("active");
-    // Close member dropdown if open
+    
+    // Safety: Close member dropdown if it's open
     if(memberDropdown) memberDropdown.classList.remove("active");
   });
 }
@@ -60,7 +61,7 @@ if(menuBtn) {
 // 2. Handle "Members" click inside the menu
 if(membersTrigger) {
   membersTrigger.addEventListener("click", (e) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent document click from closing it immediately
     // Close the main menu
     menuDropdown.classList.remove("active");
     
@@ -74,7 +75,12 @@ if(membersTrigger) {
   });
 }
 
-// 3. Close everything when clicking outside
+// 3. Close menus when clicking anywhere else on the page
+document.addEventListener("click", () => {
+  if(menuDropdown) menuDropdown.classList.remove("active");
+  if(memberDropdown) memberDropdown.classList.remove("active");
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     const [authData, chapterData] = await Promise.all([
@@ -100,6 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "dashboard.html";
   }
 });
+
 // 👇 NEW FUNCTION: Fetch friends and populate datalist
 async function loadFriendsForAutocomplete() {
   try {
@@ -120,33 +127,8 @@ async function loadFriendsForAutocomplete() {
 }
 
 // --- INITIALIZATION ---
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    const [authData, chapterData] = await Promise.all([
-      apiFetch("/auth/me"),
-      apiFetch(`/chapters/${chapterId}`)
-    ]);
-    
-    currentUser = authData.user;
-    currentChapter = chapterData.chapter;
-    currentMembers = chapterData.members;
-
-    // ✅ Call new function to load friends for autocomplete
-    loadFriendsForAutocomplete();
-
-    renderChapterInfo();
-    renderMembers();
-    
-    // ✅ NEW: Load Events -> Then Expenses
-    await loadEvents(); 
-    loadExpenses(); // Now uses currentEventId
-
-  } catch (err) {
-    console.error(err);
-    alert("Failed to load chapter");
-    window.location.href = "dashboard.html";
-  }
-});
+// NOTE: This duplicate DOMContentLoaded listener has been removed to avoid conflicts
+// The single listener above handles all initialization
 
 // ✅ NEW: Load Events
 async function loadEvents() {
@@ -210,8 +192,8 @@ async function loadExpenses() {
     let url = `/expenses/chapter/${chapterId}`;
     if (currentEventId) url += `?eventId=${currentEventId}`;
 
-    // Show loading state in Hero and List
-    document.getElementById('hero-status-amount').innerHTML = '<span class="spinner-small"></span>';
+    // REMOVED: Reference to deleted hero-status-amount element
+    // document.getElementById('hero-status-amount').innerHTML = '<span class="spinner-small"></span>';
     
     const data = await apiFetch(url);
     expenses = data.expenses;
@@ -885,112 +867,76 @@ window.deleteMember = async function(memberId) {
   }
 };
 
+// ==========================================
+// ✅ SETTLEMENT HERO LOGIC - COMPLETELY REPLACED (Steps 1, 2, 4)
+// ==========================================
+// --- Updated Toggle Logic (Step 4) ---
+const heroCard = document.getElementById('hero-summary-card');
+if (heroCard) {
+    heroCard.onclick = (e) => {
+        // Prevent toggle when clicking refresh button (has stopPropagation in HTML)
+        const content = document.getElementById('hero-details-content');
+        const btn = document.getElementById('hero-expand-btn');
+        content.classList.toggle('active');
+        btn.classList.toggle('active');
+    };
+}
 
-/* client/js/chapter.js - Settlement Hero Logic */
-
-// 1. Toggle Functionality
-document.getElementById('hero-summary-card').addEventListener('click', () => {
-  const content = document.getElementById('hero-details-content');
-  const btn = document.getElementById('hero-expand-btn');
-  content.classList.toggle('active');
-  btn.classList.toggle('active');
-});
-
-// 2. Settlement Refresh
+// --- Updated Settlement Refresh (Step 2 & 4) ---
 window.refreshSettlements = async function() {
-  const amountEl = document.getElementById('hero-status-amount');
-  const listEl = document.getElementById('hero-settlement-list');
-  
-  amountEl.style.opacity = '0.5';
-  await loadHeroSettlements();
-  amountEl.style.opacity = '1';
-  showToast("Settlements updated", "info");
+    try {
+        await loadHeroSettlements();
+        showToast("Settlements updated", "info");
+    } catch (err) {
+        console.error("Refresh settlements error:", err);
+        showToast("Failed to refresh", "error");
+    }
 };
 
-// 3. Data Loading (Modified from openSettlementModal logic)
+// --- Data Loading for Hero Settlements (Unchanged core logic) ---
 async function loadHeroSettlements() {
-  try {
-      let url = `/expenses/chapter/${chapterId}/settlements`;
-      if (currentEventId) url += `?eventId=${currentEventId}`;
+    try {
+        let url = `/expenses/chapter/${chapterId}/settlements`;
+        if (currentEventId) url += `?eventId=${currentEventId}`;
 
-      const data = await apiFetch(url);
-      renderHeroSettlements(data.settlements);
-  } catch (err) {
-      console.error("Hero Settlement Error:", err);
-  }
+        const data = await apiFetch(url);
+        renderHeroSettlements(data.settlements);
+    } catch (err) {
+        console.error("Hero Settlement Error:", err);
+        const listEl = document.getElementById('hero-settlement-list');
+        if (listEl) {
+            listEl.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Error loading settlements</div>';
+        }
+    }
 }
 
-/* client/js/chapter.js - Tactile Feedback */
-
-/* client/js/chapter.js - UI Label Fixes */
-
+// --- Updated Render Logic (Step 2 & 4) ---
 function renderHeroSettlements(settlements) {
-  const amountEl = document.getElementById('hero-status-amount');
-  const listEl = document.getElementById('hero-settlement-list');
-  const content = document.getElementById('hero-details-content');
-  const btn = document.getElementById('hero-expand-btn');
+    const listEl = document.getElementById('hero-settlement-list');
+    const content = document.getElementById('hero-details-content');
+    const btn = document.getElementById('hero-expand-btn');
 
-  // 1. Force Expand by Default
-  content.classList.add('active');
-  content.style.maxHeight = "1000px"; // Ensure it's not cut off
-  btn.classList.add('active');
+    // 1. Keep it expanded if there are settlements
+    if (settlements && settlements.length > 0) {
+        content.classList.add('active');
+        btn.classList.add('active');
+    }
 
-  if (!settlements || settlements.length === 0) {
-      amountEl.textContent = "All Settled! 🎉";
-      listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No pending payments.</div>';
-      return;
-  }
+    if (!settlements || settlements.length === 0) {
+        listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No pending payments. 🎉</div>';
+        return;
+    }
 
-  // 2. Logic for "You Owe/Get"
-  const myName = currentUser.real_name;
-  let myOwes = 0;
-  let myGets = 0;
-
-  settlements.forEach(s => {
-      if (s.from === myName) myOwes += parseFloat(s.amount);
-      if (s.to === myName) myGets += parseFloat(s.amount);
-  });
-
-  const net = myGets - myOwes;
-  if (net > 0) {
-      amountEl.textContent = `You'll get ₹${net.toFixed(0)}`;
-      amountEl.style.color = "#00e676";
-  } else if (net < 0) {
-      amountEl.textContent = `You owe ₹${Math.abs(net).toFixed(0)}`;
-      amountEl.style.color = "#ff5252";
-  } else {
-      amountEl.textContent = "Balanced";
-  }
-
-  // 3. Render List using the new clean structure
-  let listHtml = settlements.map(item => `
-      <div class="mini-settle-item">
-          <div class="settle-info">
-              <div class="small-avatar" style="background:${getAvatarColor(item.from)}">
-                  ${getInitials(item.from)}
-              </div>
-              <span><strong>${item.from}</strong> <span class="settle-arrow">→</span> <strong>${item.to}</strong></span>
-          </div>
-          <span class="settle-amount">₹${item.amount}</span>
-      </div>
-  `).join('');
-
-  // Append the footer line
-  listHtml += `
-      <div style="margin-top:15px; font-size:0.75rem; color:#888; text-align:center; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
-          ${settlements.length} payment${settlements.length > 1 ? 's' : ''} pending
-      </div>
-  `;
-
-  listEl.innerHTML = listHtml;
-}
-
-
-function initializeHeroState() {
-  const content = document.getElementById('hero-details-content');
-  const btn = document.getElementById('hero-expand-btn');
-  
-  // Set to expanded by default
-  content.classList.add('active', 'init-expanded');
-  btn.classList.add('active');
+    // 2. Render List without the "N payments pending" footer
+    listEl.innerHTML = settlements.map(item => `
+        <div class="mini-settle-item" style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
+            <div class="settle-info" style="display:flex; align-items:center; gap:10px;">
+                <div class="small-avatar" style="background:${getAvatarColor(item.from)}; width:24px; height:24px; font-size:0.7rem;">
+                    ${getInitials(item.from)}
+                </div>
+                <span style="font-size:0.85rem;"><strong>${item.from}</strong> <span style="color:#ccc;">→</span> <strong>${item.to}</strong></span>
+            </div>
+            <span class="settle-amount" style="font-weight:600; color:#d000ff; font-size:0.9rem;">₹${item.amount}</span>
+        </div>
+    `).join('');
 }
