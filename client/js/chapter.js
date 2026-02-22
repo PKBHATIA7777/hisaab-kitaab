@@ -328,7 +328,14 @@ window.openAddExpenseModal = function() {
   isEditingExpense = false;
   editingExpenseId = null;
   document.getElementById("expense-modal-title").textContent = "Add Expense";
-  document.getElementById("btn-save-expense").textContent = "Save Expense";
+  
+  // 🔒 SAFETY RESET: Explicitly enable button and reset text for new expense
+  const saveBtn = document.getElementById("btn-save-expense");
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = "Save Expense";
+  }
+  
   document.getElementById("btn-delete-expense").style.display = "none";
   
   addExpenseForm.reset();
@@ -350,7 +357,14 @@ window.openEditExpenseModal = async function(id) {
 
     addExpenseForm.reset();
     document.getElementById("expense-modal-title").textContent = "Edit Expense";
-    document.getElementById("btn-save-expense").textContent = "Update Expense";
+    
+    // 🔒 SAFETY RESET: Explicitly enable button and set update text for editing
+    const saveBtn = document.getElementById("btn-save-expense");
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = "Update Expense";
+    }
+    
     document.getElementById("btn-delete-expense").style.display = "block";
 
     addExpenseForm.querySelector("input[name='amount']").value = expense.amount;
@@ -367,17 +381,26 @@ window.openEditExpenseModal = async function(id) {
   }
 };
 
+// ✅ FIX #1: Added document.activeElement.blur() to prevent focus traps
 window.closeAddExpenseModal = function() {
   addExpenseModal.classList.remove("active");
-  isEditingExpense = false;
-  editingExpenseId = null;
   
-  // Re-enable the save button in case it was disabled during a failed attempt
+  // 🔒 Clear focus to prevent focus traps & keyboard issues
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
+  
+  // 🔒 Re-enable the save button and reset to default text
   const saveBtn = document.getElementById("btn-save-expense");
   if (saveBtn) {
     saveBtn.disabled = false;
-    saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
+    // Always reset to default "Save Expense" since modal opens in add mode by default
+    saveBtn.innerHTML = "Save Expense";
   }
+  
+  // Reset state after button update
+  isEditingExpense = false;
+  editingExpenseId = null;
 };
 
 window.toggleSelectAll = function() {
@@ -407,10 +430,18 @@ window.handleDeleteExpense = async function() {
 
 // --- FORM SUBMIT (Handles Both Add & Edit) ---
 // --- Updated to include eventId ---
-addExpenseForm.onsubmit = async (e) => {
+// ✅ FIX #2: Changed from .onsubmit = to addEventListener for robustness
+addExpenseForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   
   const saveBtn = document.getElementById("btn-save-expense");
+  
+  // 🔒 GUARD CLAUSE: Prevent duplicate submissions if button is already in loading state
+  // This prevents race conditions where multiple clicks stack up pending promises
+  if (saveBtn.disabled || saveBtn.innerHTML.includes('spinner')) {
+    return;
+  }
+  
   const formData = new FormData(addExpenseForm);
   
   const amount = parseFloat(formData.get("amount"));
@@ -452,8 +483,8 @@ addExpenseForm.onsubmit = async (e) => {
     expenses.unshift(tempExpense);
     renderExpenses();
     
-    // CLOSE MODAL INSTANTLY for better UX
-    addExpenseModal.classList.remove("active"); 
+    // 🔒 CHANGE: Use wrapper function to ensure proper button reset
+    closeAddExpenseModal(); 
   }
 
   try {
@@ -484,11 +515,29 @@ addExpenseForm.onsubmit = async (e) => {
       addExpenseModal.classList.add("active"); // Re-open so user doesn't lose data
     }
     
+    // 🔒 Ensure button is re-enabled and spinner replaced with original text on error
     saveBtn.disabled = false;
     saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
-    showToast(err.message || "Failed to save expense", "error");
+    
+    // ✅ IMPROVED: Display user-friendly error messages from main.js apiFetch
+    // Handles rate limit (429) and server errors (5xx) with clear messaging
+    const errorMsg = err.isRateLimit 
+      ? "You're adding expenses too fast, please wait a moment."
+      : err.isServerError
+        ? "Server is temporarily unavailable. Please try again."
+        : (err.message || "Failed to save expense");
+    
+    showToast(errorMsg, "error");
+    
+  } finally {
+    // ✅ CRITICAL: GUARANTEE button re-enables regardless of success/failure
+    // This ensures the UI never gets stuck in "Saving..." state
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
+    }
   }
-};
+});
 
 // --- SUMMARY LOGIC ---
 const summaryModal = document.getElementById("summary-modal");
@@ -646,6 +695,11 @@ function renderSettlements(settlements) {
 window.downloadReport = async function() {
   const btn = document.querySelector("button[onclick='downloadReport()']");
   
+  // 🔒 GUARD CLAUSE: Prevent duplicate export requests
+  if (btn && (btn.disabled || btn.innerHTML.includes('spinner'))) {
+    return;
+  }
+  
   try {
     if (btn) setBtnLoading(btn, true);
     
@@ -697,7 +751,15 @@ window.downloadReport = async function() {
 
   } catch (err) {
     console.error("Download error:", err);
-    showToast(err.message || "Failed to download report", "error");
+    
+    // ✅ IMPROVED: Handle rate limit and server errors for export too
+    const errorMsg = err.isRateLimit 
+      ? "You're requesting reports too fast, please wait a moment."
+      : err.isServerError
+        ? "Server is temporarily unavailable. Please try again."
+        : (err.message || "Failed to download report");
+    
+    showToast(errorMsg, "error");
   } finally {
     if (btn) setBtnLoading(btn, false);
   }
@@ -719,6 +781,12 @@ window.closeCreateEventModal = function() {
 createEventForm.onsubmit = async (e) => {
   e.preventDefault();
   const btn = createEventForm.querySelector("button[type='submit']");
+  
+  // 🔒 GUARD CLAUSE: Prevent duplicate event creation requests
+  if (btn && (btn.disabled || btn.innerHTML.includes('spinner'))) {
+    return;
+  }
+  
   const name = createEventForm.name.value.trim();
   
   if(!name) return;
@@ -738,7 +806,14 @@ createEventForm.onsubmit = async (e) => {
     switchEvent(data.event.id);
 
   } catch(err) {
-    showToast(err.message || "Failed to create event", "error");
+    // ✅ IMPROVED: Handle rate limit and server errors for event creation
+    const errorMsg = err.isRateLimit 
+      ? "You're creating events too fast, please wait a moment."
+      : err.isServerError
+        ? "Server is temporarily unavailable. Please try again."
+        : (err.message || "Failed to create event");
+    
+    showToast(errorMsg, "error");
   } finally {
     setBtnLoading(btn, false);
   }
@@ -796,6 +871,12 @@ if(addMemberFormEl) {
   addMemberFormEl.addEventListener("submit", async (e) => {
     e.preventDefault();
     
+    // 🔒 GUARD CLAUSE: Prevent duplicate member addition requests
+    const submitBtn = addMemberFormEl.querySelector('button[type="submit"]');
+    if (submitBtn && (submitBtn.disabled || submitBtn.innerHTML.includes('spinner'))) {
+      return;
+    }
+    
     const nameInput = document.getElementById("new-member-name");
     const name = nameInput.value.trim();
     if (!name) return;
@@ -812,6 +893,12 @@ if(addMemberFormEl) {
     };
 
     try {
+      // Disable button during request if it exists
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner-small"></span> Adding...`;
+      }
+      
       const data = await apiFetch(`/chapters/${chapterId}/members`, {
         method: "POST",
         body: JSON.stringify(payload),
@@ -827,7 +914,21 @@ if(addMemberFormEl) {
       }
     } catch (err) {
       console.error(err);
-      showToast("Server error", "error");
+      
+      // ✅ IMPROVED: Handle rate limit and server errors for member addition
+      const errorMsg = err.isRateLimit 
+        ? "You're adding members too fast, please wait a moment."
+        : err.isServerError
+          ? "Server is temporarily unavailable. Please try again."
+          : "Server error";
+      
+      showToast(errorMsg, "error");
+    } finally {
+      // Re-enable button in finally block
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = "Add Member";
+      }
     }
   });
 }
@@ -863,7 +964,14 @@ window.deleteMember = async function(memberId) {
     currentMembers = data.members;
     renderMembers();
   } catch (err) {
-    showToast(err.message || "Failed to remove member", "error");
+    // ✅ IMPROVED: Handle rate limit and server errors for member deletion
+    const errorMsg = err.isRateLimit 
+      ? "Please wait a moment before trying again."
+      : err.isServerError
+        ? "Server is temporarily unavailable. Please try again."
+        : (err.message || "Failed to remove member");
+    
+    showToast(errorMsg, "error");
   }
 };
 
@@ -884,12 +992,38 @@ if (heroCard) {
 
 // --- Updated Settlement Refresh (Step 2 & 4) ---
 window.refreshSettlements = async function() {
+    // 🔒 GUARD CLAUSE: Prevent duplicate refresh requests
+    const refreshBtn = document.getElementById('hero-refresh-btn');
+    if (refreshBtn && (refreshBtn.disabled || refreshBtn.innerHTML.includes('spinner'))) {
+      return;
+    }
+    
     try {
+        // Disable refresh button during request
+        if (refreshBtn) {
+          refreshBtn.disabled = true;
+          refreshBtn.innerHTML = `<span class="spinner-small"></span>`;
+        }
+        
         await loadHeroSettlements();
         showToast("Settlements updated", "info");
     } catch (err) {
         console.error("Refresh settlements error:", err);
-        showToast("Failed to refresh", "error");
+        
+        // ✅ IMPROVED: Handle rate limit and server errors for settlement refresh
+        const errorMsg = err.isRateLimit 
+          ? "Please wait a moment before refreshing."
+          : err.isServerError
+            ? "Server is temporarily unavailable. Please try again."
+            : "Failed to refresh";
+        
+        showToast(errorMsg, "error");
+    } finally {
+        // Re-enable refresh button
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = "⟳";
+        }
     }
 };
 

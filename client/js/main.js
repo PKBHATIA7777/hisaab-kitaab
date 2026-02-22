@@ -9,16 +9,16 @@
     "Which is your favourite movie? 🎬",
     "Who is your best friend?",
     "What was the last song that made you smile? 🎶",
-    "What’s your comfort food after a long day?",
-    "Imagine you’re at your favourite vacation spot right now 🌴",
-    "Who’s the first person you’d call with good news?",
+    "What's your comfort food after a long day?",
+    "Imagine you're at your favourite vacation spot right now 🌴",
+    "Who's the first person you'd call with good news?",
     "Remember the last time you laughed uncontrollably?",
     "If today was a movie, what genre would it be?",
-    "What’s one small thing that made you happy recently?",
+    "What's one small thing that made you happy recently?",
     "If you could pause time, what would you do first?",
     "Which place makes you feel instantly calm?",
-    "What’s your favourite childhood memory?",
-    "What’s something simple that always lifts your mood?"
+    "What's your favourite childhood memory?",
+    "What's something simple that always lifts your mood?"
 ];
 
 let loaderInterval;
@@ -75,13 +75,13 @@ function hideAppLoader() {
           : "https://hisaab-kitaab-service-app.onrender.com/api";
     },
     
-    // ... rest of your config remains exactly the same ...
     TIMEOUTS: {
       TOAST_DURATION: 4000, 
       DEBOUNCE_DELAY: 300,  
       SESSION_CHECK: 60000, 
       SESSION_WARN: 300000, 
       GOOGLE_INIT_DELAY: 500,
+      REQUEST_TIMEOUT: 10000, // ✅ NEW: 10 second request timeout
     },
     
     SELECTORS: {
@@ -98,11 +98,25 @@ function hideAppLoader() {
   let csrfToken = null; 
   let csrfPromise = null;
   
-  function initCSRF() {
-    if (csrfToken) return Promise.resolve(csrfToken);
-    if (csrfPromise) return csrfPromise;
-  
-    // Use the full URL from CONFIG
+  // ✅ CHANGE 1: Modified initCSRF to accept optional forceRefresh parameter
+  function initCSRF(forceRefresh = false) {
+    // If forcing refresh, clear existing state to guarantee fresh fetch
+    if (forceRefresh) {
+      csrfToken = null;
+      csrfPromise = null;
+    }
+    
+    // Return cached token if available and not forcing refresh
+    if (!forceRefresh && csrfToken) {
+      return Promise.resolve(csrfToken);
+    }
+    
+    // Return existing promise if available and not forcing refresh
+    if (!forceRefresh && csrfPromise) {
+      return csrfPromise;
+    }
+
+    // Fetch fresh token from server
     csrfPromise = fetch(CONFIG.API_BASE + "/csrf-token", { credentials: "include" })
       .then(res => res.json())
       .then(data => {
@@ -130,30 +144,120 @@ function hideAppLoader() {
     };
   };
 
+  // ✅ UPDATED: apiFetch with AbortController timeout + Content-Type validation
   window.apiFetch = async function(path, options = {}) {
-    await initCSRF();
-  
+    const method = (options.method || "GET").toUpperCase();
+    const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
+    
+    // ✅ CHANGE 1: Force token refresh on mutation requests
+    if (isMutation) {
+      await initCSRF(true);
+    } else {
+      await initCSRF();
+    }
+
     const headers = {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     };
-  
+
     if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
-  
-    // Use the full URL from CONFIG
-    const res = await fetch(CONFIG.API_BASE + path, {
-      method: options.method || "GET",
-      headers: headers,
-      credentials: "include",
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-  
+
+    // ✅ CHANGE 1: Implement AbortController for request timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUTS.REQUEST_TIMEOUT);
+    
+    let res;
+    try {
+      res = await fetch(CONFIG.API_BASE + path, {
+        method: method,
+        headers: headers,
+        credentials: "include",
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal, // ✅ Attach abort signal
+      });
+      clearTimeout(timeoutId); // ✅ Clear timeout on successful response
+    } catch (err) {
+      clearTimeout(timeoutId); // ✅ Always clear timeout
+      
+      // ✅ Handle timeout/abort errors specifically
+      if (err.name === 'AbortError') {
+        const error = new Error("Request timed out. Please check your connection and try again.");
+        error.status = 408;
+        error.isTimeout = true;
+        throw error;
+      }
+      
+      // ✅ Handle network errors (offline, DNS failure, etc.)
+      if (!window.navigator.onLine || err.message.includes('Failed to fetch')) {
+        const error = new Error("Network error. Please check your internet connection.");
+        error.status = 0;
+        error.isNetworkError = true;
+        throw error;
+      }
+      
+      throw err; // Re-throw other errors
+    }
+
+    // ✅ CHANGE 3: Strengthened 403 retry logic
     if (res.status === 403) {
-      const json = await res.clone().json().catch(() => ({}));
-      if (json.message && json.message.includes("CSRF")) {
+      let shouldRetry = false;
+      
+      if (isMutation) {
+        shouldRetry = true;
+      } else {
+        // Only attempt JSON parse for non-mutation if content-type suggests JSON
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const json = await res.clone().json().catch(() => ({}));
+          shouldRetry = json.message && json.message.includes("CSRF");
+        }
+      }
+      
+      if (shouldRetry) {
+        // Clear stale token state and force fresh fetch
         csrfToken = null;
         csrfPromise = null;
-        return window.apiFetch(path, options); 
+        await initCSRF(true);
+        
+        // Rebuild headers with fresh token
+        const retryHeaders = {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        };
+        if (csrfToken) retryHeaders["X-CSRF-Token"] = csrfToken;
+        
+        // Retry the request once with fresh token (with timeout)
+        const retryController = new AbortController();
+        const retryTimeoutId = setTimeout(() => retryController.abort(), CONFIG.TIMEOUTS.REQUEST_TIMEOUT);
+        
+        try {
+          res = await fetch(CONFIG.API_BASE + path, {
+            method: method,
+            headers: retryHeaders,
+            credentials: "include",
+            body: options.body ? JSON.stringify(options.body) : undefined,
+            signal: retryController.signal,
+          });
+          clearTimeout(retryTimeoutId);
+        } catch (err) {
+          clearTimeout(retryTimeoutId);
+          if (err.name === 'AbortError') {
+            const error = new Error("Request timed out. Please check your connection and try again.");
+            error.status = 408;
+            error.isTimeout = true;
+            throw error;
+          }
+          throw err;
+        }
+      }
+    }
+
+    // ✅ CHANGE 2: Check for new CSRF token in response headers on successful mutation
+    if (isMutation && res.ok) {
+      const newToken = res.headers.get("X-CSRF-Token");
+      if (newToken && newToken !== csrfToken) {
+        csrfToken = newToken;
       }
     }
 
@@ -165,11 +269,56 @@ function hideAppLoader() {
         return; 
       }
     }
-  
-    const data = await res.json().catch(() => ({}));
+    
+    // ✅ Handle Rate Limit (429) with user-friendly error
+    if (res.status === 429) {
+      const error = new Error("You're adding expenses too fast, please wait a moment.");
+      error.status = 429;
+      error.isRateLimit = true;
+      throw error;
+    }
+    
+    // ✅ Handle server errors (502, 503, etc.) with generic message
+    if (res.status >= 500 && res.status < 600) {
+      const error = new Error("Server is temporarily unavailable. Please try again.");
+      error.status = res.status;
+      error.isServerError = true;
+      throw error;
+    }
+
+    // ✅ CHANGE 2: Validate Content-Type before parsing JSON
+    const contentType = res.headers.get("content-type") || "";
+    let data;
+    
+    if (contentType.includes("application/json")) {
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        console.warn("JSON parse failed for valid content-type", parseErr);
+        data = { message: "Invalid response format from server" };
+      }
+    } else {
+      // ✅ Server returned non-JSON (likely HTML error page from proxy/hosting)
+      const text = await res.text().catch(() => "");
+      console.warn("Expected JSON but received:", contentType, 
+                   "Preview:", text.substring(0, 200) + (text.length > 200 ? "..." : ""));
+      
+      // Provide meaningful error based on status code
+      if (res.status >= 500) {
+        data = { message: "Server is temporarily unavailable. Please try again." };
+      } else if (res.status === 404) {
+        data = { message: "Endpoint not found. Please refresh the page." };
+      } else if (res.status === 502 || res.status === 504) {
+        data = { message: "Gateway error. The server is taking too long to respond." };
+      } else {
+        data = { message: "Invalid server response. Please try again." };
+      }
+    }
+    
     if (!res.ok) {
       const error = new Error(data.message || "Request failed");
       error.status = res.status;
+      error.data = data;
       throw error;
     }
     return data;
@@ -201,7 +350,13 @@ function hideAppLoader() {
         { theme: "outline", size: "large", width: "100%" } 
       );
     } catch (err) {
-      console.error("Failed to init Google Auth", err);
+      // ✅ Handle specific error types for better UX
+      if (err.isTimeout || err.isNetworkError || err.isServerError) {
+        window.showToast(err.message, "error");
+      } else {
+        console.error("Failed to init Google Auth", err);
+        window.showToast("Failed to initialize sign-in. Please refresh.", "error");
+      }
     }
   }
 
@@ -214,7 +369,12 @@ function hideAppLoader() {
       window.showToast("Logged in as " + data.user.username, "success");
       setTimeout(() => { window.location.href = "dashboard.html"; }, 1000);
     } catch (err) {
-      window.showToast(err.message || "Google sign-in failed", "error");
+      // ✅ Handle specific error types for better UX
+      if (err.isTimeout || err.isNetworkError || err.isServerError) {
+        window.showToast(err.message, "error");
+      } else {
+        window.showToast(err.message || "Google sign-in failed", "error");
+      }
     }
   };
 
@@ -471,6 +631,10 @@ function hideAppLoader() {
       // ... you can add more setup here if needed ...
     } catch (err) {
       console.error("App initialization failed", err);
+      // ✅ Show user-friendly error for timeout/network issues
+      if (err.isTimeout || err.isNetworkError) {
+        window.showToast(err.message, "error");
+      }
     } finally {
       // Hide loader whether success or failure
       hideAppLoader();

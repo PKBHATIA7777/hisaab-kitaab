@@ -85,25 +85,43 @@ app.use(
 );
 
 // =========================================
-/* 4. RATE LIMITING (ENHANCED) */
+/* 4. RATE LIMITING (ENHANCED - STEP 3 FIXES) */
 // =========================================
+
+// ✅ IMPROVED: Rate limit handler with Retry-After header and structured response
 const rateLimitHandler = (req, res, next, options) => {
-  console.warn(`⚠️ Rate Limit: IP ${req.ip} -> ${req.originalUrl}`);
-  res.status(options.statusCode).json(options.message);
+  const retryAfter = Math.ceil(options.resetTime / 1000) - Math.floor(Date.now() / 1000);
+  
+  console.warn(`⚠️ Rate Limit Hit: IP=${req.ip} | Path=${req.originalUrl} | Method=${req.method} | RetryAfter=${retryAfter}s`);
+  
+  // Set standard Retry-After header (in seconds)
+  res.setHeader("Retry-After", retryAfter > 0 ? retryAfter : 60);
+  
+  // Return structured JSON error that frontend can parse
+  res.status(options.statusCode).json({ 
+    ok: false, 
+    message: options.message.message || "Too many requests, please try again later.",
+    retryAfter: retryAfter > 0 ? retryAfter : 60,
+    isRateLimit: true // Flag for frontend to display specific messaging
+  });
 };
 
 // 1. Global Limiter (Read operations mostly)
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: isProduction ? 100 : 1000,
-  standardHeaders: true,
-  legacyHeaders: false,
+  standardHeaders: true,    // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false,     // Disable `X-RateLimit-*` headers
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please try again later." },
+  // ✅ Use session ID if available for more accurate limiting per user
+  keyGenerator: (req) => {
+    return req.session?.id || req.ip;
+  }
 });
 app.use(globalLimiter);
 
-// 2. Strict Auth Limiter (Login/OTP)
+// 2. Strict Auth Limiter (Login/OTP) - Keep strict for security
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30, // 30 attempts per 15 min
@@ -111,6 +129,9 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many login attempts. Try again in 15 mins." },
+  keyGenerator: (req) => {
+    return req.session?.id || req.ip;
+  }
 });
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register/request-otp", authLimiter);
@@ -119,29 +140,52 @@ app.use("/api/auth/register/complete", authLimiter);
 app.use("/api/auth/forgot/request-otp", authLimiter);
 app.use("/api/auth", authLimiter); // Apply to all auth routes for safety
 
-// ✅ FIX S4: Write Limiter (Spam Protection for Create/Edit/Delete)
+// ✅ FIX S4: Write Limiter - ADJUSTED FOR EXPENSE ENTRY WORKFLOW (STEP 3)
 const writeLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute window
-  max: 10, // Max 10 writes per minute per IP
+  windowMs: 60 * 1000,        // 1 minute window
+  max: isProduction ? 30 : 100, // ✅ INCREASED: 30 writes/min in prod, 100 in dev (was 10)
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  message: { ok: false, message: "You are doing that too fast. Please slow down." }
+  message: { ok: false, message: "You're adding expenses too fast, please wait a moment." },
+  // ✅ Use session ID for per-user limiting instead of just IP (prevents shared WiFi issues)
+  keyGenerator: (req) => {
+    return req.session?.id || req.ip;
+  },
+  // ✅ Skip limiting successful OPTIONS preflight requests
+  skipSuccessfulRequests: false,
+  // ✅ In production, consider using Redis store for distributed rate limiting:
+  // store: isProduction ? new RedisStore({ sendCommand: (...args) => redisClient.sendCommand(args) }) : undefined
 });
 
-// Apply write limiter only to data mutations
+// Apply write limiter only to data mutations on expense/chapter routes
 app.use("/api/chapters", (req, res, next) => {
-  if (["POST", "PUT", "DELETE"].includes(req.method)) {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
     return writeLimiter(req, res, next);
   }
   next();
 });
+
 app.use("/api/expenses", (req, res, next) => {
-  if (["POST", "PUT", "DELETE"].includes(req.method)) {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
     return writeLimiter(req, res, next);
   }
   next();
 });
+
+// ✅ NEW: Specific limiter for settlements/summary (read-heavy but can be expensive)
+const readHeavyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isProduction ? 60 : 200, // More generous for read operations
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+  message: { ok: false, message: "Too many requests, please wait a moment." },
+  keyGenerator: (req) => req.session?.id || req.ip
+});
+
+app.use("/api/expenses/chapter/:chapterId/settlements", readHeavyLimiter);
+app.use("/api/expenses/chapter/:chapterId/summary", readHeavyLimiter);
 
 // =========================================
 // MIDDLEWARE
@@ -183,6 +227,29 @@ app.get(/^(?!\/api).+/, (req, res) => {
 });
 
 // =========================================
+// DATABASE CONNECTION POOLING BEST PRACTICES
+// =========================================
+// ✅ NOTE: Ensure all route handlers in ./routes/* use try/finally to release connections:
+// 
+// Example pattern for db.query usage:
+// ```
+// let client;
+// try {
+//   client = await db.pool.connect();
+//   await client.query('BEGIN');
+//   // ... your queries ...
+//   await client.query('COMMIT');
+// } catch (err) {
+//   if (client) await client.query('ROLLBACK');
+//   throw err;
+// } finally {
+//   if (client) client.release(); // ✅ CRITICAL: Always release connection
+// }
+// ```
+// 
+// This prevents "hanging" requests and connection pool exhaustion.
+
+// =========================================
 // HOUSEKEEPING: Cleanup old OTPs
 // =========================================
 setInterval(async () => {
@@ -194,9 +261,39 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000); // 1 hour
 
+// ✅ Graceful Shutdown Handler (Prevents hanging connections on deploy/restart)
+process.on("SIGTERM", async () => {
+  console.log("🛑 SIGTERM received, shutting down gracefully");
+  try {
+    if (db.pool) {
+      await db.pool.end();
+      console.log("🔌 Database connection pool closed");
+    }
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Error during shutdown:", err);
+    process.exit(1);
+  }
+});
+
+process.on("SIGINT", async () => {
+  console.log("🛑 SIGINT received, shutting down gracefully");
+  try {
+    if (db.pool) {
+      await db.pool.end();
+      console.log("🔌 Database connection pool closed");
+    }
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Error during shutdown:", err);
+    process.exit(1);
+  }
+});
+
 // Start
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔒 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`⚡ Rate Limits: Global=${isProduction ? 100 : 1000}/15min | Write=${isProduction ? 30 : 100}/min`);
 });
