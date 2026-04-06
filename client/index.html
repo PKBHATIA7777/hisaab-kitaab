@@ -19,6 +19,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+  <meta name="theme-color" content="#ffffff">
 </head>
 <body>
 
@@ -103,5 +106,20 @@
       } catch (e) {}
     })();
   </script>
+
+    <div id="pwa-install-prompt" class="pwa-popup hidden">
+      <div class="pwa-popup-content">
+        <div class="pwa-icon">📱</div>
+        <div class="pwa-text">
+          <h4>Install Hisaab</h4>
+          <p id="pwa-instructions">Add to your home screen for quick access!</p>
+        </div>
+        <div class="pwa-actions">
+          <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
+          <button id="pwa-close-btn" class="pwa-btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+
 </body>
 </html>

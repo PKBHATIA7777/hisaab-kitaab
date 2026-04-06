@@ -680,6 +680,92 @@ function hideAppLoader() {
     window.addEventListener('resize', window.debounce(initMobileTweaks, CONFIG.TIMEOUTS.DEBOUNCE_DELAY));
   });
 
+  /* ======================================
+     7. REGISTER PWA SERVICE WORKER
+     ====================================== */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+    });
+  }
+
+  /* ======================================
+     8. PWA INSTALL PROMPT LOGIC
+     ====================================== */
+  document.addEventListener("DOMContentLoaded", () => {
+    let deferredPrompt;
+    const pwaPopup = document.getElementById('pwa-install-prompt');
+    const pwaInstallBtn = document.getElementById('pwa-install-btn');
+    const pwaCloseBtn = document.getElementById('pwa-close-btn');
+    const pwaInstructions = document.getElementById('pwa-instructions');
+
+    if (!pwaPopup) return; // Exit if popup HTML isn't on this page
+
+    // 1. Detect Device & Install Status
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+    // 2. Function to show popup safely
+    function showPopup() {
+      // Only show if the app is NOT already installed
+      if (!isStandalone) {
+        // Show after 1.5 seconds for a smooth user experience
+        setTimeout(() => {
+          pwaPopup.classList.remove('hidden');
+        }, 1500);
+      }
+    }
+
+    // 3. Handle Android / Windows / Mac (Chrome & Edge)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      deferredPrompt = e;
+      
+      if (pwaInstructions) {
+        pwaInstructions.textContent = "Add to your home screen for quick access!";
+      }
+      showPopup();
+    });
+
+    // 4. Handle iOS (Safari)
+    // Apple strictly blocks `beforeinstallprompt`, so we guide them manually
+    if (isIOS && !isStandalone) {
+      if (pwaInstructions) {
+        pwaInstructions.innerHTML = "To install: tap the <b>Share</b> icon below and select <b>Add to Home Screen</b>.";
+      }
+      if (pwaInstallBtn) {
+        pwaInstallBtn.style.display = 'none'; // Hide the install button because iOS requires manual action
+      }
+      showPopup();
+    }
+
+    // 5. Button Listeners
+    if (pwaInstallBtn) {
+      pwaInstallBtn.addEventListener('click', async () => {
+        pwaPopup.classList.add('hidden'); // Hide our custom popup
+        
+        if (deferredPrompt) {
+          deferredPrompt.prompt(); // Show the native browser install prompt
+          
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User response to install prompt: ${outcome}`);
+          
+          deferredPrompt = null; // Can only be used once
+        }
+      });
+    }
+
+    if (pwaCloseBtn) {
+      pwaCloseBtn.addEventListener('click', () => {
+        pwaPopup.classList.add('hidden');
+      });
+    }
+  });
+
 })();
 
 
