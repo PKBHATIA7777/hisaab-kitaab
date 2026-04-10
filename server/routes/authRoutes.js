@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const cache = require("../middleware/cacheMiddleware");
+const { requireAuth } = require("../middleware/authMiddleware");
 
 const {
   registerRequestOtp,
@@ -14,6 +15,7 @@ const {
   logout,
   googleLogin,
   setPassword,
+  updateProfile,
   
   // ✅ NEW IMPORTS (Ensure these are here)
   checkIdentifier,
@@ -48,6 +50,7 @@ router.post("/forgot/reset", resetPassword);
 
 // user
 router.get("/me", me); // Cache removed in Phase 2
+router.patch("/profile", requireAuth, updateProfile);
 
 router.post("/logout", logout);
 

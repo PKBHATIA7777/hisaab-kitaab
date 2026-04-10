@@ -93,7 +93,7 @@
           <label>Members <span style="color:red">*</span></label>
           <div class="member-list" id="member-list-container">
           </div>
-          <button type="button" class="btn-small" onclick="addMemberInput()">+ Add another person</button>
+          <button type="button" class="btn-small" onclick="addMemberInput()">+ Add member (optional)</button>
 
           <div style="margin-top: 25px;">
             <button type="submit" class="btn-primary">Create Chapter</button>
@@ -132,7 +132,29 @@
           
           <div class="profile-header-section">
             <div id="profile-avatar" class="profile-avatar-large">?</div>
-            <h2 id="profile-realname" class="profile-name">Loading...</h2>
+            <div style="display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+              <h2 id="profile-realname" class="profile-name" style="margin:0;">Loading...</h2>
+              <button id="btn-edit-name" onclick="openEditName()" 
+                style="background:none; border:none; cursor:pointer; color:#d000ff; font-size:0.85rem; font-weight:600; padding:4px 8px; border-radius:6px; border:1px solid rgba(208,0,255,0.3);">
+                ✏️ Edit
+              </button>
+            </div>
+
+            <!-- Inline edit form (hidden by default) -->
+            <div id="edit-name-form" style="display:none; margin-top:10px;">
+              <input type="text" id="input-edit-name" maxlength="100"
+                style="width:100%; padding:10px; border-radius:10px; border:2px solid #d000ff; font-family:var(--font-main); font-size:1rem; text-align:center; outline:none; margin-bottom:8px;">
+              <div style="display:flex; gap:8px; justify-content:center;">
+                <button onclick="saveEditName()" 
+                  style="padding:8px 20px; background:#000; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:var(--font-main); font-weight:600; font-size:0.9rem;">
+                  Save
+                </button>
+                <button onclick="cancelEditName()"
+                  style="padding:8px 16px; background:#f0f0f0; color:#333; border:none; border-radius:8px; cursor:pointer; font-family:var(--font-main); font-size:0.9rem;">
+                  Cancel
+                </button>
+              </div>
+            </div>
             <p id="profile-username" class="profile-username">@...</p>
           </div>
 

@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     loadFriendsForAutocomplete();
     renderChapterInfo();
-    renderMembers();
+    await renderMembers(); // ✅ UPDATED: await async renderMembers()
     
     // Load Events first, then trigger unified data load
     await loadEvents(); 
@@ -264,20 +264,37 @@ function renderChapterInfo() {
   }
 }
 
-function renderMembers() {
+// ✅ UPDATED: renderMembers() - Async with deletability check
+async function renderMembers() {
   memberListEl.innerHTML = "";
+
+  // Fetch which members are involved in expenses
+  let involvedIds = [];
+  try {
+    const data = await apiFetch(`/chapters/${chapterId}/members/deletability`);
+    involvedIds = data.involvedMemberIds || [];
+  } catch (e) {
+    // If fetch fails, assume all are involved (safe default — no delete shown)
+    involvedIds = currentMembers.map(m => m.id);
+  }
+
+  const isAdmin = currentUser.id === currentChapter.created_by;
+
   currentMembers.forEach(m => {
     const isMemberAdmin = (m.user_id === currentChapter.created_by);
-    
+    const isInvolved = involvedIds.includes(m.id);
+    const canDelete = isAdmin && !isMemberAdmin && !isInvolved;
+
     const row = document.createElement("div");
     row.className = "dropdown-member-item";
-    
+
     row.innerHTML = `
       <div class="small-avatar" style="background:${getAvatarColor(m.member_name)}">${getInitials(m.member_name)}</div>
-      <div class="member-name-text">
+      <div class="member-name-text" style="flex:1;">
         ${m.member_name}
         ${isMemberAdmin ? '<span class="admin-badge">Admin</span>' : ''}
       </div>
+      ${canDelete ? `<button class="btn-delete-member" onclick="deleteMember(${m.id})" title="Remove member" aria-label="Remove ${m.member_name}">×</button>` : ''}
     `;
     memberListEl.appendChild(row);
   });

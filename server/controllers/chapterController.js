@@ -14,7 +14,7 @@ const createChapterSchema = z.object({
       name: z.string().min(1).max(50).trim(),
       friendId: z.number().int().nullish() // Optional ID if picking from friends list
     })
-  ).min(1),
+  ).min(0), // CHANGE 1: Changed from .min(1) to .min(0) to allow solo chapters
 });
 
 const addMemberSchema = z.object({
@@ -88,6 +88,7 @@ async function createChapter(req, res) {
       );
 
       // 6. Insert Deduplicated Members (With friend_id if available)
+      // CHANGE 2: Loop naturally runs zero times if cleanMembers is empty - no guard needed
       for (const m of cleanMembers) {
         await db.query(
           `INSERT INTO chapter_members (chapter_id, member_name, friend_id) VALUES ($1, $2, $3)`,
@@ -174,15 +175,54 @@ async function deleteMember(req, res) {
 }
 
 // =========================================
+// CHANGE 3: New function to check member deletability
+// =========================================
+async function getMemberDeletability(req, res) {
+  try {
+    const { id } = req.params; // chapterId
+    const userId = req.user.userId;
+
+    // Verify ownership
+    const { rows: chap } = await db.query(
+      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
+      [id, userId]
+    );
+    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+
+    // Find members who appear in ANY expense (as payer OR split participant)
+    const { rows } = await db.query(
+      `SELECT DISTINCT cm.id
+       FROM chapter_members cm
+       WHERE cm.chapter_id = $1
+         AND (
+           EXISTS (SELECT 1 FROM expenses e WHERE e.payer_member_id = cm.id AND e.chapter_id = $1)
+           OR
+           EXISTS (SELECT 1 FROM expense_splits es JOIN expenses e ON es.expense_id = e.id WHERE es.member_id = cm.id AND e.chapter_id = $1)
+         )`,
+      [id]
+    );
+
+    const involvedIds = rows.map(r => r.id);
+    res.json({ ok: true, involvedMemberIds: involvedIds });
+  } catch (err) {
+    console.error("getMemberDeletability error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// =========================================
 // 4. Get All Chapters for Dashboard (Optimized)
 // =========================================
 async function getMyChapters(req, res) {
   try {
+    const showArchived = req.query.archived === "true";
     const { rows } = await db.query(
-      `SELECT c.id, c.name, c.description, c.created_at, COUNT(cm.id) as member_count
+      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, COUNT(cm.id) as member_count
        FROM chapters c LEFT JOIN chapter_members cm ON c.id = cm.chapter_id
-       WHERE c.created_by = $1 GROUP BY c.id ORDER BY c.created_at DESC`,
-      [req.user.userId]
+       WHERE c.created_by = $1
+         AND ($2 OR c.is_archived = FALSE)
+       GROUP BY c.id ORDER BY c.created_at DESC`,
+      [req.user.userId, showArchived]
     );
     res.json({ ok: true, chapters: rows });
   } catch (err) { 
@@ -192,7 +232,34 @@ async function getMyChapters(req, res) {
 }
 
 // =========================================
-// 5. Get Single Chapter Details
+// 5. Toggle Chapter Archive State
+// =========================================
+async function toggleArchiveChapter(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const { is_archived } = req.body; // boolean
+
+    const { rowCount } = await db.query(
+      `UPDATE chapters SET is_archived = $1 WHERE id = $2 AND created_by = $3`,
+      [!!is_archived, id, userId]
+    );
+
+    if (rowCount === 0) return res.status(404).json({ ok: false, message: "Chapter not found" });
+
+    res.json({ 
+      ok: true, 
+      message: is_archived ? "Chapter archived" : "Chapter restored",
+      is_archived: !!is_archived
+    });
+  } catch (err) {
+    console.error("toggleArchiveChapter error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// =========================================
+// 6. Get Single Chapter Details
 // =========================================
 async function getChapterDetails(req, res) {
   try {
@@ -200,6 +267,11 @@ async function getChapterDetails(req, res) {
     const userId = req.user.userId;
     const { rows: chapterRows } = await db.query(`SELECT * FROM chapters WHERE id = $1 AND created_by = $2`, [id, userId]);
     if (chapterRows.length === 0) return res.status(404).json({ ok: false, message: "Chapter not found" });
+
+    await db.query(
+      "UPDATE chapters SET last_opened_at = NOW() WHERE id = $1",
+      [id]
+    );
 
     // Fetch members with user_id so frontend knows who is Admin
     const { rows: memberRows } = await db.query(`SELECT * FROM chapter_members WHERE chapter_id = $1 ORDER BY id ASC`, [id]);
@@ -280,6 +352,7 @@ async function deleteChapter(req, res) {
   }
 }
 
+// CHANGE 4: Export the new function
 module.exports = {
   createChapter,
   getMyChapters,
@@ -287,5 +360,7 @@ module.exports = {
   updateChapter,
   deleteChapter,
   addMember,
-  deleteMember
+  deleteMember,
+  getMemberDeletability,
+  toggleArchiveChapter
 };

@@ -31,5 +31,6 @@ router.delete("/:id", chapterController.deleteChapter);
 // --- MEMBERS ---
 router.post("/:id/members", chapterController.addMember);
 router.delete("/:id/members/:memberId", chapterController.deleteMember);
+router.get("/:id/members/deletability", chapterController.getMemberDeletability);
 
 module.exports = router;

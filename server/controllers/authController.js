@@ -4,6 +4,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const { sendOtpEmail } = require("../utils/email");
 const bcrypt = require("bcrypt");
+const xss = require("xss");
 const db = require("../config/db");
 const { createToken, sendAuthCookie, clearAuthCookies, SHORT_MS, LONG_MS } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
@@ -746,6 +747,35 @@ function logout(req, res) {
   }
 }
 
+async function updateProfile(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ ok: false, message: "Not authenticated" });
+
+    const { realName } = req.body;
+    if (!realName || realName.trim().length < 2) {
+      return res.status(400).json({ ok: false, message: "Name must be at least 2 characters" });
+    }
+    if (realName.trim().length > 100) {
+      return res.status(400).json({ ok: false, message: "Name too long (max 100 chars)" });
+    }
+
+    const clean = xss(realName.trim());
+
+    const { rows } = await db.query(
+      `UPDATE users SET real_name = $1, updated_at = NOW() WHERE id = $2 RETURNING real_name`,
+      [clean, userId]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ ok: false, message: "User not found" });
+
+    res.json({ ok: true, message: "Name updated", realName: rows[0].real_name });
+  } catch (err) {
+    console.error("updateProfile error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
 module.exports = {
   checkIdentifier,
   loginRequestOtp,
@@ -760,4 +790,5 @@ module.exports = {
   resetPassword,
   me,
   logout,
+  updateProfile,
 };

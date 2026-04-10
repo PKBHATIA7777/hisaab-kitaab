@@ -14,6 +14,7 @@ let editChapterId = null;
 let currentUser = null; // ✅ NEW: Store global user
 let cachedFriends = []; // ✅ NEW: Cache friends
 let myFriends = [];     // ✅ Moved here for global access
+let showingArchived = false; // ✅ CHANGE 2: Archived toggle state
 
 // ✅ NEW: Track who we are looking at in friend details
 let currentViewFriendId = null;
@@ -101,13 +102,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       <div class="toolbar-sort">
         <select id="chapter-sort">
-          <option value="newest">📅 Newest</option>
-          <option value="oldest">📅 Oldest</option>
+          <option value="last_opened" selected>🕐 Recently Opened</option>
+          <option value="newest">📅 Newest First</option>
+          <option value="oldest">📅 Oldest First</option>
           <option value="az">🔤 Name (A-Z)</option>
-          <option value="members">👥 Size</option>
+          <option value="members">👥 Members</option>
         </select>
         <span class="sort-arrow">▼</span>
       </div>
+      
+      <!-- ✅ CHANGE 1: Archived toggle button -->
+      <button id="btn-show-archived" 
+        style="padding:10px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.9); font-family:var(--font-main); font-size:0.9rem; cursor:pointer; color:#555; white-space:nowrap;">
+        🗃️ Archived
+      </button>
     </div>
   `;
   
@@ -117,6 +125,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchInput = document.getElementById('chapter-search');
   const clearBtn = document.getElementById('search-clear-btn');
   const sortSelect = document.getElementById('chapter-sort');
+
+  // ✅ CHANGE 3: Wire up the Archived toggle button
+  const archivedBtn = document.getElementById('btn-show-archived');
+  if (archivedBtn) {
+    archivedBtn.addEventListener('click', async () => {
+      showingArchived = !showingArchived;
+      archivedBtn.textContent = showingArchived ? '📋 Active' : '🗃️ Archived';
+      archivedBtn.style.background = showingArchived ? 'rgba(208,0,255,0.1)' : 'rgba(255,255,255,0.9)';
+      archivedBtn.style.borderColor = showingArchived ? '#d000ff' : 'rgba(255,255,255,0.2)';
+      archivedBtn.style.color = showingArchived ? '#d000ff' : '#555';
+      await reloadChaptersGrid();
+    });
+  }
 
   // ✅ FIX P2: Enhanced runFilter with empty state handling & mobile optimization
   const runFilter = () => {
@@ -193,6 +214,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (criteria === 'members') {
       sorted.sort((a, b) => b.member_count - a.member_count);
     }
+    // ✅ CHANGE 2: Add last_opened sort case
+    else if (criteria === 'last_opened') {
+      sorted.sort((a, b) => {
+        const aTime = a.last_opened_at ? new Date(a.last_opened_at) : new Date(a.created_at);
+        const bTime = b.last_opened_at ? new Date(b.last_opened_at) : new Date(b.created_at);
+        return bTime - aTime; // Most recent first
+      });
+    }
     
     // Re-render
     renderGrid(sorted);
@@ -258,7 +287,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // ✅ FIX: Store data globally
     allChapters = chaptersData.chapters;
-    renderGrid(allChapters);
+    
+    // ✅ CHANGE 3: Trigger default sort immediately so the default applies on load
+    // Removed standalone renderGrid(allChapters) - runSort calls renderGrid internally
+    const sortSelectEl = document.getElementById('chapter-sort');
+    if (sortSelectEl) sortSelectEl.dispatchEvent(new Event('change'));
 
   } catch (err) {
     clearTimeout(slowNetworkTimeout);
@@ -328,8 +361,6 @@ createForm.onsubmit = async (e) => {
         }
       });
 
-      if(members.length === 0) throw new Error("Add at least one member");
-
       await apiFetch("/chapters", {
         method: "POST",
         body: { name, description, members } // Send objects
@@ -351,7 +382,9 @@ createForm.onsubmit = async (e) => {
 async function reloadChaptersGrid() {
   renderSkeletons();
   try {
-    const data = await apiFetch("/chapters");
+    // ✅ CHANGE 4: Pass archived param based on toggle state
+    const url = showingArchived ? "/chapters?archived=true" : "/chapters";
+    const data = await apiFetch(url);
     
     // ✅ FIX: Update global state and re-apply sort
     allChapters = data.chapters;
@@ -422,6 +455,7 @@ function renderGrid(chapters) {
     const color = getAvatarColor(chapter.name);
     const timeString = timeAgo(chapter.created_at);
 
+    // ✅ CHANGE 5: Updated menu dropdown with archive/unarchive option
     card.innerHTML = `
       <div class="card-header-row">
         <div class="chapter-initials" style="background: ${color}; color: #fff; box-shadow: 0 5px 15px ${color}40;">
@@ -434,6 +468,7 @@ function renderGrid(chapters) {
 
         <div id="menu-${chapter.id}" class="menu-dropdown">
           <button class="menu-item" onclick="openEditModal('${chapter.id}', '${chapter.name}', '${chapter.description || ''}')">Edit</button>
+          <button class="menu-item" onclick="toggleArchive('${chapter.id}', ${chapter.is_archived})">${chapter.is_archived ? '📋 Restore' : '✅ Mark Settled'}</button>
           <button class="menu-item delete" onclick="confirmDelete('${chapter.id}')">Delete</button>
         </div>
       </div>
@@ -445,6 +480,12 @@ function renderGrid(chapters) {
         <span>${timeString}</span>
       </div>
     `;
+
+    // ✅ CHANGE 7: Add visual indicator for archived chapters
+    if (chapter.is_archived) {
+      card.style.opacity = "0.75";
+      card.style.borderLeft = "3px solid #d000ff";
+    }
 
     card.addEventListener("click", (e) => {
       if (e.target.tagName === "BUTTON" || e.target.closest(".menu-dropdown")) return;
@@ -474,9 +515,9 @@ window.openModal = function() {
   createModal.querySelector(".modal-header h2").textContent = "New Chapter";
   createForm.querySelector("button[type='submit']").textContent = "Create Chapter";
 
-  // Reset member inputs to default (1 empty input)
+  // Reset member inputs - No pre-added input, user can add members optionally
   memberListContainer.innerHTML = "";
-  addMemberInput();
+  // No pre-added input — user can add members optionally
 
   createModal.classList.add("active");
 
@@ -763,6 +804,62 @@ if (profileLogoutBtn) {
     }
   });
 }
+
+// ==========================================
+// ✅ STEP 4.4 — PROFILE NAME EDIT FUNCTIONS
+// ==========================================
+window.openEditName = function() {
+  const currentName = document.getElementById("profile-realname").textContent;
+  document.getElementById("input-edit-name").value = currentName;
+  document.getElementById("profile-realname").parentElement.style.display = "none";
+  document.getElementById("edit-name-form").style.display = "block";
+  setTimeout(() => document.getElementById("input-edit-name").focus(), 50);
+};
+
+window.cancelEditName = function() {
+  document.getElementById("edit-name-form").style.display = "none";
+  document.getElementById("profile-realname").parentElement.style.display = "flex";
+};
+
+window.saveEditName = async function() {
+  const input = document.getElementById("input-edit-name");
+  const newName = input.value.trim();
+
+  if (!newName || newName.length < 2) {
+    showToast("Name must be at least 2 characters", "error");
+    return;
+  }
+
+  const saveBtn = input.nextElementSibling?.querySelector("button");
+
+  try {
+    if (saveBtn) setBtnLoading(saveBtn, true);
+
+    const data = await apiFetch("/auth/profile", {
+      method: "PATCH",
+      body: { realName: newName }
+    });
+
+    // Update UI
+    document.getElementById("profile-realname").textContent = data.realName;
+    cancelEditName();
+
+    // Update header avatar and name
+    if (currentUser) {
+      currentUser.realName = data.realName;
+      renderProfileIcon();
+      const desktopName = document.getElementById("desktop-profile-name");
+      if (desktopName) desktopName.textContent = data.realName;
+    }
+
+    showToast("Name updated successfully", "success");
+
+  } catch (err) {
+    showToast(err.message || "Failed to update name", "error");
+  } finally {
+    if (saveBtn) setBtnLoading(saveBtn, false);
+  }
+};
 
 // ==========================================
 // ✅ FRIENDS MANAGEMENT LOGIC
@@ -1080,5 +1177,23 @@ window.deleteFriend = async function(id) {
     loadFriends(); // Refresh list
   } catch (err) {
     showToast(err.message, "error");
+  }
+};
+
+// ==========================================
+// ✅ CHANGE 6: Toggle Archive Function
+// ==========================================
+window.toggleArchive = async function(id, currentState) {
+  document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
+  const newState = !currentState;
+  try {
+    await apiFetch(`/chapters/${id}/archive`, {
+      method: "PATCH",
+      body: { is_archived: newState }
+    });
+    showToast(newState ? "Chapter marked as settled" : "Chapter restored", "success");
+    await reloadChaptersGrid();
+  } catch (err) {
+    showToast("Failed to update chapter", "error");
   }
 };
