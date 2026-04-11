@@ -26,6 +26,10 @@ router.get("/:chapterId/events", eventController.getChapterEvents);
 router.get("/:id/export", exportController.exportChapter);
 router.get("/:id", chapterController.getChapterDetails);
 router.put("/:id", chapterController.updateChapter);
+
+// ✅ Added PATCH route for Archive/Unarchive
+router.patch("/:id/archive", chapterController.toggleArchiveChapter);
+
 router.delete("/:id", chapterController.deleteChapter);
 
 // --- MEMBERS ---
