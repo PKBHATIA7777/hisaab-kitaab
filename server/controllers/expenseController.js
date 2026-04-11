@@ -86,11 +86,12 @@ async function addExpense(req, res) {
     }
 
     // 3. DATABASE TRANSACTION
-    await db.query("BEGIN");
+    const client = await db.pool.connect();
+    await client.query("BEGIN");
 
     try {
       // A. Insert Main Expense (✅ Now with event_id)
-      const { rows: expenseRows } = await db.query(
+      const { rows: expenseRows } = await client.query(
         `INSERT INTO expenses (chapter_id, event_id, payer_member_id, amount, description, expense_date)
          VALUES ($1, $2, $3, $4, $5, NOW())
          RETURNING id, created_at`,
@@ -100,14 +101,14 @@ async function addExpense(req, res) {
 
       // B. Insert Splits
       for (const split of finalSplits) {
-        await db.query(
+        await client.query(
           `INSERT INTO expense_splits (expense_id, member_id, amount_owed)
            VALUES ($1, $2, $3)`,
           [expenseId, split.memberId, split.amount]
         );
       }
 
-      await db.query("COMMIT");
+      await client.query("COMMIT");
 
       res.json({ 
         ok: true, 
@@ -122,8 +123,10 @@ async function addExpense(req, res) {
       });
 
     } catch (err) {
-      await db.query("ROLLBACK");
+      await client.query("ROLLBACK");
       throw err;
+    } finally {
+      client.release();
     }
 
   } catch (err) {
@@ -346,11 +349,12 @@ async function updateExpense(req, res) {
       });
     }
 
-    await db.query("BEGIN");
+    const client = await db.pool.connect();
+    await client.query("BEGIN");
 
     try {
       // ✅ Update Main Expense (including event_id)
-      await db.query(
+      await client.query(
         `UPDATE expenses 
          SET amount = $1, description = $2, payer_member_id = $3, chapter_id = $4, event_id = $5
          WHERE id = $6`,
@@ -358,23 +362,25 @@ async function updateExpense(req, res) {
       );
 
       // Delete Old Splits
-      await db.query("DELETE FROM expense_splits WHERE expense_id = $1", [id]);
+      await client.query("DELETE FROM expense_splits WHERE expense_id = $1", [id]);
 
       // Insert New Splits
       for (const split of finalSplits) {
-        await db.query(
+        await client.query(
           `INSERT INTO expense_splits (expense_id, member_id, amount_owed)
            VALUES ($1, $2, $3)`,
           [id, split.memberId, split.amount]
         );
       }
 
-      await db.query("COMMIT");
+      await client.query("COMMIT");
       res.json({ ok: true, message: "Expense updated" });
 
     } catch (err) {
-      await db.query("ROLLBACK");
+      await client.query("ROLLBACK");
       throw err;
+    } finally {
+      client.release();
     }
   } catch (err) {
     console.error("updateExpense error:", err);

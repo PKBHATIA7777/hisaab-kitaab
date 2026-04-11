@@ -250,7 +250,7 @@ async function registerVerifyOtp(req, res) {
 }
 
 
-// ✅ UPDATED: registerComplete with AUTO-GENERATED USERNAME
+// ✅ UPDATED: registerComplete with AUTO-GENERATED USERNAME & PROPER TRANSACTION HANDLING
 async function registerComplete(req, res) {
   try {
     const result = registerSchema.safeParse(req.body);
@@ -275,18 +275,20 @@ async function registerComplete(req, res) {
     const email = payload.email;
     const otpId = payload.otpId;
 
-    await db.query("BEGIN");
+    const client = await db.pool.connect(); // Get a dedicated client
+    await client.query("BEGIN");
 
     try {
-      const { rows: otpCheck } = await db.query("SELECT used FROM otps WHERE id = $1 FOR UPDATE", [otpId]);
+      // Use client.query for EVERYTHING inside this block
+      const { rows: otpCheck } = await client.query("SELECT used FROM otps WHERE id = $1 FOR UPDATE", [otpId]);
       if (!otpCheck[0] || otpCheck[0].used) {
-        await db.query("ROLLBACK");
+        await client.query("ROLLBACK");
         return res.status(400).json({ ok: false, message: "Link already used" });
       }
 
-      const { rows: existingRows } = await db.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
+      const { rows: existingRows } = await client.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
       if (existingRows[0]) {
-        await db.query("ROLLBACK");
+        await client.query("ROLLBACK");
         return res.status(400).json({ ok: false, message: "Email already in use" });
       }
 
@@ -299,7 +301,7 @@ async function registerComplete(req, res) {
 
       // Ensure uniqueness
       while (true) {
-        const { rows: uRows } = await db.query("SELECT 1 FROM users WHERE username = $1 LIMIT 1", [username]);
+        const { rows: uRows } = await client.query("SELECT 1 FROM users WHERE username = $1 LIMIT 1", [username]);
         if (uRows.length === 0) break;
         username = `${baseUsername}${counter++}`;
       }
@@ -308,7 +310,7 @@ async function registerComplete(req, res) {
       const passwordHash = await bcrypt.hash(password, 10);
       const now = new Date();
 
-      const { rows: userRows } = await db.query(
+      const { rows: userRows } = await client.query(
         `INSERT INTO users
           (real_name, username, email, password_hash, provider,
            google_id, needs_password, last_login_at)
@@ -318,8 +320,8 @@ async function registerComplete(req, res) {
       );
       const user = userRows[0];
 
-      await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
-      await db.query("COMMIT");
+      await client.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
+      await client.query("COMMIT");
 
       res.clearCookie("signup_token");
       const token = createToken({ userId: user.id.toString() });
@@ -332,8 +334,10 @@ async function registerComplete(req, res) {
       });
 
     } catch (err) {
-      await db.query("ROLLBACK");
+      await client.query("ROLLBACK");
       throw err;
+    } finally {
+      client.release(); // CRITICAL: Release connection back to pool
     }
   } catch (err) {
     console.error("registerComplete error:", err);

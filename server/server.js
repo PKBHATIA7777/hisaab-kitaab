@@ -7,6 +7,7 @@ const compression = require("compression");
 const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const { ipKeyGenerator } = rateLimit;
 const logger = require("./middleware/logger"); // ✅ Import Logger
 
 const csrfProtection = require("./middleware/csrfMiddleware");
@@ -116,7 +117,7 @@ const globalLimiter = rateLimit({
   message: { ok: false, message: "Too many requests, please try again later." },
   // ✅ Use session ID if available for more accurate limiting per user
   keyGenerator: (req) => {
-    return req.session?.id || req.ip;
+    return req.session?.id || ipKeyGenerator(req);
   }
 });
 app.use(globalLimiter);
@@ -130,7 +131,7 @@ const authLimiter = rateLimit({
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many login attempts. Try again in 15 mins." },
   keyGenerator: (req) => {
-    return req.session?.id || req.ip;
+    return req.session?.id || ipKeyGenerator(req);
   }
 });
 app.use("/api/auth/login", authLimiter);
@@ -150,7 +151,7 @@ const writeLimiter = rateLimit({
   message: { ok: false, message: "You're adding expenses too fast, please wait a moment." },
   // ✅ Use session ID for per-user limiting instead of just IP (prevents shared WiFi issues)
   keyGenerator: (req) => {
-    return req.session?.id || req.ip;
+    return req.session?.id || ipKeyGenerator(req);
   },
   // ✅ Skip limiting successful OPTIONS preflight requests
   skipSuccessfulRequests: false,
@@ -181,7 +182,7 @@ const readHeavyLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please wait a moment." },
-  keyGenerator: (req) => req.session?.id || req.ip
+  keyGenerator: (req) => req.session?.id || ipKeyGenerator(req)
 });
 
 app.use("/api/expenses/chapter/:chapterId/settlements", readHeavyLimiter);

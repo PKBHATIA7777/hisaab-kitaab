@@ -71,18 +71,19 @@ async function createChapter(req, res) {
       return res.status(400).json({ ok: false, message: "You already have a chapter with this name." });
     }
 
-    await db.query("BEGIN");
+    const client = await db.pool.connect();
+    await client.query("BEGIN");
 
     try {
       // 4. Insert Chapter
-      const { rows: chapterRows } = await db.query(
+      const { rows: chapterRows } = await client.query(
         `INSERT INTO chapters (name, description, created_by) VALUES ($1, $2, $3) RETURNING *`,
         [name, description, userId]
       );
       const chapter = chapterRows[0];
 
       // 5. Insert Creator
-      await db.query(
+      await client.query(
         `INSERT INTO chapter_members (chapter_id, member_name, user_id) VALUES ($1, $2, $3)`,
         [chapter.id, creatorName, userId]
       );
@@ -90,17 +91,19 @@ async function createChapter(req, res) {
       // 6. Insert Deduplicated Members (With friend_id if available)
       // CHANGE 2: Loop naturally runs zero times if cleanMembers is empty - no guard needed
       for (const m of cleanMembers) {
-        await db.query(
+        await client.query(
           `INSERT INTO chapter_members (chapter_id, member_name, friend_id) VALUES ($1, $2, $3)`,
           [chapter.id, m.name, m.friendId]
         );
       }
 
-      await db.query("COMMIT");
+      await client.query("COMMIT");
       res.json({ ok: true, message: "Chapter created", chapter });
     } catch (err) {
-      await db.query("ROLLBACK");
+      await client.query("ROLLBACK");
       throw err;
+    } finally {
+      client.release();
     }
   } catch (err) {
     console.error("createChapter error:", err);
@@ -324,29 +327,35 @@ async function deleteChapter(req, res) {
     const { id } = req.params;
     const userId = req.user.userId;
 
-    // Use a transaction to clean up members first
-    await db.query("BEGIN");
+    const client = await db.pool.connect();
+    await client.query("BEGIN");
     
-    // 1. Check ownership
-    const { rows } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [id, userId]
-    );
-    if (rows.length === 0) {
-      await db.query("ROLLBACK");
-      return res.status(404).json({ ok: false, message: "Chapter not found" });
+    try {
+      // 1. Check ownership
+      const { rows } = await client.query(
+        "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
+        [id, userId]
+      );
+      if (rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ ok: false, message: "Chapter not found" });
+      }
+
+      // 2. Delete Members
+      await client.query("DELETE FROM chapter_members WHERE chapter_id = $1", [id]);
+      
+      // 3. Delete Chapter
+      await client.query("DELETE FROM chapters WHERE id = $1", [id]);
+
+      await client.query("COMMIT");
+      res.json({ ok: true, message: "Chapter deleted successfully" });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    // 2. Delete Members
-    await db.query("DELETE FROM chapter_members WHERE chapter_id = $1", [id]);
-    
-    // 3. Delete Chapter
-    await db.query("DELETE FROM chapters WHERE id = $1", [id]);
-
-    await db.query("COMMIT");
-    res.json({ ok: true, message: "Chapter deleted successfully" });
   } catch (err) {
-    await db.query("ROLLBACK");
     console.error("deleteChapter error:", err);
     res.status(500).json({ ok: false, message: "Server error" });
   }
