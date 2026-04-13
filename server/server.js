@@ -20,6 +20,12 @@ const expenseRoutes = require("./routes/expenseRoutes");
 const friendRoutes = require("./routes/friendRoutes"); // <--- ADDED
 
 const app = express();
+// =========================================
+// 🔥 PING ROUTE (for UptimeRobot)
+// =========================================
+app.get('/ping', (req, res) => {
+  res.status(200).send('OK');
+});
 const isProduction = process.env.NODE_ENV === "production";
 
 // =========================================
@@ -120,7 +126,10 @@ const globalLimiter = rateLimit({
     return req.session?.id || ipKeyGenerator(req);
   }
 });
-app.use(globalLimiter);
+app.use((req, res, next) => {
+  if (req.path === '/ping') return next(); // skip rate limit for ping
+  globalLimiter(req, res, next);
+});
 
 // 2. Strict Auth Limiter (Login/OTP) - Keep strict for security
 const authLimiter = rateLimit({
@@ -193,7 +202,10 @@ app.use("/api/expenses/chapter/:chapterId/summary", readHeavyLimiter);
 // =========================================
 app.use(express.json());
 app.use(cookieParser());
-app.use(csrfProtection);
+app.use((req, res, next) => {
+  if (req.path === '/ping') return next(); // skip CSRF for ping
+  csrfProtection(req, res, next);
+});
 
 // ✅ FIX S6: Config Endpoint (Serve Public Keys dynamically)
 app.get("/api/config", (req, res) => {
