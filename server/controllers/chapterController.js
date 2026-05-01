@@ -320,7 +320,7 @@ async function updateChapter(req, res) {
 }
 
 // =========================================
-// 7. Delete Chapter
+// 7. Delete Chapter - ✅ FIXED CASCADE ORDER
 // =========================================
 async function deleteChapter(req, res) {
   try {
@@ -341,10 +341,17 @@ async function deleteChapter(req, res) {
         return res.status(404).json({ ok: false, message: "Chapter not found" });
       }
 
-      // 2. Delete Members
+      // 2. Delete in correct order: splits → expenses → members → chapter
+      // (or rely entirely on DB CASCADE — all child tables have ON DELETE CASCADE)
+      // Explicit order used here as a safety net in case CASCADE is misconfigured.
+      await client.query(
+        `DELETE FROM expense_splits WHERE expense_id IN (
+           SELECT id FROM expenses WHERE chapter_id = $1
+         )`,
+        [id]
+      );
+      await client.query("DELETE FROM expenses WHERE chapter_id = $1", [id]);
       await client.query("DELETE FROM chapter_members WHERE chapter_id = $1", [id]);
-      
-      // 3. Delete Chapter
       await client.query("DELETE FROM chapters WHERE id = $1", [id]);
 
       await client.query("COMMIT");

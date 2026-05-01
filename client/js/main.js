@@ -588,13 +588,13 @@ function hideAppLoader() {
   /* ======================================
      4. TOAST NOTIFICATIONS (Using CONFIG)
      ====================================== */
-  window.showToast = function(message, type = 'info') {
+window.showToast = function(message, type = 'info', options = null) {
     const container = document.getElementById(CONFIG.SELECTORS.TOAST_CONTAINER);
     if (!container) return;
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    
+
     let iconHtml = '';
     if (type === 'success') {
       iconHtml = `<div class="checkmark-circle"><div class="background"></div><div class="draw"></div></div>`;
@@ -604,14 +604,38 @@ function hideAppLoader() {
       iconHtml = `<span style="margin-right:10px; font-size:1.2rem;">ℹ️</span>`;
     }
 
-    toast.innerHTML = `${iconHtml}<span>${message}</span>`;
+    // Undo / action button support
+    let actionHtml = '';
+    if (options && options.label && typeof options.callback === 'function') {
+      actionHtml = `<button class="toast-action-btn" style="
+        margin-left:12px; background:none; border:1px solid rgba(255,255,255,0.4);
+        color:#fff; padding:3px 10px; border-radius:6px; cursor:pointer;
+        font-family:var(--font-main); font-size:0.8rem; font-weight:600;
+        white-space:nowrap; flex-shrink:0;">
+        ${options.label}
+      </button>`;
+    }
+
+    toast.innerHTML = `${iconHtml}<span style="flex:1;">${message}</span>${actionHtml}`;
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
     toast.setAttribute('role', 'alert');
     toast.setAttribute('aria-live', 'assertive');
     container.appendChild(toast);
 
+    // Wire up the action button callback
+    if (options && options.callback) {
+      const btn = toast.querySelector('.toast-action-btn');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          options.callback();
+          toast.remove();
+        });
+      }
+    }
+
     requestAnimationFrame(() => toast.classList.add('show'));
 
-    // Use Constant
     setTimeout(() => {
       toast.classList.remove('show');
       toast.addEventListener('transitionend', () => {
@@ -641,7 +665,15 @@ function hideAppLoader() {
     }
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", () => {
+    // Auto-create toast container if not present in HTML
+    if (!document.getElementById("toast-container")) {
+      const tc = document.createElement("div");
+      tc.id = "toast-container";
+      tc.className = "toast-container";
+      document.body.appendChild(tc);
+    }
+
     // Start loader rotation immediately
     startLoaderRotation();
 

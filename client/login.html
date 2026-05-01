@@ -333,18 +333,13 @@
       setBtnLoading(btn, true);
 
       try {
+        // Single call — server now issues the session cookie directly
         const data = await apiFetch('/auth/login/otp-verify', {
           method: 'POST',
-          body: { email: userContext.email, otp }
+          body: { email: userContext.email, otp, rememberMe: true }
         });
-        
-        // Finalize Login (Session Exchange)
-        const loginData = await apiFetch('/auth/login', {
-          method: 'POST',
-          body: { identifier: userContext.email, rememberMe: true }
-        });
-        
-        loginSuccess(loginData);
+
+        loginSuccess(data);
 
       } catch (err) {
         showToast(err.message || "Invalid Code", "error");

@@ -71,16 +71,15 @@ async function addExpense(req, res) {
       const count = involvedMemberIds.length;
       if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
 
+      // Sort numerically so remainder distribution is always deterministic
+      // regardless of the order the client sends member IDs
+      const sortedIds = [...involvedMemberIds].map(Number).sort((a, b) => a - b);
+
       const baseShareCents = Math.floor(totalCents / count);
       let remainderCents = totalCents % count;
 
-      involvedMemberIds.forEach(mId => {
-        let myShareCents = baseShareCents;
-        // Distribute remainder 1 cent at a time
-        if (remainderCents > 0) {
-          myShareCents += 1;
-          remainderCents--;
-        }
+      sortedIds.forEach(mId => {
+        const myShareCents = baseShareCents + (remainderCents-- > 0 ? 1 : 0);
         finalSplits.push({ memberId: mId, amount: myShareCents / 100 });
       });
     }
@@ -336,15 +335,15 @@ async function updateExpense(req, res) {
       const count = involvedMemberIds.length;
       if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
 
+      // Sort numerically so remainder distribution is always deterministic
+      // regardless of the order the client sends member IDs
+      const sortedIds = [...involvedMemberIds].map(Number).sort((a, b) => a - b);
+
       const baseShareCents = Math.floor(totalCents / count);
       let remainderCents = totalCents % count;
 
-      involvedMemberIds.forEach(mId => {
-        let myShareCents = baseShareCents;
-        if (remainderCents > 0) {
-          myShareCents += 1;
-          remainderCents--;
-        }
+      sortedIds.forEach(mId => {
+        const myShareCents = baseShareCents + (remainderCents-- > 0 ? 1 : 0);
         finalSplits.push({ memberId: mId, amount: myShareCents / 100 });
       });
     }
@@ -396,13 +395,12 @@ function calculateSettlements(balances) {
   let debtors = [];
   let creditors = [];
 
-  balances.forEach(person => {
-    // Round to nearest cent
+ balances.forEach(person => {
     const balanceCents = Math.round(person.balance * 100);
-    
-    // Ignore near-zero balances (floating point noise)
-    if (balanceCents < -1) debtors.push({ ...person, balanceCents });
-    else if (balanceCents > 1) creditors.push({ ...person, balanceCents });
+    // Strict zero-threshold — the integer math in addExpense guarantees
+    // splits always sum to the total, so residuals are true rounding artefacts
+    if (balanceCents < 0) debtors.push({ ...person, balanceCents });
+    else if (balanceCents > 0) creditors.push({ ...person, balanceCents });
   });
 
   // 2. Sort by Magnitude (Optimization)

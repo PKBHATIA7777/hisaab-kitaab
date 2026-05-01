@@ -115,28 +115,32 @@ async function loginRequestOtp(req, res) {
 }
 
 
-// ✅ NEW: loginVerifyOtp (exported)
+// ✅ FIXED: loginVerifyOtp - issues real session cookie directly (no second call needed)
 async function loginVerifyOtp(req, res) {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, rememberMe } = req.body;
     if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
 
     const otpRow = await verifyOtpLogic(email, otp, "login");
 
-    const tempToken = jwt.sign(
-      { email: email.trim().toLowerCase(), purpose: "complete_login", otpId: otpRow.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
+    // Mark OTP as used immediately
+    await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
 
-    res.cookie("login_token", tempToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 15 * 60 * 1000,
+    // Find the user
+    const user = await findUserByIdentifier(email.trim().toLowerCase());
+    if (!user) return res.status(400).json({ ok: false, message: "User not found" });
+
+    // Issue the real session cookie directly — no second /auth/login call needed
+    const remember = !!rememberMe;
+    const token = createToken({ userId: user.id.toString() }, remember);
+    sendAuthCookie(res, token, remember);
+
+    return res.json({
+      ok: true,
+      message: "Login successful",
+      user: { id: user.id, realName: user.real_name, username: user.username, email: user.email },
+      sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS),
     });
-
-    return res.json({ ok: true, message: "Login code verified successfully" });
   } catch (err) {
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
     return res.status(status).json({ ok: false, message: err.message });
@@ -253,6 +257,11 @@ async function registerVerifyOtp(req, res) {
 // ✅ UPDATED: registerComplete with AUTO-GENERATED USERNAME & PROPER TRANSACTION HANDLING
 async function registerComplete(req, res) {
   try {
+    // Fail fast: ensure JWT signing will succeed before touching the DB
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ ok: false, message: "Server configuration error" });
+    }
+
     const result = registerSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
 
@@ -346,57 +355,10 @@ async function registerComplete(req, res) {
 }
 
 
-// POST /api/auth/login (Standard + Final OTP Step) - ✅ FIXED
+// POST /api/auth/login (Standard Password Login Only) - ✅ SIMPLIFIED
 async function login(req, res) {
   try {
-    // 1. Check for OTP Login Token (Cookie)
-    const loginToken = req.cookies.login_token;
-    
-    // CASE A: OTP LOGIN (Final Step)
-    if (loginToken) {
-        let payload;
-        try {
-          payload = jwt.verify(loginToken, process.env.JWT_SECRET);
-          if (payload.purpose !== "complete_login") throw new Error();
-        } catch {
-          // If token invalid, fall through to password check or error
-          res.clearCookie("login_token");
-          return res.status(401).json({ ok: false, message: "Session expired. Please verify OTP again." });
-        }
-
-        // Verify OTP wasn't reused
-        const { rows: otpCheck } = await db.query("SELECT used FROM otps WHERE id = $1 FOR UPDATE", [payload.otpId]);
-        if (!otpCheck[0] || otpCheck[0].used) {
-          return res.status(400).json({ ok: false, message: "This code has already been used." });
-        }
-
-        // Get User
-        const user = await findUserByIdentifier(payload.email);
-        if (!user) return res.status(400).json({ ok: false, message: "User not found" });
-
-        // ✅ FIX: REMOVED the "password_hash" check here.
-        // Since they verified via OTP, we trust them and log them in immediately.
-
-        // Complete Login
-        await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [payload.otpId]);
-        res.clearCookie("login_token"); // Clear temp cookie
-
-        // Issue real session
-        const rememberMe = !!req.body.rememberMe;
-        const token = createToken({ userId: user.id.toString() }, rememberMe);
-        sendAuthCookie(res, token, rememberMe);
-
-        return res.json({
-          ok: true,
-          message: "Login successful",
-          user: { id: user.id, realName: user.real_name, username: user.username, email: user.email },
-          sessionExpiresAt: Date.now() + (rememberMe ? LONG_MS : SHORT_MS)
-        });
-    }
-
-    // CASE B: PASSWORD LOGIN (Standard)
-    // If no OTP cookie, we expect password in body
-    const { identifier, password } = req.body;
+    const { identifier, password, rememberMe } = req.body;
     if (!identifier || !password) {
       return res.status(400).json({ ok: false, message: "Missing credentials" });
     }
@@ -404,7 +366,6 @@ async function login(req, res) {
     const user = await findUserByIdentifier(identifier);
     if (!user) return res.status(400).json({ ok: false, message: "Invalid credentials" });
 
-    // Block if user has no password (e.g. Google user trying to force password login)
     if (!user.password_hash) {
       return res.status(400).json({ ok: false, message: "This account uses Google/OTP login." });
     }
@@ -412,17 +373,16 @@ async function login(req, res) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ ok: false, message: "Invalid credentials" });
 
-    const rememberMe = !!req.body.rememberMe;
-    const token = createToken({ userId: user.id.toString() }, rememberMe);
-    sendAuthCookie(res, token, rememberMe);
+    const remember = !!rememberMe;
+    const token = createToken({ userId: user.id.toString() }, remember);
+    sendAuthCookie(res, token, remember);
 
     return res.json({
       ok: true,
       message: "Login successful",
       user: { id: user.id, realName: user.real_name, username: user.username, email: user.email },
-      sessionExpiresAt: Date.now() + (rememberMe ? LONG_MS : SHORT_MS)
+      sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS),
     });
-
   } catch (err) {
     console.error("login error:", err);
     return res.status(500).json({ ok: false, message: "Server error" });
@@ -714,8 +674,11 @@ async function me(req, res) {
     const refreshThreshold = 5 * 24 * 60 * 60; // 5 days in seconds
 
     if (tokenAgeSeconds > refreshThreshold) {
-       const originalDuration = payload.exp - payload.iat;
-       const isRemembered = originalDuration > (86400 + 1000);
+  const originalDuration = payload.exp - payload.iat;
+    // SHORT_AGE = 15 days = 1,296,000 seconds. LONG_AGE = 90 days.
+    // We use 20 days as the midpoint threshold — anything longer is "remembered".
+    const TWENTY_DAYS_SECONDS = 20 * 24 * 60 * 60;
+    const isRemembered = originalDuration > TWENTY_DAYS_SECONDS;
 
        const newToken = createToken({ userId: user.id.toString() }, isRemembered);
        sendAuthCookie(res, newToken, isRemembered);

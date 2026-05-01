@@ -3,6 +3,13 @@ const db = require("../config/db");
 const ExcelJS = require("exceljs");
 const { calculateSettlements } = require("./expenseController");
 
+// Prevent CSV/Excel formula injection by prefixing dangerous leading chars
+function sanitizeCell(value) {
+  if (typeof value !== "string") return value;
+  if (/^[=+\-@\t]/.test(value)) return "\t" + value;
+  return value;
+}
+
 async function exportChapter(req, res) {
   try {
     const { id } = req.params; // Chapter ID
@@ -141,11 +148,11 @@ async function exportChapter(req, res) {
       const net = m.balance;
       const status = net > 0 ? "Gets back" : (net < 0 ? "Owes" : "Settled");
       const row = sheet1.addRow([
-        m.name, 
-        m.paid, 
-        m.consumed, 
-        net, 
-        status
+        sanitizeCell(m.name),
+        m.paid,
+        m.consumed,
+        net,
+        status,
       ]);
       
       // Color coding logic
@@ -188,11 +195,11 @@ async function exportChapter(req, res) {
     expenses.forEach((ex, index) => {
       const splitNames = (splitsMap[ex.id] || []).join(", ");
       sheet1.addRow([
-        index + 1,           // S.No.
-        ex.description,      // Description
-        ex.payer_name,       // Paid By
-        parseFloat(ex.amount), // Amount
-        splitNames           // Divided Among
+        index + 1,
+        sanitizeCell(ex.description),
+        sanitizeCell(ex.payer_name),
+        parseFloat(ex.amount),
+        sanitizeCell(splitNames),
       ]);
     });
 

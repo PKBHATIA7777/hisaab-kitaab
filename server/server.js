@@ -121,9 +121,10 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,     // Disable `X-RateLimit-*` headers
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please try again later." },
-  // ✅ Use session ID if available for more accurate limiting per user
+  // ✅ Use authenticated user ID for per-user rate limiting on protected routes.
+  // Fall back to IP for auth/unauthenticated endpoints.
   keyGenerator: (req) => {
-    return req.session?.id || ipKeyGenerator(req);
+    return req.user?.userId || ipKeyGenerator(req);
   }
 });
 app.use((req, res, next) => {
@@ -139,8 +140,10 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many login attempts. Try again in 15 mins." },
+  // ✅ Use authenticated user ID for per-user rate limiting on protected routes.
+  // Fall back to IP for auth/unauthenticated endpoints.
   keyGenerator: (req) => {
-    return req.session?.id || ipKeyGenerator(req);
+    return req.user?.userId || ipKeyGenerator(req);
   }
 });
 app.use("/api/auth/login", authLimiter);
@@ -158,9 +161,10 @@ const writeLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "You're adding expenses too fast, please wait a moment." },
-  // ✅ Use session ID for per-user limiting instead of just IP (prevents shared WiFi issues)
+  // ✅ Use authenticated user ID for per-user rate limiting on protected routes.
+  // Fall back to IP for auth/unauthenticated endpoints.
   keyGenerator: (req) => {
-    return req.session?.id || ipKeyGenerator(req);
+    return req.user?.userId || ipKeyGenerator(req);
   },
   // ✅ Skip limiting successful OPTIONS preflight requests
   skipSuccessfulRequests: false,
@@ -191,7 +195,11 @@ const readHeavyLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please wait a moment." },
-  keyGenerator: (req) => req.session?.id || ipKeyGenerator(req)
+  // ✅ Use authenticated user ID for per-user rate limiting on protected routes.
+  // Fall back to IP for auth/unauthenticated endpoints.
+  keyGenerator: (req) => {
+    return req.user?.userId || ipKeyGenerator(req);
+  }
 });
 
 app.use("/api/expenses/chapter/:chapterId/settlements", readHeavyLimiter);

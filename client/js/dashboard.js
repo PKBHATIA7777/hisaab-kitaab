@@ -778,9 +778,12 @@ window.openProfileModal = function() {
   }
 
   // ✅ NEW: Load Friends List
+
+  // Ensure we start in list mode (not stuck in edit mode)
+// Load Friends List
   loadFriends();
   // Ensure we start in list mode (not stuck in edit mode)
-  cancelFriendEdit(); 
+  window.cancelFriendEdit();
 
   modal.classList.add("active");
 };

@@ -957,11 +957,12 @@ function closeModal(modalId) {
 }
 
 // Reload chapter details (used after adding member)
+
 async function loadChapterDetails() {
   try {
     const data = await apiFetch(`/chapters/${chapterId}`);
     currentMembers = data.members;
-    renderMembers();
+    await renderMembers(); // await so deletability check completes before paint
   } catch (err) {
     console.error("Failed to reload chapter", err);
   }
