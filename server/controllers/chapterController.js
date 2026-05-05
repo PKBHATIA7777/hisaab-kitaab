@@ -82,11 +82,14 @@ async function createChapter(req, res) {
       );
       const chapter = chapterRows[0];
 
-      // 5. Insert Creator
-      await client.query(
-        `INSERT INTO chapter_members (chapter_id, member_name, user_id) VALUES ($1, $2, $3)`,
-        [chapter.id, creatorName, userId]
-      );
+      // ✅ PATCH B APPLIED: Insert Creator (skip if explicitly excluded — Feature 2)
+      const creatorExcluded = req.body.creatorExcluded === true || req.body.creatorExcluded === 'true';
+      if (!creatorExcluded) {
+        await client.query(
+          `INSERT INTO chapter_members (chapter_id, member_name, user_id) VALUES ($1, $2, $3)`,
+          [chapter.id, creatorName, userId]
+        );
+      }
 
       // 6. Insert Deduplicated Members (With friend_id if available)
       // CHANGE 2: Loop naturally runs zero times if cleanMembers is empty - no guard needed
@@ -219,8 +222,9 @@ async function getMemberDeletability(req, res) {
 async function getMyChapters(req, res) {
   try {
     const showArchived = req.query.archived === "true";
+    // ✅ PATCH C APPLIED: Added c.is_personal to SELECT clause
     const { rows } = await db.query(
-      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, COUNT(cm.id) as member_count
+      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, c.is_personal, COUNT(cm.id) as member_count
        FROM chapters c LEFT JOIN chapter_members cm ON c.id = cm.chapter_id
        WHERE c.created_by = $1
          AND ($2 OR c.is_archived = FALSE)

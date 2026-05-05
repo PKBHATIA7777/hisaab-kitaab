@@ -1,9 +1,12 @@
 /* server/controllers/exportController.js */
+/* MODIFIED: Settlement Plan now shows PENDING and COMPLETED separately (Feature 1) */
+/* All other logic is identical to original */
+
 const db = require("../config/db");
 const ExcelJS = require("exceljs");
 const { calculateSettlements } = require("./expenseController");
+const { getNetSettlements } = require("./settlementRecordController");
 
-// Prevent CSV/Excel formula injection by prefixing dangerous leading chars
 function sanitizeCell(value) {
   if (typeof value !== "string") return value;
   if (/^[=+\-@\t]/.test(value)) return "\t" + value;
@@ -12,16 +15,14 @@ function sanitizeCell(value) {
 
 async function exportChapter(req, res) {
   try {
-    const { id } = req.params; // Chapter ID
-    const { eventId } = req.query; // ✅ Get eventId from URL
+    const { id } = req.params;
+    const { eventId } = req.query;
     const userId = req.user.userId;
 
-    // 1. Verify Access & Fetch Chapter Details
     const { rows: chapterRows } = await db.query(
       "SELECT * FROM chapters WHERE id = $1 AND created_by = $2",
       [id, userId]
     );
-
     if (chapterRows.length === 0) {
       return res.status(403).json({ ok: false, message: "Unauthorized or Chapter not found" });
     }
@@ -30,35 +31,33 @@ async function exportChapter(req, res) {
     let reportTitle = chapter.name;
     let filenamePrefix = chapter.name;
 
-    // If Event ID exists, fetch event name to append to filename and title
     if (eventId) {
-      const { rows: ev } = await db.query("SELECT name FROM events WHERE id = $1 AND chapter_id = $2", [eventId, id]);
+      const { rows: ev } = await db.query(
+        "SELECT name FROM events WHERE id = $1 AND chapter_id = $2",
+        [eventId, id]
+      );
       if (ev.length > 0) {
         reportTitle += ` - ${ev[0].name}`;
         filenamePrefix += `_${ev[0].name}`;
       }
     }
 
-    // 2. Fetch Summary Data (Spent vs Used) - Filtered by eventId if provided
+    // Summary data
     const summaryQuery = `
       WITH spent_cte AS (
         SELECT payer_member_id, SUM(amount) as total
-        FROM expenses 
-        WHERE chapter_id = $1 
-        ${eventId ? "AND event_id = $2" : ""}
+        FROM expenses
+        WHERE chapter_id = $1 ${eventId ? "AND event_id = $2" : ""}
         GROUP BY payer_member_id
       ),
       used_cte AS (
         SELECT es.member_id, SUM(es.amount_owed) as total
         FROM expense_splits es
         JOIN expenses e ON es.expense_id = e.id
-        WHERE e.chapter_id = $1
-        ${eventId ? "AND e.event_id = $2" : ""}
+        WHERE e.chapter_id = $1 ${eventId ? "AND e.event_id = $2" : ""}
         GROUP BY es.member_id
       )
-      SELECT 
-        cm.id, 
-        cm.member_name, 
+      SELECT cm.id, cm.member_name,
         COALESCE(s.total, 0) as total_spent,
         COALESCE(u.total, 0) as total_used
       FROM chapter_members cm
@@ -67,11 +66,9 @@ async function exportChapter(req, res) {
       WHERE cm.chapter_id = $1
       ORDER BY total_spent DESC
     `;
-
     const summaryParams = eventId ? [id, eventId] : [id];
     const { rows: summaryRows } = await db.query(summaryQuery, summaryParams);
 
-    // 3. Prepare Balances for Settlement Calculation
     const memberBalances = summaryRows.map(row => ({
       id: row.id,
       name: row.member_name,
@@ -80,29 +77,50 @@ async function exportChapter(req, res) {
       consumed: parseFloat(row.total_used)
     }));
 
-    const settlements = calculateSettlements(memberBalances);
+    const rawSettlements = calculateSettlements(memberBalances);
+
+    // ✅ NEW Feature 1: Get pending settlements (minus already settled)
+    const pendingSettlements = await getNetSettlements(rawSettlements, id, eventId || null);
+
+    // ✅ NEW Feature 1: Get completed settlements
+    let settledQuery = `
+      SELECT
+        sr.amount, sr.note, sr.marked_at,
+        fm.member_name AS from_name,
+        tm.member_name AS to_name
+      FROM settlement_records sr
+      JOIN chapter_members fm ON sr.from_member_id = fm.id
+      JOIN chapter_members tm ON sr.to_member_id = tm.id
+      WHERE sr.chapter_id = $1 AND sr.status = 'settled'
+    `;
+    const settledParams = [id];
+    if (eventId) {
+      settledQuery += ` AND sr.event_id = $2`;
+      settledParams.push(eventId);
+    }
+    settledQuery += ` ORDER BY sr.marked_at DESC`;
+    const { rows: completedSettlements } = await db.query(settledQuery, settledParams);
+
     const totalChapterSpend = memberBalances.reduce((sum, m) => sum + m.paid, 0);
 
-    // 4. Fetch Detailed Expenses - Filtered by eventId if provided
+    // Expenses
     const expenseQuery = `
       SELECT e.id, e.description, e.amount, e.expense_date, cm.member_name as payer_name
       FROM expenses e
       JOIN chapter_members cm ON e.payer_member_id = cm.id
-      WHERE e.chapter_id = $1
-      ${eventId ? "AND e.event_id = $2" : ""}
+      WHERE e.chapter_id = $1 ${eventId ? "AND e.event_id = $2" : ""}
       ORDER BY e.expense_date DESC
     `;
     const expenseParams = eventId ? [id, eventId] : [id];
     const { rows: expenses } = await db.query(expenseQuery, expenseParams);
 
-    // 5. Fetch Splits - Filtered by eventId if provided
+    // Splits
     const splitsQuery = `
-      SELECT es.expense_id, cm.member_name 
+      SELECT es.expense_id, cm.member_name
       FROM expense_splits es
       JOIN expenses e ON es.expense_id = e.id
       JOIN chapter_members cm ON es.member_id = cm.id
-      WHERE e.chapter_id = $1
-      ${eventId ? "AND e.event_id = $2" : ""}
+      WHERE e.chapter_id = $1 ${eventId ? "AND e.event_id = $2" : ""}
     `;
     const splitsParams = eventId ? [id, eventId] : [id];
     const { rows: allSplits } = await db.query(splitsQuery, splitsParams);
@@ -113,33 +131,24 @@ async function exportChapter(req, res) {
       splitsMap[s.expense_id].push(s.member_name);
     });
 
-    // ==========================================
-    // 6. GENERATE EXCEL
-    // ==========================================
+    // ── BUILD EXCEL ─────────────────────────────────────────
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Hisaab-Kitaab';
     workbook.created = new Date();
 
-    // --- SHEET 1: SUMMARY ---
     const sheet1 = workbook.addWorksheet('Summary');
-
-    // Define column widths
     sheet1.columns = [{ width: 10 }, { width: 30 }, { width: 20 }, { width: 15 }, { width: 40 }];
 
-    // ✅ MODIFICATION 1: Updated Header Format with Report Title
-    sheet1.addRow([reportTitle]); // Uses dynamic title (with event if provided)
+    sheet1.addRow([reportTitle]);
     sheet1.addRow([`Chapter Description - ${chapter.description || "N/A"}`]);
     sheet1.addRow([`Total Budget: ₹${totalChapterSpend.toFixed(2)}`]);
     sheet1.addRow([`Export Date: ${new Date().toLocaleDateString()}`]);
-    sheet1.addRow([]); // Spacer
+    sheet1.addRow([]);
 
-    // Style the Title (Keep existing color)
     sheet1.getRow(1).font = { bold: true, size: 14, color: { argb: 'FFD000FF' } };
 
-    // --- Table 1: Member Balances ---
+    // Member balances table
     sheet1.addRow(['MEMBER', 'PAID', 'CONSUMED', 'NET BALANCE', 'STATUS']);
-    
-    // Style Header Row
     const balanceHeaderRow = sheet1.lastRow;
     balanceHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     balanceHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
@@ -147,51 +156,62 @@ async function exportChapter(req, res) {
     memberBalances.forEach(m => {
       const net = m.balance;
       const status = net > 0 ? "Gets back" : (net < 0 ? "Owes" : "Settled");
-      const row = sheet1.addRow([
-        sanitizeCell(m.name),
-        m.paid,
-        m.consumed,
-        net,
-        status,
-      ]);
-      
-      // Color coding logic
-      if(net > 0) row.getCell(4).font = { color: { argb: 'FF00B050' } }; // Green
-      if(net < 0) row.getCell(4).font = { color: { argb: 'FFFF0000' } }; // Red
+      const row = sheet1.addRow([sanitizeCell(m.name), m.paid, m.consumed, net, status]);
+      if (net > 0) row.getCell(4).font = { color: { argb: 'FF00B050' } };
+      if (net < 0) row.getCell(4).font = { color: { argb: 'FFFF0000' } };
     });
 
-    sheet1.addRow([]); // Spacer
+    sheet1.addRow([]);
 
-    // --- Table 2: Settlement Plan ---
-    sheet1.addRow(['SETTLEMENT PLAN']).font = { bold: true, size: 12 };
-    
-    if (settlements.length === 0) {
-        sheet1.addRow(['All settled up! No debts.']);
+    // ✅ NEW Feature 1: PENDING settlements section
+    sheet1.addRow(['PENDING SETTLEMENTS']).font = { bold: true, size: 12, color: { argb: 'FFFF6B00' } };
+
+    if (pendingSettlements.length === 0) {
+      sheet1.addRow(['All pending settlements cleared ✓']).font = { color: { argb: 'FF00B050' } };
     } else {
-        sheet1.addRow(['FROM (Debtor)', 'TO (Creditor)', 'AMOUNT']);
-        sheet1.lastRow.font = { bold: true };
-        sheet1.lastRow.border = { bottom: { style: 'thin' } };
+      const pendingHeader = sheet1.addRow(['FROM (Debtor)', 'TO (Creditor)', 'AMOUNT']);
+      pendingHeader.font = { bold: true };
+      pendingHeader.border = { bottom: { style: 'thin' } };
 
-        settlements.forEach(s => {
-            sheet1.addRow([s.from, s.to, parseFloat(s.amount)]);
-        });
+      pendingSettlements.forEach(s => {
+        sheet1.addRow([s.from, s.to, parseFloat(s.amount)]);
+      });
     }
 
-    sheet1.addRow([]); // Spacer
-    sheet1.addRow([]); // Extra Spacer before expenses
+    sheet1.addRow([]);
 
-    // ✅ MODIFICATION 2: Add Expense Table to Sheet 1
+    // ✅ NEW Feature 1: COMPLETED settlements section
+    sheet1.addRow(['COMPLETED SETTLEMENTS']).font = { bold: true, size: 12, color: { argb: 'FF00B050' } };
+
+    if (completedSettlements.length === 0) {
+      sheet1.addRow(['No settlements marked as completed yet.']);
+    } else {
+      const doneHeader = sheet1.addRow(['FROM', 'TO', 'AMOUNT', 'DATE', 'NOTE']);
+      doneHeader.font = { bold: true };
+      doneHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+
+      completedSettlements.forEach(s => {
+        sheet1.addRow([
+          sanitizeCell(s.from_name),
+          sanitizeCell(s.to_name),
+          parseFloat(s.amount),
+          new Date(s.marked_at).toLocaleDateString(),
+          sanitizeCell(s.note || '—')
+        ]);
+      });
+    }
+
+    sheet1.addRow([]);
+    sheet1.addRow([]);
+
+    // All Expenses table
     sheet1.addRow(['ALL EXPENSES RECORD']).font = { bold: true, size: 12, color: { argb: 'FFD000FF' } };
-    
-    // Headers: S.No., Description, Paid By, Amount, Split Between
     sheet1.addRow(['S.No.', 'Description', 'Paid By', 'Amount', 'Split Between']);
-    
-    // Style the Expense Header
+
     const expenseHeaderRow = sheet1.lastRow;
     expenseHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    expenseHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF800080' } }; // Purple background
+    expenseHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF800080' } };
 
-    // Add Data Rows
     expenses.forEach((ex, index) => {
       const splitNames = (splitsMap[ex.id] || []).join(", ");
       sheet1.addRow([
@@ -203,18 +223,10 @@ async function exportChapter(req, res) {
       ]);
     });
 
-    // 7. Stream Response
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    
-    // Sanitize filename
+    // Response headers
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     const safeName = filenamePrefix.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=${safeName}_report.xlsx`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename=${safeName}_report.xlsx`);
 
     await workbook.xlsx.write(res);
     res.end();

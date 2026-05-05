@@ -450,6 +450,8 @@ function renderGrid(chapters) {
     const card = document.createElement("div");
     card.className = "chapter-card card-content";
     card.style.position = "relative";
+    // ✅ PATCH A APPLIED: Store chapter ID as data attribute
+    card.dataset.chapterId = chapter.id;
 
     const initials = getInitials(chapter.name);
     const color = getAvatarColor(chapter.name);

@@ -1,38 +1,72 @@
 /* server/routes/chapterRoutes.js */
+/* MODIFIED: Added personal chapter routes (Feature 3) and settlement record routes (Feature 1) */
+/* All existing routes are 100% unchanged */
+
 const express = require("express");
 const router = express.Router();
 const chapterController = require("../controllers/chapterController");
-const exportController = require("../controllers/exportController"); 
-// ✅ Import Event Controller
+const exportController = require("../controllers/exportController");
 const eventController = require("../controllers/eventController");
 
-const { requireAuth } = require("../middleware/authMiddleware"); 
-const cache = require("../middleware/cacheMiddleware");
+// ✅ NEW imports for Features 1 and 3
+const {
+  markSettlement,
+  getSettlementHistory,
+  undoSettlement,
+} = require("../controllers/settlementRecordController");
 
-router.use(requireAuth); 
+const {
+  createPersonalChapter,
+  getPersonalChapterStatus,
+  addToPersonalFromChapter,
+  getSyncStatus,
+  updateSyncedExpense,
+} = require("../controllers/personalChapterController");
 
-// --- CHAPTERS ---
+const { requireAuth } = require("../middleware/authMiddleware");
+
+router.use(requireAuth);
+
+// ── FEATURE 3: Personal chapter routes ───────────────────────
+// These must come BEFORE /:id routes to avoid param conflicts
+
+// Check if user has a personal chapter
+router.get("/personal/status", getPersonalChapterStatus);
+
+// Create personal chapter (for existing users)
+router.post("/create-personal", createPersonalChapter);
+
+// Add consumed amount from a source chapter to My Expenses
+router.post("/personal/add-from-chapter", addToPersonalFromChapter);
+
+// ── EXISTING ROUTES (unchanged) ──────────────────────────────
 router.post("/", chapterController.createChapter);
-
-// Cache the chapter list for 5 minutes
 router.get("/", chapterController.getMyChapters);
 
-// --- EVENTS (New) ---
-// Place these BEFORE the generic /:id routes to ensure matching
+// ── FEATURE 1: Settlement record routes ──────────────────────
+// Place before /:id/export to avoid conflicts
+router.post("/:chapterId/settlements/mark", markSettlement);
+router.get("/:chapterId/settlements/history", getSettlementHistory);
+router.delete("/:chapterId/settlements/history/:recordId", undoSettlement);
+
+// ── EVENTS (existing) ─────────────────────────────────────────
 router.post("/:chapterId/events", eventController.createEvent);
 router.get("/:chapterId/events", eventController.getChapterEvents);
 
-// --- SPECIFIC CHAPTER ---
+// ── FEATURE 3: Sync status routes ────────────────────────────
+// Check if user's synced expense is stale
+router.get("/:chapterId/sync-status", getSyncStatus);
+// Update or dismiss the stale warning
+router.patch("/:chapterId/sync-update", updateSyncedExpense);
+
+// ── EXISTING SPECIFIC CHAPTER ROUTES (unchanged) ─────────────
 router.get("/:id/export", exportController.exportChapter);
 router.get("/:id", chapterController.getChapterDetails);
 router.put("/:id", chapterController.updateChapter);
-
-// ✅ Added PATCH route for Archive/Unarchive
 router.patch("/:id/archive", chapterController.toggleArchiveChapter);
-
 router.delete("/:id", chapterController.deleteChapter);
 
-// --- MEMBERS ---
+// ── EXISTING MEMBER ROUTES (unchanged) ───────────────────────
 router.post("/:id/members", chapterController.addMember);
 router.delete("/:id/members/:memberId", chapterController.deleteMember);
 router.get("/:id/members/deletability", chapterController.getMemberDeletability);
