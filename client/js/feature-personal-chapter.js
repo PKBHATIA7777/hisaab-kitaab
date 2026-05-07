@@ -1,14 +1,29 @@
 /* client/js/feature-personal-chapter.js */
 /* Feature 3: "My Expenses" personal chapter + cross-chapter sync */
-/* Include in dashboard.html AFTER dashboard.js */
-/* Include in chapter.html AFTER chapter.js */
-/* <script src="js/feature-personal-chapter.js"></script> */
+/* FIX v2:
+   - window.chapterId vs chapterId scope fixed (chapter.js defines it as const, not on window)
+   - markPersonalChaptersOnGrid now uses correct data-chapter-id attribute timing
+   - reloadChaptersGrid called correctly after personal chapter creation
+   - Sync status uses correct chapterId reference
+*/
 
 // ─────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────
-let personalChapterData = null; // { id, name } or null
-let syncStatusCache = {};       // { [chapterId]: { isDirty, currentConsumed, syncedConsumed, ... } }
+let personalChapterData = null;
+let syncStatusCache = {};
+
+// ─────────────────────────────────────────────────────────────
+// Helper: get chapterId safely from chapter page
+// chapter.js declares: const chapterId = urlParams.get("id");
+// It is NOT on window, so we read from URL params instead
+// ─────────────────────────────────────────────────────────────
+function getCurrentChapterId() {
+  // Try window.chapterId first (if someone set it), then URL param
+  if (window.chapterId) return window.chapterId;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('id');
+}
 
 // ─────────────────────────────────────────────────────────────
 // DASHBOARD: Check for personal chapter + show banner
@@ -29,8 +44,6 @@ async function checkAndRenderPersonalChapterBanner() {
 function renderPersonalChapterBanner() {
   const grid = document.getElementById('chapters-grid');
   if (!grid) return;
-
-  // Don't show if already present
   if (document.getElementById('personal-chapter-banner')) return;
 
   const banner = document.createElement('div');
@@ -53,24 +66,24 @@ window.createPersonalChapterNow = async function() {
     personalChapterData = data.chapter;
     showToast('My Expenses chapter created!', 'success');
     document.getElementById('personal-chapter-banner')?.remove();
-    // Reload grid to show the new chapter
     if (typeof reloadChaptersGrid === 'function') reloadChaptersGrid();
   } catch (err) {
     showToast(err.message || 'Failed to create', 'error');
-  } finally {
     if (btn) setBtnLoading(btn, false);
   }
 };
 
 // ─────────────────────────────────────────────────────────────
-// DASHBOARD: Mark personal chapters with a special badge
+// DASHBOARD: Mark personal chapters with badge
+// Called after renderGrid — cards have data-chapter-id set
 // ─────────────────────────────────────────────────────────────
 function markPersonalChaptersOnGrid() {
   if (!window.allChapters) return;
 
   window.allChapters.forEach(ch => {
     if (!ch.is_personal) return;
-    const card = document.querySelector(`[data-chapter-id="${ch.id}"]`);
+    // Find by data-chapter-id attribute (set by dashboard.js renderGrid patch)
+    const card = document.querySelector(`.chapter-card[data-chapter-id="${ch.id}"]`);
     if (!card) return;
     if (card.querySelector('.personal-chapter-badge')) return;
 
@@ -79,7 +92,7 @@ function markPersonalChaptersOnGrid() {
     badge.textContent = 'My Expenses';
     card.appendChild(badge);
 
-    // Also hide the delete menu item for personal chapters
+    // Hide delete option for personal chapters
     const deleteBtn = card.querySelector('.menu-item.delete');
     if (deleteBtn) deleteBtn.style.display = 'none';
   });
@@ -89,11 +102,12 @@ function markPersonalChaptersOnGrid() {
 // CHAPTER PAGE: Sync status check
 // ─────────────────────────────────────────────────────────────
 async function checkSyncStatus() {
-  if (!window.chapterId || !window.currentUser) return;
+  const cid = getCurrentChapterId();
+  if (!cid || !window.currentUser) return null;
 
   try {
-    const data = await apiFetch(`/chapters/${window.chapterId}/sync-status`);
-    syncStatusCache[window.chapterId] = data;
+    const data = await apiFetch(`/chapters/${cid}/sync-status`);
+    syncStatusCache[cid] = data;
     return data;
   } catch (err) {
     console.warn('Sync status check failed:', err.message);
@@ -102,15 +116,15 @@ async function checkSyncStatus() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// CHAPTER PAGE: Inject "Add to My Expenses" in summary modal
+// CHAPTER PAGE: "Add to My Expenses" button in summary modal
 // ─────────────────────────────────────────────────────────────
 function injectAddToPersonalButton(memberId, memberUserId, memberName, consumedAmount) {
-  // Only show for the current user's own row
   if (!window.currentUser) return '';
   if (parseInt(memberUserId) !== parseInt(window.currentUser.id)) return '';
   if (!consumedAmount || parseFloat(consumedAmount) <= 0) return '';
 
-  const syncData = syncStatusCache[window.chapterId];
+  const cid = getCurrentChapterId();
+  const syncData = syncStatusCache[cid];
   const hasSynced = syncData?.hasSynced;
   const isDirty = syncData?.isDirty;
 
@@ -125,19 +139,20 @@ function injectAddToPersonalButton(memberId, memberUserId, memberName, consumedA
 
   return `
     <button class="btn-add-to-personal"
-      onclick="addToMyExpenses(${memberId}, ${memberUserId}, '${memberName.replace(/'/g,"\\'")}', ${consumedAmount})">
+      onclick="addToMyExpenses(${memberId}, ${memberUserId}, '${memberName.replace(/'/g, "\\'")}', ${consumedAmount})">
       📥 Add to My Expenses
     </button>
   `;
 }
 
 // ─────────────────────────────────────────────────────────────
-// CHAPTER PAGE: Add to My Expenses flow
+// Add to My Expenses flow
 // ─────────────────────────────────────────────────────────────
 window.addToMyExpenses = async function(memberId, memberUserId, memberName, consumedAmount) {
-  // Step 1: Check for pending receivables
+  const cid = getCurrentChapterId();
+
   try {
-    let url = `/expenses/chapter/${window.chapterId}/settlements`;
+    let url = `/expenses/chapter/${cid}/settlements`;
     if (window.currentEventId) url += `?eventId=${window.currentEventId}`;
 
     const settlementData = await apiFetch(url);
@@ -160,12 +175,10 @@ window.addToMyExpenses = async function(memberId, memberUserId, memberName, cons
     console.warn('Could not check settlements:', err.message);
   }
 
-  // Step 2: Open category picker then proceed
   openCategoryPickerForSync(memberId, consumedAmount);
 };
 
 function openCategoryPickerForSync(memberId, consumedAmount) {
-  // Show a quick modal to pick category (or skip)
   const existing = document.getElementById('sync-category-modal');
   if (existing) existing.remove();
 
@@ -179,7 +192,8 @@ function openCategoryPickerForSync(memberId, consumedAmount) {
         <button class="close-modal" onclick="document.getElementById('sync-category-modal').remove()">×</button>
       </div>
       <p style="color:#666; font-size:0.88rem; margin-bottom:16px;">
-        Adding ₹${parseFloat(consumedAmount).toFixed(2)} from <strong>${window.currentChapter?.name || 'this chapter'}</strong> to My Expenses.
+        Adding <strong>₹${parseFloat(consumedAmount).toFixed(2)}</strong> from
+        <strong>${window.currentChapter?.name || 'this chapter'}</strong> to My Expenses.
       </p>
       <label style="font-size:0.82rem; color:#555; font-weight:600; margin-bottom:8px; display:block;">
         Category <span style="font-weight:400; color:#aaa;">(optional)</span>
@@ -194,8 +208,6 @@ function openCategoryPickerForSync(memberId, consumedAmount) {
     </div>
   `;
   document.body.appendChild(modal);
-
-  // Load and render categories in the picker
   loadCategoriesForSyncPicker();
 }
 
@@ -205,10 +217,16 @@ async function loadCategoriesForSyncPicker() {
     const container = document.getElementById('sync-category-pills');
     if (!container) return;
 
+    if (!data.categories || data.categories.length === 0) {
+      container.innerHTML = '<span style="color:#aaa; font-size:0.82rem;">No categories found</span>';
+      return;
+    }
+
     container.innerHTML = data.categories.map(cat => `
-      <button class="category-pill" style="background:${cat.color}20; border-color:${cat.color}50; color:${cat.color};"
-        data-cat-id="${cat.id}"
-        onclick="selectSyncCategory(this, ${cat.id})">
+      <button class="category-pill"
+        style="background:${cat.color}20; border-color:${cat.color}50; color:${cat.color};"
+        data-cat-id="${cat.id}" data-cat-color="${cat.color}"
+        onclick="selectSyncCategory(this, ${cat.id}, '${cat.color}')">
         ${cat.icon} ${cat.name}
       </button>
     `).join('');
@@ -218,10 +236,15 @@ async function loadCategoriesForSyncPicker() {
   }
 }
 
-window.selectSyncCategory = function(btn, categoryId) {
-  document.querySelectorAll('#sync-category-pills .category-pill').forEach(b => b.classList.remove('selected'));
+window.selectSyncCategory = function(btn, categoryId, color) {
+  document.querySelectorAll('#sync-category-pills .category-pill').forEach(b => {
+    const c = b.dataset.catColor || '#888';
+    b.classList.remove('selected');
+    b.style.background = `${c}20`;
+    b.style.color = c;
+  });
   btn.classList.add('selected');
-  btn.style.background = btn.style.borderColor.replace('50)', '');
+  btn.style.background = color;
   btn.style.color = '#fff';
   document.getElementById('sync-selected-category').value = categoryId;
 };
@@ -231,11 +254,13 @@ window.confirmAddToPersonal = async function(memberId, consumedAmount) {
   const btn = document.querySelector('#sync-category-modal .btn-primary');
   if (btn) setBtnLoading(btn, true);
 
+  const cid = getCurrentChapterId();
+
   try {
     await apiFetch('/chapters/personal/add-from-chapter', {
       method: 'POST',
       body: {
-        sourceChapterId: window.chapterId,
+        sourceChapterId: cid,
         sourceMemberId: memberId,
         amount: parseFloat(consumedAmount),
         categoryId: categoryId ? parseInt(categoryId) : null,
@@ -245,10 +270,8 @@ window.confirmAddToPersonal = async function(memberId, consumedAmount) {
     showToast('Added to My Expenses ✓', 'success');
     document.getElementById('sync-category-modal')?.remove();
 
-    // Refresh sync status
     await checkSyncStatus();
 
-    // Refresh summary modal if open
     const summaryModal = document.getElementById('summary-modal');
     if (summaryModal?.classList.contains('active')) {
       window.openSummaryModal?.();
@@ -260,11 +283,12 @@ window.confirmAddToPersonal = async function(memberId, consumedAmount) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// CHAPTER PAGE: Sync update modal (when isDirty)
+// Sync update modal (when isDirty)
 // ─────────────────────────────────────────────────────────────
 window.openSyncUpdateModal = function(e) {
   if (e) e.stopPropagation();
-  const syncData = syncStatusCache[window.chapterId];
+  const cid = getCurrentChapterId();
+  const syncData = syncStatusCache[cid];
   if (!syncData) return;
 
   const existing = document.getElementById('sync-update-modal');
@@ -285,11 +309,11 @@ window.openSyncUpdateModal = function(e) {
       <div style="background:#f5f5f7; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
         <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:4px;">
           <span style="color:#888;">Previously synced:</span>
-          <span style="font-weight:600;">₹${parseFloat(syncData.syncedConsumed).toFixed(2)}</span>
+          <span style="font-weight:600;">₹${parseFloat(syncData.syncedConsumed || 0).toFixed(2)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
           <span style="color:#888;">Current consumption:</span>
-          <span style="font-weight:700; color:#d000ff;">₹${parseFloat(syncData.currentConsumed).toFixed(2)}</span>
+          <span style="font-weight:700; color:#d000ff;">₹${parseFloat(syncData.currentConsumed || 0).toFixed(2)}</span>
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px;">
@@ -304,18 +328,17 @@ window.openSyncUpdateModal = function(e) {
 window.applySyncUpdate = async function() {
   const btn = document.querySelector('#sync-update-modal .btn-primary');
   if (btn) setBtnLoading(btn, true);
+  const cid = getCurrentChapterId();
 
   try {
-    await apiFetch(`/chapters/${window.chapterId}/sync-update`, {
+    await apiFetch(`/chapters/${cid}/sync-update`, {
       method: 'PATCH',
       body: { action: 'update' }
     });
 
     showToast('My Expenses updated with latest amount ✓', 'success');
     document.getElementById('sync-update-modal')?.remove();
-
-    // Refresh sync status
-    syncStatusCache[window.chapterId] = await checkSyncStatus();
+    syncStatusCache[cid] = await checkSyncStatus();
     window.openSummaryModal?.();
   } catch (err) {
     showToast(err.message || 'Update failed', 'error');
@@ -324,14 +347,15 @@ window.applySyncUpdate = async function() {
 };
 
 window.dismissSyncWarning = async function() {
+  const cid = getCurrentChapterId();
   try {
-    await apiFetch(`/chapters/${window.chapterId}/sync-update`, {
+    await apiFetch(`/chapters/${cid}/sync-update`, {
       method: 'PATCH',
       body: { action: 'dismiss' }
     });
     document.getElementById('sync-update-modal')?.remove();
     showToast('Warning dismissed', 'info');
-    const d = syncStatusCache[window.chapterId];
+    const d = syncStatusCache[cid];
     if (d) d.isDirty = false;
   } catch (err) {
     showToast('Failed to dismiss', 'error');
@@ -339,7 +363,7 @@ window.dismissSyncWarning = async function() {
 };
 
 // ─────────────────────────────────────────────────────────────
-// OVERRIDE: renderSummary in chapter.js to add "Add to My Expenses" button
+// OVERRIDE renderSummary to add "Add to My Expenses" button
 // ─────────────────────────────────────────────────────────────
 (function() {
   const tryOverride = () => {
@@ -350,15 +374,9 @@ window.dismissSyncWarning = async function() {
 
     const _orig = window.renderSummary;
     window.renderSummary = async function(data) {
-      // Call original render first
       _orig(data);
-
-      // Load sync status if on chapter page
-      if (window.chapterId) {
-        await checkSyncStatus();
-      }
-
-      // After original render, add "Add to My Expenses" button to current user's row
+      const cid = getCurrentChapterId();
+      if (cid) await checkSyncStatus();
       addPersonalButtonsToSummary(data);
     };
   };
@@ -390,11 +408,9 @@ function addPersonalButtonsToSummary(data) {
   );
   if (!btnHtml) return;
 
-  // Find the correct summary row and append button
   const rows = summaryList.querySelectorAll('[style*="margin-bottom"]');
   rows.forEach(rowEl => {
-    const nameText = rowEl.textContent;
-    if (nameText.includes(myRow.member_name)) {
+    if (rowEl.textContent.includes(myRow.member_name)) {
       if (!rowEl.querySelector('.btn-add-to-personal')) {
         rowEl.insertAdjacentHTML('beforeend', btnHtml);
       }
@@ -403,17 +419,15 @@ function addPersonalButtonsToSummary(data) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// INIT: Run on both dashboard and chapter pages
+// INIT
 // ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   // Dashboard page
   if (document.getElementById('chapters-grid')) {
-    // After existing dashboard data loads, check personal chapter
     setTimeout(async () => {
       await checkAndRenderPersonalChapterBanner();
-      // Also add data-chapter-id attributes to cards for badge injection
-      // (cards are rendered by dashboard.js renderGrid)
-      setTimeout(markPersonalChaptersOnGrid, 300);
-    }, 1000);
+      // Wait for grid to render then add badges
+      setTimeout(markPersonalChaptersOnGrid, 600);
+    }, 800);
   }
 });

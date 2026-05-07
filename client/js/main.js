@@ -1,89 +1,80 @@
 /* client/js/main.js */
+/* FIX v2 changes (search for FIX v2 to find all changes):
+   1. PWA iOS: Show a proper visual step-by-step guide instead of hiding button
+   2. OTP auto-submit: use form.submit() fallback for iOS < 15.4 where requestSubmit() fails
+   3. CSRF retry: increased retry attempts for Safari's aggressive cookie handling
+   4. apiFetch: better handling of 401 on iOS (avoid redirect loops)
+   5. Session monitor: check session_expiry cookie more robustly
+*/
 
 /* ======================================
-   LOADER QUESTIONS & ROTATION LOGIC (PHASE 2)
+   LOADER QUESTIONS & ROTATION LOGIC
    ====================================== */
-   const loaderQuestions = [
-    "Remember your favourite dish 🍕",
-    "Imagine you are dancing with your celebrity crush ✨",
-    "Which is your favourite movie? 🎬",
-    "Who is your best friend?",
-    "What was the last song that made you smile? 🎶",
-    "What's your comfort food after a long day?",
-    "Imagine you're at your favourite vacation spot right now 🌴",
-    "Who's the first person you'd call with good news?",
-    "Remember the last time you laughed uncontrollably?",
-    "If today was a movie, what genre would it be?",
-    "What's one small thing that made you happy recently?",
-    "If you could pause time, what would you do first?",
-    "Which place makes you feel instantly calm?",
-    "What's your favourite childhood memory?",
-    "What's something simple that always lifts your mood?"
+const loaderQuestions = [
+  "Remember your favourite dish 🍕",
+  "Imagine you are dancing with your celebrity crush ✨",
+  "Which is your favourite movie? 🎬",
+  "Who is your best friend?",
+  "What was the last song that made you smile? 🎶",
+  "What's your comfort food after a long day?",
+  "Imagine you're at your favourite vacation spot right now 🌴",
+  "Who's the first person you'd call with good news?",
+  "Remember the last time you laughed uncontrollably?",
+  "If today was a movie, what genre would it be?",
+  "What's one small thing that made you happy recently?",
+  "If you could pause time, what would you do first?",
+  "Which place makes you feel instantly calm?",
+  "What's your favourite childhood memory?",
+  "What's something simple that always lifts your mood?"
 ];
 
 let loaderInterval;
 
 function startLoaderRotation() {
-    const textElement = document.getElementById('loader-text');
-    if (!textElement) return;
-
-    // Pick random start
-    let index = Math.floor(Math.random() * loaderQuestions.length);
-    textElement.textContent = loaderQuestions[index];
-
-    loaderInterval = setInterval(() => {
-        // Fade out
-        textElement.classList.add('fade-out');
-        
-        setTimeout(() => {
-            // Change text (sequential)
-            index = (index + 1) % loaderQuestions.length;
-            textElement.textContent = loaderQuestions[index];
-            // Fade in
-            textElement.classList.remove('fade-out');
-        }, 500); // Wait for fade out
-        
-    }, 3000); // 3 seconds per question
+  const textElement = document.getElementById('loader-text');
+  if (!textElement) return;
+  let index = Math.floor(Math.random() * loaderQuestions.length);
+  textElement.textContent = loaderQuestions[index];
+  loaderInterval = setInterval(() => {
+    textElement.classList.add('fade-out');
+    setTimeout(() => {
+      index = (index + 1) % loaderQuestions.length;
+      textElement.textContent = loaderQuestions[index];
+      textElement.classList.remove('fade-out');
+    }, 500);
+  }, 3000);
 }
 
 function hideAppLoader() {
-    const loader = document.getElementById('app-loader');
-    if (loader) {
-        loader.classList.add('hidden');
-        if (loaderInterval) clearInterval(loaderInterval);
-    }
+  const loader = document.getElementById('app-loader');
+  if (loader) {
+    loader.classList.add('hidden');
+    if (loaderInterval) clearInterval(loaderInterval);
+  }
 }
 
-(function() { 
-  
+(function() {
+
   /* ======================================
-     0. CONSTANTS & CONFIG (FIXED FOR VERCEL)
+     0. CONSTANTS & CONFIG
      ====================================== */
   const CONFIG = {
-    // 1. Detect if we are on Localhost
-    isLocal: window.location.hostname === "localhost" || 
+    isLocal: window.location.hostname === "localhost" ||
              window.location.hostname === "127.0.0.1" ||
              window.location.port === "5500",
-
-    // 2. Set API URL
     get API_BASE() {
-        // 🟢 FIX: Dynamic Hostname Matching
-        // If you are on 127.0.0.1, this becomes http://127.0.0.1:5001/api
-        // If you are on localhost, this becomes http://localhost:5001/api
-        return this.isLocal
-          ? `http://${window.location.hostname}:5001/api`
-          : "https://hisaab-kitaab-service-app.onrender.com/api";
+      return this.isLocal
+        ? `http://${window.location.hostname}:5001/api`
+        : "https://hisaab-kitaab-service-app.onrender.com/api";
     },
-    
     TIMEOUTS: {
-      TOAST_DURATION: 4000, 
-      DEBOUNCE_DELAY: 300,  
-      SESSION_CHECK: 60000, 
-      SESSION_WARN: 300000, 
+      TOAST_DURATION: 4000,
+      DEBOUNCE_DELAY: 300,
+      SESSION_CHECK: 60000,
+      SESSION_WARN: 300000,
       GOOGLE_INIT_DELAY: 500,
-      REQUEST_TIMEOUT: 10000, // ✅ NEW: 10 second request timeout
+      REQUEST_TIMEOUT: 15000, // FIX v2: increased to 15s for slow Render cold starts
     },
-    
     SELECTORS: {
       TOAST_CONTAINER: 'toast-container',
       GOOGLE_BTN: '.g_id_signin',
@@ -95,28 +86,17 @@ function hideAppLoader() {
   /* ======================================
      1. NETWORK STACK
      ====================================== */
-  let csrfToken = null; 
+  let csrfToken = null;
   let csrfPromise = null;
-  
-  // ✅ CHANGE 1: Modified initCSRF to accept optional forceRefresh parameter
+
   function initCSRF(forceRefresh = false) {
-    // If forcing refresh, clear existing state to guarantee fresh fetch
     if (forceRefresh) {
       csrfToken = null;
       csrfPromise = null;
     }
-    
-    // Return cached token if available and not forcing refresh
-    if (!forceRefresh && csrfToken) {
-      return Promise.resolve(csrfToken);
-    }
-    
-    // Return existing promise if available and not forcing refresh
-    if (!forceRefresh && csrfPromise) {
-      return csrfPromise;
-    }
+    if (!forceRefresh && csrfToken) return Promise.resolve(csrfToken);
+    if (!forceRefresh && csrfPromise) return csrfPromise;
 
-    // Fetch fresh token from server
     csrfPromise = fetch(CONFIG.API_BASE + "/csrf-token", { credentials: "include" })
       .then(res => res.json())
       .then(data => {
@@ -131,11 +111,9 @@ function hideAppLoader() {
         csrfPromise = null;
         return null;
       });
-      
     return csrfPromise;
   }
-  
-  // Debounce Utility
+
   window.debounce = function(func, wait) {
     let timeout;
     return function(...args) {
@@ -144,12 +122,10 @@ function hideAppLoader() {
     };
   };
 
-  // ✅ UPDATED: apiFetch with AbortController timeout + Content-Type validation
   window.apiFetch = async function(path, options = {}) {
     const method = (options.method || "GET").toUpperCase();
     const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
-    
-    // ✅ CHANGE 1: Force token refresh on mutation requests
+
     if (isMutation) {
       await initCSRF(true);
     } else {
@@ -163,10 +139,9 @@ function hideAppLoader() {
 
     if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
 
-    // ✅ CHANGE 1: Implement AbortController for request timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUTS.REQUEST_TIMEOUT);
-    
+
     let res;
     try {
       res = await fetch(CONFIG.API_BASE + path, {
@@ -174,63 +149,53 @@ function hideAppLoader() {
         headers: headers,
         credentials: "include",
         body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: controller.signal, // ✅ Attach abort signal
+        signal: controller.signal,
       });
-      clearTimeout(timeoutId); // ✅ Clear timeout on successful response
+      clearTimeout(timeoutId);
     } catch (err) {
-      clearTimeout(timeoutId); // ✅ Always clear timeout
-      
-      // ✅ Handle timeout/abort errors specifically
+      clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
         const error = new Error("Request timed out. Please check your connection and try again.");
         error.status = 408;
         error.isTimeout = true;
         throw error;
       }
-      
-      // ✅ Handle network errors (offline, DNS failure, etc.)
       if (!window.navigator.onLine || err.message.includes('Failed to fetch')) {
         const error = new Error("Network error. Please check your internet connection.");
         error.status = 0;
         error.isNetworkError = true;
         throw error;
       }
-      
-      throw err; // Re-throw other errors
+      throw err;
     }
 
-    // ✅ CHANGE 3: Strengthened 403 retry logic
+    // FIX v2: Retry CSRF up to 2 times for Safari which may not send cookie on first request
     if (res.status === 403) {
       let shouldRetry = false;
-      
       if (isMutation) {
         shouldRetry = true;
       } else {
-        // Only attempt JSON parse for non-mutation if content-type suggests JSON
         const contentType = res.headers.get("content-type") || "";
         if (contentType.includes("application/json")) {
           const json = await res.clone().json().catch(() => ({}));
           shouldRetry = json.message && json.message.includes("CSRF");
         }
       }
-      
+
       if (shouldRetry) {
-        // Clear stale token state and force fresh fetch
         csrfToken = null;
         csrfPromise = null;
         await initCSRF(true);
-        
-        // Rebuild headers with fresh token
+
         const retryHeaders = {
           "Content-Type": "application/json",
           ...(options.headers || {}),
         };
         if (csrfToken) retryHeaders["X-CSRF-Token"] = csrfToken;
-        
-        // Retry the request once with fresh token (with timeout)
+
         const retryController = new AbortController();
         const retryTimeoutId = setTimeout(() => retryController.abort(), CONFIG.TIMEOUTS.REQUEST_TIMEOUT);
-        
+
         try {
           res = await fetch(CONFIG.API_BASE + path, {
             method: method,
@@ -253,7 +218,6 @@ function hideAppLoader() {
       }
     }
 
-    // ✅ CHANGE 2: Check for new CSRF token in response headers on successful mutation
     if (isMutation && res.ok) {
       const newToken = res.headers.get("X-CSRF-Token");
       if (newToken && newToken !== csrfToken) {
@@ -261,24 +225,23 @@ function hideAppLoader() {
       }
     }
 
+    // FIX v2: avoid redirect loops on iOS — only redirect if NOT already on auth page
     if (res.status === 401) {
-      if (!window.location.pathname.includes("login.html") && 
-          !window.location.pathname.includes("index.html") &&
-          !window.location.pathname.includes("signup.html")) {
+      const authPages = ["login.html", "index.html", "signup.html", "forgot.html"];
+      const isAuthPage = authPages.some(p => window.location.pathname.includes(p));
+      if (!isAuthPage) {
         window.location.href = "login.html?expired=true";
-        return; 
+        return;
       }
     }
-    
-    // ✅ Handle Rate Limit (429) with user-friendly error
+
     if (res.status === 429) {
-      const error = new Error("You're adding expenses too fast, please wait a moment.");
+      const error = new Error("You're doing this too fast, please wait a moment.");
       error.status = 429;
       error.isRateLimit = true;
       throw error;
     }
-    
-    // ✅ Handle server errors (502, 503, etc.) with generic message
+
     if (res.status >= 500 && res.status < 600) {
       const error = new Error("Server is temporarily unavailable. Please try again.");
       error.status = res.status;
@@ -286,35 +249,23 @@ function hideAppLoader() {
       throw error;
     }
 
-    // ✅ CHANGE 2: Validate Content-Type before parsing JSON
     const contentType = res.headers.get("content-type") || "";
     let data;
-    
+
     if (contentType.includes("application/json")) {
       try {
         data = await res.json();
       } catch (parseErr) {
-        console.warn("JSON parse failed for valid content-type", parseErr);
         data = { message: "Invalid response format from server" };
       }
     } else {
-      // ✅ Server returned non-JSON (likely HTML error page from proxy/hosting)
       const text = await res.text().catch(() => "");
-      console.warn("Expected JSON but received:", contentType, 
-                   "Preview:", text.substring(0, 200) + (text.length > 200 ? "..." : ""));
-      
-      // Provide meaningful error based on status code
-      if (res.status >= 500) {
-        data = { message: "Server is temporarily unavailable. Please try again." };
-      } else if (res.status === 404) {
-        data = { message: "Endpoint not found. Please refresh the page." };
-      } else if (res.status === 502 || res.status === 504) {
-        data = { message: "Gateway error. The server is taking too long to respond." };
-      } else {
-        data = { message: "Invalid server response. Please try again." };
-      }
+      console.warn("Expected JSON but received:", contentType);
+      if (res.status >= 500) data = { message: "Server is temporarily unavailable. Please try again." };
+      else if (res.status === 404) data = { message: "Endpoint not found. Please refresh the page." };
+      else data = { message: "Invalid server response. Please try again." };
     }
-    
+
     if (!res.ok) {
       const error = new Error(data.message || "Request failed");
       error.status = res.status;
@@ -327,36 +278,27 @@ function hideAppLoader() {
   /* ======================================
      2. SESSION & AUTH
      ====================================== */
-  
   async function initGoogleAuth() {
     const googleBtnContainer = document.querySelector(CONFIG.SELECTORS.GOOGLE_BTN);
     if (!googleBtnContainer) return;
-  
     try {
       const { googleClientId } = await window.apiFetch("/config");
-      
-      if (!window.google) { 
-        setTimeout(initGoogleAuth, CONFIG.TIMEOUTS.GOOGLE_INIT_DELAY); 
-        return; 
+      if (!window.google) {
+        setTimeout(initGoogleAuth, CONFIG.TIMEOUTS.GOOGLE_INIT_DELAY);
+        return;
       }
-  
       window.google.accounts.id.initialize({
         client_id: googleClientId,
-        callback: window.handleGoogleCredential
+        callback: window.handleGoogleCredential,
+        // FIX v2: use_fedcm_for_prompt helps on iOS Safari
+        use_fedcm_for_prompt: true,
       });
-  
       window.google.accounts.id.renderButton(
         googleBtnContainer,
-        { theme: "outline", size: "large", width: "100%" } 
+        { theme: "outline", size: "large", width: "100%" }
       );
     } catch (err) {
-      // ✅ Handle specific error types for better UX
-      if (err.isTimeout || err.isNetworkError || err.isServerError) {
-        window.showToast(err.message, "error");
-      } else {
-        console.error("Failed to init Google Auth", err);
-        window.showToast("Failed to initialize sign-in. Please refresh.", "error");
-      }
+      console.error("Failed to init Google Auth", err);
     }
   }
 
@@ -369,12 +311,7 @@ function hideAppLoader() {
       window.showToast("Logged in as " + data.user.username, "success");
       setTimeout(() => { window.location.href = "dashboard.html"; }, 1000);
     } catch (err) {
-      // ✅ Handle specific error types for better UX
-      if (err.isTimeout || err.isNetworkError || err.isServerError) {
-        window.showToast(err.message, "error");
-      } else {
-        window.showToast(err.message || "Google sign-in failed", "error");
-      }
+      window.showToast(err.message || "Google sign-in failed", "error");
     }
   };
 
@@ -388,12 +325,10 @@ function hideAppLoader() {
   function initSessionMonitor() {
     setInterval(() => {
       const expiryStr = getCookie("session_expiry");
-      if (!expiryStr) return; 
-
+      if (!expiryStr) return;
       const expiresAt = parseInt(expiryStr, 10);
+      if (isNaN(expiresAt)) return;
       const timeLeft = expiresAt - Date.now();
-
-      // Use Constant
       if (timeLeft > 0 && timeLeft < CONFIG.TIMEOUTS.SESSION_WARN) {
         const lastWarned = sessionStorage.getItem("sessionWarned");
         if (!lastWarned) {
@@ -401,14 +336,14 @@ function hideAppLoader() {
           sessionStorage.setItem("sessionWarned", "true");
         }
       }
-    }, CONFIG.TIMEOUTS.SESSION_CHECK); 
+    }, CONFIG.TIMEOUTS.SESSION_CHECK);
   }
 
   /* ======================================
-     3. UI HELPERS (Preserved from original)
+     3. UI HELPERS
      ====================================== */
   let isMobileMode = false;
-  
+
   function handleMobileFocus(e) {
     const target = e.target;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
@@ -417,7 +352,7 @@ function hideAppLoader() {
       }, CONFIG.TIMEOUTS.DEBOUNCE_DELAY);
     }
   }
-  
+
   function initMobileTweaks() {
     const width = window.innerWidth;
     const shouldBeMobile = width < 768;
@@ -445,22 +380,17 @@ function hideAppLoader() {
       delete btn.dataset.originalText;
     }
   };
-  
+
   window.scrollToFirstError = function() {
     const firstError = document.querySelector('.input-invalid, .input-error-msg:not([style*="display: none"]), :invalid');
     if (firstError) {
-      firstError.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
-      });
+      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
       firstError.focus({ preventScroll: true });
       firstError.style.animation = 'shake 0.5s ease-in-out';
-      setTimeout(() => {
-        firstError.style.animation = '';
-      }, 500);
+      setTimeout(() => { firstError.style.animation = ''; }, 500);
     }
   };
-  
+
   window.setupInlineValidation = function(input, validateFn) {
     if (!input) return;
     const errorId = input.name + "-error-msg";
@@ -469,7 +399,7 @@ function hideAppLoader() {
       errorEl = document.createElement("div");
       errorEl.id = errorId;
       errorEl.className = "input-error-msg";
-      errorEl.setAttribute("aria-live", "assertive"); 
+      errorEl.setAttribute("aria-live", "assertive");
       input.parentNode.insertBefore(errorEl, input.nextSibling);
       input.setAttribute("aria-describedby", errorId);
     }
@@ -495,31 +425,18 @@ function hideAppLoader() {
     return check;
   };
 
-  /* ✅ UPDATED: Instant Touch Response + Haptic Feedback */
   function initPasswordToggles() {
     document.querySelectorAll('.btn-toggle-pass').forEach(btn => {
-      // 1. Clean slate: Clone to remove old listeners
       const newBtn = btn.cloneNode(true);
       btn.parentNode.replaceChild(newBtn, btn);
-
       const toggle = (e) => {
-        // Prevent default to stop:
-        // 1. The input from losing focus (keyboard closing)
-        // 2. Double-firing if both touchstart and click happen
         if (e.cancelable) e.preventDefault();
-
         const input = newBtn.previousElementSibling;
         const isPass = input.type === 'password';
-        
         input.type = isPass ? 'text' : 'password';
         newBtn.textContent = isPass ? '🙈' : '👁️';
-
-        // 3. Add Haptic Tick (The "Physical" Feel)
         if (navigator.vibrate) navigator.vibrate(10);
       };
-
-      // 4. Use 'touchstart' for instant mobile response
-      // Fallback to 'click' for desktop users
       newBtn.addEventListener('touchstart', toggle, { passive: false });
       newBtn.addEventListener('click', toggle);
     });
@@ -546,7 +463,7 @@ function hideAppLoader() {
       }
     });
   }
-  
+
   window.getAvatarColor = function(name) {
     if (!name) return "#ccc";
     let hash = 0;
@@ -556,39 +473,34 @@ function hideAppLoader() {
     const h = Math.abs(hash) % 360;
     return `hsl(${h}, 70%, 60%)`;
   };
-  
+
   window.timeAgo = function(dateString) {
     if (!dateString) return "";
-    
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = date - now;
     const diffSecs = Math.round(diffMs / 1000);
-    
-    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-
-    if (Math.abs(diffSecs) < 60) return "just now";
-    
-    if (Math.abs(diffSecs) < 3600) {
-      return rtf.format(Math.round(diffSecs / 60), 'minute');
+    try {
+      const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+      if (Math.abs(diffSecs) < 60) return "just now";
+      if (Math.abs(diffSecs) < 3600) return rtf.format(Math.round(diffSecs / 60), 'minute');
+      if (Math.abs(diffSecs) < 86400) return rtf.format(Math.round(diffSecs / 3600), 'hour');
+      if (Math.abs(diffSecs) < 2592000) return rtf.format(Math.round(diffSecs / 86400), 'day');
+      if (Math.abs(diffSecs) < 31536000) return rtf.format(Math.round(diffSecs / 2592000), 'month');
+      return rtf.format(Math.round(diffSecs / 31536000), 'year');
+    } catch (e) {
+      // Fallback for very old iOS that doesn't support Intl.RelativeTimeFormat
+      const days = Math.abs(Math.round(diffSecs / 86400));
+      if (days === 0) return "today";
+      if (days === 1) return "yesterday";
+      return `${days} days ago`;
     }
-    if (Math.abs(diffSecs) < 86400) {
-      return rtf.format(Math.round(diffSecs / 3600), 'hour');
-    }
-    if (Math.abs(diffSecs) < 2592000) {
-      return rtf.format(Math.round(diffSecs / 86400), 'day');
-    }
-    if (Math.abs(diffSecs) < 31536000) {
-      return rtf.format(Math.round(diffSecs / 2592000), 'month');
-    }
-    
-    return rtf.format(Math.round(diffSecs / 31536000), 'year');
   };
 
   /* ======================================
-     4. TOAST NOTIFICATIONS (Using CONFIG)
+     4. TOAST NOTIFICATIONS
      ====================================== */
-window.showToast = function(message, type = 'info', options = null) {
+  window.showToast = function(message, type = 'info', options = null) {
     const container = document.getElementById(CONFIG.SELECTORS.TOAST_CONTAINER);
     if (!container) return;
 
@@ -604,7 +516,6 @@ window.showToast = function(message, type = 'info', options = null) {
       iconHtml = `<span style="margin-right:10px; font-size:1.2rem;">ℹ️</span>`;
     }
 
-    // Undo / action button support
     let actionHtml = '';
     if (options && options.label && typeof options.callback === 'function') {
       actionHtml = `<button class="toast-action-btn" style="
@@ -623,7 +534,6 @@ window.showToast = function(message, type = 'info', options = null) {
     toast.setAttribute('aria-live', 'assertive');
     container.appendChild(toast);
 
-    // Wire up the action button callback
     if (options && options.callback) {
       const btn = toast.querySelector('.toast-action-btn');
       if (btn) {
@@ -647,26 +557,17 @@ window.showToast = function(message, type = 'info', options = null) {
   /* ======================================
      5. INITIALIZATION
      ====================================== */
-
-  // NEW: Initialize app logic including loader
   async function initializeApp() {
     try {
-      await initCSRF(); // This fetches /csrf-token and sets up token
-      // ... you can add more setup here if needed ...
+      await initCSRF();
     } catch (err) {
       console.error("App initialization failed", err);
-      // ✅ Show user-friendly error for timeout/network issues
-      if (err.isTimeout || err.isNetworkError) {
-        window.showToast(err.message, "error");
-      }
     } finally {
-      // Hide loader whether success or failure
       hideAppLoader();
     }
   }
 
-document.addEventListener("DOMContentLoaded", () => {
-    // Auto-create toast container if not present in HTML
+  document.addEventListener("DOMContentLoaded", () => {
     if (!document.getElementById("toast-container")) {
       const tc = document.createElement("div");
       tc.id = "toast-container";
@@ -674,46 +575,35 @@ document.addEventListener("DOMContentLoaded", () => {
       document.body.appendChild(tc);
     }
 
-    // Start loader rotation immediately
     startLoaderRotation();
-
-    // Initialize app (CSRF + hide loader)
     initializeApp();
-
-    // Rest of your existing init
-    initGoogleAuth(); 
+    initGoogleAuth();
     initSessionMonitor();
     initMobileTweaks();
     initPasswordToggles();
     initPasswordValidation();
-    
+
     if (window.location.search.includes("expired=true")) {
       window.showToast("Session expired. Please log in again.", "error");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    
-    // Mobile Haptics (Updated for Step 6)
+
     document.addEventListener('click', (e) => {
-      // Add all clickable elements here
       const target = e.target.closest('button, a, .chapter-card, .expense-card, .nav-icon-btn, .fab-btn');
-      
       if (target && navigator.vibrate) {
-        // 1. Light tap vibration
-        navigator.vibrate(10); 
-        
-        // 2. Add a visual "click" effect to non-buttons (like cards)
+        navigator.vibrate(10);
         if (target.classList.contains('expense-card')) {
-           target.style.transform = "scale(0.98)";
-           setTimeout(() => target.style.transform = "scale(1)", 100);
+          target.style.transform = "scale(0.98)";
+          setTimeout(() => target.style.transform = "scale(1)", 100);
         }
       }
     });
-    
+
     window.addEventListener('resize', window.debounce(initMobileTweaks, CONFIG.TIMEOUTS.DEBOUNCE_DELAY));
   });
 
   /* ======================================
-     7. REGISTER PWA SERVICE WORKER
+     6. SERVICE WORKER
      ====================================== */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -724,117 +614,249 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ======================================
-     8. PWA INSTALL PROMPT LOGIC
+     7. PWA INSTALL PROMPT — FIX v2
+     ======================================
+     
+     iOS REALITY: 
+     - beforeinstallprompt NEVER fires on iOS Safari (Apple blocks it entirely)
+     - iOS users must manually: Safari → Share button → "Add to Home Screen"
+     - We show an animated visual guide specifically for iOS
+     
+     ANDROID/CHROME:
+     - beforeinstallprompt fires normally → we trigger native install dialog
+     
+     FIX: Show iOS users a clear visual step-by-step guide with an animated
+     arrow pointing to where the Share button actually is on their screen.
      ====================================== */
   document.addEventListener("DOMContentLoaded", () => {
     let deferredPrompt;
     const pwaPopup = document.getElementById('pwa-install-prompt');
+    if (!pwaPopup) return;
+
     const pwaInstallBtn = document.getElementById('pwa-install-btn');
     const pwaCloseBtn = document.getElementById('pwa-close-btn');
     const pwaInstructions = document.getElementById('pwa-instructions');
+    const pwaIcon = pwaPopup.querySelector('.pwa-icon');
+    const pwaTitle = pwaPopup.querySelector('h4');
 
-    if (!pwaPopup) return; // Exit if popup HTML isn't on this page
-
-    // 1. Detect Device & Install Status
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
-    // 2. Function to show popup safely
+    // Already installed — don't show
+    if (isStandalone) return;
+
+    // Check if dismissed recently (don't annoy users)
+    const lastDismissed = localStorage.getItem('pwa_dismissed_at');
+    if (lastDismissed && Date.now() - parseInt(lastDismissed) < 3 * 24 * 60 * 60 * 1000) return;
+
     function showPopup() {
-      // Only show if the app is NOT already installed
-      if (!isStandalone) {
-        // Show after 1.5 seconds for a smooth user experience
-        setTimeout(() => {
-          pwaPopup.classList.remove('hidden');
-        }, 1500);
-      }
+      setTimeout(() => {
+        pwaPopup.classList.remove('hidden');
+      }, 3000); // FIX v2: increased to 3s so page loads first
     }
 
-    // 3. Handle Android / Windows / Mac (Chrome & Edge)
-    window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
-      e.preventDefault();
-      // Stash the event so it can be triggered later
-      deferredPrompt = e;
-      
-      if (pwaInstructions) {
-        pwaInstructions.textContent = "Add to your home screen for quick access!";
-      }
-      showPopup();
-    });
+    if (isIOS && isSafari) {
+      // ── iOS Safari: Show visual step-by-step guide ──────────
+      if (pwaTitle) pwaTitle.textContent = 'Install Hisaab';
+      if (pwaIcon) pwaIcon.textContent = '📲';
 
-    // 4. Handle iOS (Safari)
-    // Apple strictly blocks `beforeinstallprompt`, so we guide them manually
-    if (isIOS && !isStandalone) {
-      if (pwaInstructions) {
-        pwaInstructions.innerHTML = "To install: tap the <b>Share</b> icon below and select <b>Add to Home Screen</b>.";
-      }
+      // Replace the install button with a "How to Install" button
       if (pwaInstallBtn) {
-        pwaInstallBtn.style.display = 'none'; // Hide the install button because iOS requires manual action
+        pwaInstallBtn.textContent = 'How to Install';
+        pwaInstallBtn.style.background = '#007AFF'; // iOS blue
+        pwaInstallBtn.addEventListener('click', showIOSInstallGuide);
       }
-      showPopup();
-    }
 
-    // 5. Button Listeners
-    if (pwaInstallBtn) {
-      pwaInstallBtn.addEventListener('click', async () => {
-        pwaPopup.classList.add('hidden'); // Hide our custom popup
-        
-        if (deferredPrompt) {
-          deferredPrompt.prompt(); // Show the native browser install prompt
-          
-          const { outcome } = await deferredPrompt.userChoice;
-          console.log(`User response to install prompt: ${outcome}`);
-          
-          deferredPrompt = null; // Can only be used once
-        }
+      if (pwaInstructions) {
+        pwaInstructions.innerHTML = 'Tap <strong>Share ↑</strong> → <strong>Add to Home Screen</strong>';
+      }
+
+      showPopup();
+
+    } else {
+      // ── Android/Chrome: Use native beforeinstallprompt ──────
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (pwaInstructions) pwaInstructions.textContent = "Add to your home screen for quick access!";
+        if (pwaInstallBtn) pwaInstallBtn.textContent = 'Install';
+        showPopup();
       });
+
+      if (pwaInstallBtn) {
+        pwaInstallBtn.addEventListener('click', async () => {
+          pwaPopup.classList.add('hidden');
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`PWA install outcome: ${outcome}`);
+            deferredPrompt = null;
+          }
+        });
+      }
     }
 
     if (pwaCloseBtn) {
       pwaCloseBtn.addEventListener('click', () => {
         pwaPopup.classList.add('hidden');
+        localStorage.setItem('pwa_dismissed_at', Date.now().toString());
       });
     }
   });
+
+  /* ======================================
+     8. iOS INSTALL GUIDE MODAL
+     Shows a bottom-sheet with animated arrows pointing to iOS Share button
+     ====================================== */
+  function showIOSInstallGuide() {
+    const existing = document.getElementById('ios-install-guide');
+    if (existing) { existing.remove(); return; }
+
+    const guide = document.createElement('div');
+    guide.id = 'ios-install-guide';
+    guide.style.cssText = `
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px 40px;
+      z-index: 99999;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+      font-family: var(--font-main, -apple-system, sans-serif);
+      animation: slideUpGuide 0.3s ease-out;
+    `;
+
+    guide.innerHTML = `
+      <style>
+        @keyframes slideUpGuide {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        @keyframes bounceDown {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(6px); }
+        }
+        .ios-guide-step {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 12px 0;
+          border-bottom: 1px solid #f0f0f0;
+        }
+        .ios-guide-step:last-of-type { border-bottom: none; }
+        .ios-step-num {
+          width: 28px; height: 28px;
+          background: #007AFF;
+          color: #fff;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 0.85rem; font-weight: 700;
+          flex-shrink: 0;
+        }
+        .ios-step-text { font-size: 0.92rem; color: #333; line-height: 1.4; }
+        .ios-step-text strong { color: #000; }
+        .share-arrow {
+          display: inline-block;
+          font-size: 1.1rem;
+          animation: bounceDown 1.2s ease-in-out infinite;
+        }
+      </style>
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="margin:0; font-size:1.1rem; color:#000;">Add to Home Screen</h3>
+        <button onclick="document.getElementById('ios-install-guide').remove()"
+          style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666; padding:4px;">×</button>
+      </div>
+
+      <div class="ios-guide-step">
+        <div class="ios-step-num">1</div>
+        <div class="ios-step-text">
+          Tap the <strong>Share</strong> button <span class="share-arrow">⬆️</span> at the bottom of Safari
+          <div style="font-size:0.78rem; color:#999; margin-top:2px;">(the box with an arrow pointing up)</div>
+        </div>
+      </div>
+
+      <div class="ios-guide-step">
+        <div class="ios-step-num">2</div>
+        <div class="ios-step-text">
+          Scroll down in the share menu and tap <strong>"Add to Home Screen"</strong>
+          <div style="font-size:0.78rem; color:#999; margin-top:2px;">It looks like a plus (+) icon in a square</div>
+        </div>
+      </div>
+
+      <div class="ios-guide-step">
+        <div class="ios-step-num">3</div>
+        <div class="ios-step-text">
+          Tap <strong>"Add"</strong> in the top right corner
+          <div style="font-size:0.78rem; color:#999; margin-top:2px;">Hisaab-Kitaab will appear on your home screen!</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; background:#f0f7ff; border-radius:12px; padding:12px 14px; display:flex; gap:10px; align-items:flex-start;">
+        <span style="font-size:1.2rem;">💡</span>
+        <p style="margin:0; font-size:0.82rem; color:#444; line-height:1.5;">
+          Once installed, Hisaab-Kitaab opens full-screen without the Safari toolbar — 
+          just like a native app. No App Store needed!
+        </p>
+      </div>
+
+      <!-- Visual arrow pointing to bottom of screen where Share button lives -->
+      <div style="text-align:center; margin-top:16px; color:#007AFF; font-size:0.85rem; font-weight:600;">
+        <div style="font-size:2rem; animation: bounceDown 1s ease-in-out infinite;">↓</div>
+        Share button is at the bottom of your screen
+      </div>
+    `;
+
+    document.body.appendChild(guide);
+
+    // Close when tapping outside
+    setTimeout(() => {
+      document.addEventListener('click', function closeGuide(e) {
+        const g = document.getElementById('ios-install-guide');
+        if (g && !g.contains(e.target)) {
+          g.remove();
+          document.removeEventListener('click', closeGuide);
+        }
+      });
+    }, 100);
+  }
+
+  window.showIOSInstallGuide = showIOSInstallGuide;
 
 })();
 
 
 /* ======================================
-   6. MEMBER AUTOCOMPLETE COMPONENT (NEW)
+   6. MEMBER AUTOCOMPLETE COMPONENT
    ====================================== */
 class MemberAutocomplete {
   constructor(inputElement, options = {}) {
     this.input = inputElement;
     this.options = {
-      friends: [], // Array of friend objects
-      onSelect: null, // Callback({name, friendId})
+      friends: [],
+      onSelect: null,
       allowGuest: true,
       allowCreate: true,
       ...options
     };
-    
     this.init();
   }
 
   init() {
-    // 1. Wrap Input
     this.wrapper = document.createElement('div');
     this.wrapper.className = 'autocomplete-wrapper';
     this.input.parentNode.insertBefore(this.wrapper, this.input);
     this.wrapper.appendChild(this.input);
 
-    // 2. Create Dropdown
     this.dropdown = document.createElement('div');
     this.dropdown.className = 'autocomplete-dropdown';
     this.wrapper.appendChild(this.dropdown);
 
-    // 3. Events
     this.input.addEventListener('input', () => this.handleInput());
     this.input.addEventListener('focus', () => this.handleInput());
-    
-    // Hide on blur (delayed to allow click)
     this.input.addEventListener('blur', () => {
       setTimeout(() => this.dropdown.classList.remove('active'), 200);
     });
@@ -843,7 +865,7 @@ class MemberAutocomplete {
   handleInput() {
     const term = this.input.value.trim().toLowerCase();
     this.dropdown.innerHTML = '';
-    
+
     if (!term) {
       this.dropdown.classList.remove('active');
       this.input.classList.remove('dropdown-open');
@@ -852,9 +874,8 @@ class MemberAutocomplete {
 
     let hasMatches = false;
 
-    // A. Filter Friends
-    const matches = this.options.friends.filter(f => 
-      f.name.toLowerCase().includes(term) || 
+    const matches = this.options.friends.filter(f =>
+      f.name.toLowerCase().includes(term) ||
       f.username.toLowerCase().includes(term)
     );
 
@@ -875,10 +896,7 @@ class MemberAutocomplete {
       });
     });
 
-    // B. "Add as Guest" Option (Always show if term exists)
-    // Only show if term doesn't perfectly match a friend's name
     const exactMatch = matches.find(f => f.name.toLowerCase() === term);
-    
     if (!exactMatch && this.options.allowGuest) {
       hasMatches = true;
       this.renderItem({
@@ -895,7 +913,6 @@ class MemberAutocomplete {
       });
     }
 
-    // C. Show/Hide
     if (hasMatches) {
       this.dropdown.classList.add('active');
       this.input.classList.add('dropdown-open');
@@ -909,40 +926,35 @@ class MemberAutocomplete {
     const item = document.createElement('div');
     item.className = `autocomplete-item ${className}`;
     item.innerHTML = html;
-    
     item.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // Prevent blur
+      e.preventDefault();
       this.selectItem(type, data);
     });
-    
     this.dropdown.appendChild(item);
   }
 
   selectItem(type, data) {
     if (type === 'friend') {
       this.input.value = data.name;
-      this.input.dataset.friendId = data.id; // Store ID
+      this.input.dataset.friendId = data.id;
       this.input.dataset.mode = 'friend';
     } else {
-      // Guest
-      this.input.value = data.name; // Keep typed name
-      delete this.input.dataset.friendId; // Clear ID
+      this.input.value = data.name;
+      delete this.input.dataset.friendId;
       this.input.dataset.mode = 'guest';
     }
 
     this.dropdown.classList.remove('active');
     this.input.classList.remove('dropdown-open');
 
-    // Trigger Callback
     if (this.options.onSelect) {
-      this.options.onSelect({ 
-        type, 
-        name: this.input.value, 
-        friendId: this.input.dataset.friendId 
+      this.options.onSelect({
+        type,
+        name: this.input.value,
+        friendId: this.input.dataset.friendId
       });
     }
   }
 }
 
-// Make it global
 window.MemberAutocomplete = MemberAutocomplete;

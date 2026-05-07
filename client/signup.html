@@ -13,15 +13,20 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="theme-color" content="#ffffff">
+  <style>
+    .step-wrapper {
+      will-change: transform, opacity;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+    }
+  </style>
 </head>
 <body>
-
 
   <div id="app-loader">
     <div class="loader-spinner"></div>
     <p id="loader-text" class="loader-text">Loading...</p>
-</div>
-
+  </div>
 
   <div class="bubble-container">
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
@@ -36,7 +41,8 @@
   <main id="main-content">
     <div class="auth-wrapper">
       <section class="auth-card" style="overflow: hidden; position: relative; min-height: 400px;">
-        
+
+        <!-- Step 1: Email -->
         <div id="step-1" class="step-wrapper step-active">
           <h1 class="auth-title">Create Account</h1>
           <p class="auth-subtitle">Enter your email to get started</p>
@@ -44,13 +50,29 @@
           <form id="form-email" onsubmit="handleEmailSubmit(event)">
             <label>
               Email address
-              <input type="email" name="email" id="input-email" required autocomplete="email" placeholder="john@example.com">
+              <input type="email"
+                name="email"
+                id="input-email"
+                required
+                autocomplete="email"
+                autocapitalize="none"
+                autocorrect="off"
+                inputmode="email"
+                placeholder="john@example.com">
             </label>
             <button type="submit" class="btn-primary" id="btn-email">Send Verification Code</button>
           </form>
 
           <div style="margin-top: 20px;">
-            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signup_with" data-size="large" data-logo_alignment="left" data-width="100%"></div>
+            <div class="g_id_signin"
+              data-type="standard"
+              data-shape="rectangular"
+              data-theme="filled_black"
+              data-text="signup_with"
+              data-size="large"
+              data-logo_alignment="left"
+              data-width="100%">
+            </div>
           </div>
 
           <p style="margin-top:20px; font-size:0.9rem; color:#666;">
@@ -58,6 +80,7 @@
           </p>
         </div>
 
+        <!-- Step 2: OTP verification -->
         <div id="step-2" class="step-wrapper step-hidden-right">
           <button type="button" class="btn-text" onclick="goBackToStep1()">← Back</button>
           <h1 class="auth-title">Check your Inbox</h1>
@@ -66,7 +89,16 @@
           <form id="form-otp" onsubmit="handleOtpSubmit(event)">
             <label>
               Enter 6-digit Code
-              <input type="text" name="otp" id="input-otp" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6" style="letter-spacing: 4px; font-size: 1.2rem; text-align: center;">
+              <!-- FIX v2: one-time-code enables iOS email/SMS OTP autofill -->
+              <input type="text"
+                name="otp"
+                id="input-otp"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]*"
+                placeholder="123456"
+                maxlength="6"
+                style="letter-spacing: 6px; font-size: 1.4rem; text-align: center; padding: 14px;">
             </label>
             <button type="submit" class="btn-primary" id="btn-otp">Verify Email</button>
           </form>
@@ -76,6 +108,7 @@
           </p>
         </div>
 
+        <!-- Step 3: Name + Password -->
         <div id="step-3" class="step-wrapper step-hidden-right">
           <h1 class="auth-title">One Last Thing</h1>
           <p class="auth-subtitle">Finish setting up your profile</p>
@@ -83,14 +116,27 @@
           <form id="form-details" onsubmit="handleDetailsSubmit(event)">
             <label>
               Full Name
-              <input type="text" name="realName" required autocomplete="name" placeholder="John Doe" id="input-name">
+              <!-- FIX v2: name autocomplete lets iOS suggest from Contacts -->
+              <input type="text"
+                name="realName"
+                required
+                autocomplete="name"
+                autocapitalize="words"
+                placeholder="John Doe"
+                id="input-name">
             </label>
             <label>
               Create Password
               <div class="password-wrapper">
-                <input type="password" name="password" required autocomplete="new-password" placeholder="••••••••">
+                <!-- FIX v2: new-password triggers iOS Keychain "Strong Password" suggestion -->
+                <input type="password"
+                  name="password"
+                  required
+                  autocomplete="new-password"
+                  placeholder="••••••••">
                 <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
               </div>
+              <small class="password-hint">Must be at least 8 characters</small>
             </label>
             <button type="submit" class="btn-primary" id="btn-finish">Create Account</button>
           </form>
@@ -100,14 +146,12 @@
     </div>
   </main>
 
-
   <footer class="app-footer">
     <div class="footer-content">
       <div class="footer-col">
         <h4>Hisaab-Kitaab</h4>
         <p>The smartest way to track expenses and settle debts with friends and family.</p>
       </div>
-      
       <div class="footer-col">
         <h4>Quick Links</h4>
         <div class="footer-links">
@@ -116,27 +160,21 @@
           <a href="privacy.html">Privacy Policy</a>
         </div>
       </div>
-  
       <div class="footer-col">
         <h4>Developer</h4>
         <div class="dev-branding">
           Developed and Managed by
-          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">
-            A PLUS TECHNOLOGIES
-          </a>
+          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">A PLUS TECHNOLOGIES</a>
         </div>
       </div>
     </div>
-    
-    <div class="footer-bottom">
-      &copy; 2025 Hisaab-Kitaab. All rights reserved.
-    </div>
+    <div class="footer-bottom">&copy; 2025 Hisaab-Kitaab. All rights reserved.</div>
   </footer>
 
   <script src="js/main.js"></script>
   <script>
-    // --- STATE ---
     let signupEmail = "";
+
     const els = {
       step1: document.getElementById('step-1'),
       step2: document.getElementById('step-2'),
@@ -148,39 +186,38 @@
       btnResend: document.getElementById('btn-resend')
     };
 
-    // --- INIT ---
     document.addEventListener('DOMContentLoaded', () => {
-      if(window.initPasswordToggles) initPasswordToggles();
+      if (window.initPasswordToggles) initPasswordToggles();
       els.inputEmail.focus();
     });
 
-    // --- STEP 1: EMAIL ---
+    /* --- STEP 1: EMAIL --- */
     async function handleEmailSubmit(e) {
       e.preventDefault();
       const email = els.inputEmail.value.trim();
       const btn = document.getElementById('btn-email');
-
-      if(!email) return;
+      if (!email) return;
       setBtnLoading(btn, true);
 
       try {
         await apiFetch("/auth/register/request-otp", {
-            method: "POST",
-            body: { email }
+          method: "POST",
+          body: { email }
         });
 
-        // Success -> Move to Step 2
         signupEmail = email;
         els.displayEmail.textContent = email;
-        
         slide(els.step1, els.step2);
-        
-        // Auto-focus OTP
-        setTimeout(() => els.inputOtp.focus(), 400);
+
+        setTimeout(() => {
+          if (els.inputOtp) els.inputOtp.focus();
+        }, 400);
+
         startResendTimer();
+        attachOtpAutoSubmit();
 
       } catch (err) {
-        showToast(err.message, "error");
+        showToast(err.message || "Failed to send code", "error");
         document.querySelector('.auth-card').classList.add('shake-card');
         setTimeout(() => document.querySelector('.auth-card').classList.remove('shake-card'), 500);
       } finally {
@@ -188,19 +225,40 @@
       }
     }
 
-    // --- STEP 2: OTP ---
-    
-    // Auto-Submit Logic
-    els.inputOtp.addEventListener('input', (e) => {
-      if (e.target.value.length === 6) {
-        document.getElementById('form-otp').requestSubmit();
-        els.inputOtp.blur();
-      }
-    });
+    /* --- OTP AUTO-SUBMIT (safe for all iOS versions) --- */
+    function attachOtpAutoSubmit() {
+      const otpInput = els.inputOtp;
+      if (!otpInput) return;
 
+      // Remove any previous listener by replacing the element
+      otpInput.addEventListener('input', function onInput(e) {
+        // Strip non-digits (iOS may paste with spaces from Messages)
+        const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+        if (e.target.value !== clean) e.target.value = clean;
+
+        if (clean.length === 6) {
+          otpInput.removeEventListener('input', onInput);
+          otpInput.blur();
+          // FIX v2: safe requestSubmit with fallback for iOS < 15.4
+          const form = document.getElementById('form-otp');
+          try {
+            form.requestSubmit();
+          } catch (_) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.click();
+          }
+        }
+      });
+    }
+
+    /* --- STEP 2: OTP VERIFY --- */
     async function handleOtpSubmit(e) {
       e.preventDefault();
-      const otp = els.inputOtp.value;
+      const otp = els.inputOtp.value.replace(/\D/g, '');
+      if (otp.length !== 6) {
+        showToast("Please enter the complete 6-digit code", "error");
+        return;
+      }
       const btn = document.getElementById('btn-otp');
       setBtnLoading(btn, true);
 
@@ -210,13 +268,14 @@
           body: { email: signupEmail, otp }
         });
 
-        // Success -> Move to Step 3
         slide(els.step2, els.step3);
-        setTimeout(() => els.inputName.focus(), 400);
+        setTimeout(() => {
+          if (els.inputName) els.inputName.focus();
+        }, 400);
 
       } catch (err) {
-        showToast("Invalid code", "error");
-        els.inputOtp.classList.add('shake-card'); // shake input
+        showToast(err.message || "Invalid code", "error");
+        els.inputOtp.classList.add('shake-card');
         setTimeout(() => els.inputOtp.classList.remove('shake-card'), 500);
         els.inputOtp.value = "";
       } finally {
@@ -224,7 +283,7 @@
       }
     }
 
-    // --- STEP 3: DETAILS ---
+    /* --- STEP 3: DETAILS --- */
     async function handleDetailsSubmit(e) {
       e.preventDefault();
       const formData = new FormData(document.getElementById('form-details'));
@@ -237,7 +296,6 @@
           body: {
             realName: formData.get("realName"),
             password: formData.get("password")
-            // No username sent!
           }
         });
 
@@ -245,13 +303,13 @@
         window.location.href = "dashboard.html";
 
       } catch (err) {
-        showToast(err.message, "error");
+        showToast(err.message || "Registration failed", "error");
       } finally {
         setBtnLoading(btn, false);
       }
     }
 
-    // --- UTILS ---
+    /* --- UTILS --- */
     function slide(fromEl, toEl) {
       fromEl.classList.replace('step-active', 'step-hidden-left');
       toEl.classList.replace('step-hidden-right', 'step-active');
@@ -268,12 +326,12 @@
       let count = 60;
       els.btnResend.disabled = true;
       els.btnResend.textContent = `Resend in ${count}s`;
-      
-      if(resendTimer) clearInterval(resendTimer);
-      
+
+      if (resendTimer) clearInterval(resendTimer);
+
       resendTimer = setInterval(() => {
         count--;
-        if(count <= 0) {
+        if (count <= 0) {
           clearInterval(resendTimer);
           els.btnResend.disabled = false;
           els.btnResend.textContent = "Resend Code";
@@ -284,17 +342,33 @@
     }
 
     async function resendOtp() {
-       try {
-         await apiFetch("/auth/register/request-otp", {
-            method: "POST",
-            body: { email: signupEmail }
-         });
-         showToast("Code resent!");
-         startResendTimer();
-       } catch(err) {
-         showToast(err.message, "error");
-       }
+      try {
+        await apiFetch("/auth/register/request-otp", {
+          method: "POST",
+          body: { email: signupEmail }
+        });
+        showToast("Code resent!");
+        startResendTimer();
+        attachOtpAutoSubmit();
+      } catch (err) {
+        showToast(err.message || "Failed to resend", "error");
+      }
     }
   </script>
+
+  <div id="pwa-install-prompt" class="pwa-popup hidden">
+    <div class="pwa-popup-content">
+      <div class="pwa-icon">📱</div>
+      <div class="pwa-text">
+        <h4>Install Hisaab</h4>
+        <p id="pwa-instructions">Add to your home screen for quick access!</p>
+      </div>
+      <div class="pwa-actions">
+        <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
+        <button id="pwa-close-btn" class="pwa-btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

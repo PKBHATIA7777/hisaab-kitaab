@@ -3,33 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <title>Log in - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
-
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff' font-family='Arial, sans-serif'>₹</text></svg>">
   <link rel="stylesheet" href="css/base.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="theme-color" content="#ffffff">
+  <style>
+    /* FIX v2: iOS Safari step transitions need will-change for smooth animation */
+    .step-wrapper {
+      will-change: transform, opacity;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+    }
+    /* Prevent iOS rubber-band scroll inside auth card */
+    .auth-card {
+      -webkit-overflow-scrolling: touch;
+    }
+  </style>
 </head>
 <body>
-
-
 
   <div id="app-loader">
     <div class="loader-spinner"></div>
     <p id="loader-text" class="loader-text">Loading...</p>
-</div>
+  </div>
+
+  <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="bubble-container">
     <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
@@ -44,7 +48,8 @@
   <main id="main-content">
     <div class="auth-wrapper">
       <section class="auth-card" style="overflow: hidden; position: relative; min-height: 420px; transition: min-height 0.3s ease;">
-        
+
+        <!-- Step 1: Email/Identifier -->
         <div id="step-1" class="step-wrapper step-active">
           <h1 class="auth-title">Welcome Back</h1>
           <p class="auth-subtitle">Enter your email to continue</p>
@@ -52,7 +57,17 @@
           <form id="form-identifier" onsubmit="handleIdentifierSubmit(event)">
             <label>
               Email address
-              <input type="text" name="identifier" id="input-identifier" required autocomplete="username" placeholder="name@example.com">
+              <!-- FIX v2: proper autocomplete attributes for iOS keyboard -->
+              <input type="email"
+                name="identifier"
+                id="input-identifier"
+                required
+                autocomplete="email"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
+                inputmode="email"
+                placeholder="name@example.com">
             </label>
             <button type="submit" class="btn-primary" id="btn-next">Continue</button>
           </form>
@@ -62,23 +77,30 @@
           </p>
         </div>
 
+        <!-- Step 2: Password / OTP / Google -->
         <div id="step-2" class="step-wrapper step-hidden-right">
           <button type="button" class="btn-back-ghost" onclick="goToStep1()">
             <span>←</span> Back
           </button>
-          
+
           <h1 class="auth-title" id="welcome-user">Welcome</h1>
           <p class="auth-subtitle" id="auth-method-text">Choose how you want to sign in</p>
 
+          <!-- Password form -->
           <form id="form-password" onsubmit="handlePasswordSubmit(event)" style="display:none;">
             <label>
               Password
               <div class="password-wrapper">
-                <input type="password" name="password" id="input-password" autocomplete="current-password" placeholder="••••••••">
-                <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
+                <!-- FIX v2: current-password helps iOS Keychain autofill -->
+                <input type="password"
+                  name="password"
+                  id="input-password"
+                  autocomplete="current-password"
+                  placeholder="••••••••">
+                <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">👁️</button>
               </div>
             </label>
-            
+
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
               <label style="display:flex; align-items:center; margin:0; cursor:pointer;">
                 <input type="checkbox" name="rememberMe" checked style="width:auto; margin-right:8px;">
@@ -88,17 +110,18 @@
             </div>
 
             <button type="submit" class="btn-primary" id="btn-login-pass">Log in</button>
-            
+
             <div class="divider"><span>OR</span></div>
-            
+
             <button type="button" class="btn-secondary" onclick="handleAutoOtpSwitch(this)">Log in via OTP code</button>
           </form>
 
+          <!-- OTP section -->
           <div id="otp-section" style="display:none;">
-            
+
             <div id="otp-request-state">
               <p style="text-align:center; font-size:0.9rem; color:#888; margin-bottom:20px;">
-                We'll send a code to your email. No password needed.
+                We'll send a 6-digit code to your email.
               </p>
               <button type="button" class="btn-primary" onclick="requestLoginOtp()" id="btn-req-otp">Send Login Code</button>
             </div>
@@ -106,10 +129,19 @@
             <form id="form-otp" onsubmit="handleOtpSubmit(event)" style="display:none;">
               <label>
                 Enter 6-digit Code
-                <input type="text" name="otp" id="input-otp" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6" style="letter-spacing: 4px; font-size: 1.2rem; text-align: center;">
+                <!-- FIX v2: one-time-code triggers iOS SMS/email autofill for OTPs -->
+                <input type="text"
+                  name="otp"
+                  id="input-otp"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  pattern="[0-9]*"
+                  placeholder="123456"
+                  maxlength="6"
+                  style="letter-spacing: 6px; font-size: 1.4rem; text-align: center; padding: 14px;">
               </label>
               <button type="submit" class="btn-primary" id="btn-verify-otp">Verify & Login</button>
-              
+
               <div style="text-align: center; margin-top: 10px;">
                 <button type="button" class="btn-link-purple" id="btn-resend-otp" onclick="requestLoginOtp(this)">
                   Resend Code
@@ -117,27 +149,35 @@
               </div>
             </form>
 
-             <button type="button" class="btn-outline" id="btn-back-pass" onclick="switchToPasswordMode()">
-               Use Password instead
-             </button>
+            <button type="button" class="btn-outline" id="btn-back-pass" onclick="switchToPasswordMode()" style="display:none;">
+              Use Password instead
+            </button>
           </div>
 
+          <!-- Google Sign-in -->
           <div id="google-container" style="margin-top: 20px;">
-            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="100%"></div>
+            <div class="g_id_signin"
+              data-type="standard"
+              data-shape="rectangular"
+              data-theme="filled_black"
+              data-text="signin_with"
+              data-size="large"
+              data-logo_alignment="left"
+              data-width="100%">
+            </div>
           </div>
-
         </div>
 
       </section>
     </div>
   </main>
+
   <footer class="app-footer">
     <div class="footer-content">
       <div class="footer-col">
         <h4>Hisaab-Kitaab</h4>
         <p>The smartest way to track expenses and settle debts with friends and family.</p>
       </div>
-      
       <div class="footer-col">
         <h4>Quick Links</h4>
         <div class="footer-links">
@@ -146,21 +186,15 @@
           <a href="privacy.html">Privacy Policy</a>
         </div>
       </div>
-  
       <div class="footer-col">
         <h4>Developer</h4>
         <div class="dev-branding">
           Developed and Managed by
-          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">
-            A PLUS TECHNOLOGIES
-          </a>
+          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">A PLUS TECHNOLOGIES</a>
         </div>
       </div>
     </div>
-    
-    <div class="footer-bottom">
-      &copy; 2025 Hisaab-Kitaab. All rights reserved.
-    </div>
+    <div class="footer-bottom">&copy; 2025 Hisaab-Kitaab. All rights reserved.</div>
   </footer>
 
   <script src="js/main.js"></script>
@@ -185,7 +219,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const lastUser = localStorage.getItem('last_user');
       if (lastUser) els.inputIdentifier.value = lastUser;
-      if(window.initPasswordToggles) initPasswordToggles();
+      if (window.initPasswordToggles) initPasswordToggles();
     });
 
     /* --- STEP 1: CHECK IDENTIFIER --- */
@@ -213,7 +247,7 @@
           setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
         }
       } catch (err) {
-        showToast(err.message, "error");
+        showToast(err.message || "Failed to check account", "error");
       } finally {
         setBtnLoading(btn, false);
       }
@@ -221,22 +255,22 @@
 
     function transitionToStep2() {
       els.welcomeUser.textContent = `Hi, ${userContext.email.split('@')[0]}`;
-      
-      // Determine flow based on account type
+
       if (userContext.provider === 'google' || !userContext.hasPassword) {
-        // GOOGLE / NO-PASS: Show OTP "Send" button + Google
         els.formPass.style.display = 'none';
         els.otpSection.style.display = 'block';
         els.otpReqState.style.display = 'block';
         els.formOtp.style.display = 'none';
         els.googleContainer.style.display = 'block';
-        els.btnBackPass.style.display = 'none'; 
+        els.btnBackPass.style.display = 'none';
       } else {
-        // PASSWORD USER: Show Password form
         els.formPass.style.display = 'block';
         els.otpSection.style.display = 'none';
-        els.googleContainer.style.display = 'none'; 
-        setTimeout(() => document.getElementById('input-password').focus(), 400);
+        els.googleContainer.style.display = 'none';
+        setTimeout(() => {
+          const pwInput = document.getElementById('input-password');
+          if (pwInput) pwInput.focus();
+        }, 400);
       }
 
       els.step1.classList.replace('step-active', 'step-hidden-left');
@@ -248,14 +282,12 @@
       els.step1.classList.replace('step-hidden-left', 'step-active');
     }
 
-    /* --- 🔴 NEW: AUTO-SWITCH TO OTP --- */
+    /* --- AUTO-SWITCH TO OTP --- */
     async function handleAutoOtpSwitch(btn) {
-        // Call the shared request function, passing this button to show loading
-        await requestLoginOtp(btn);
+      await requestLoginOtp(btn);
     }
 
-    /* --- 🔴 UPDATED: REUSABLE OTP REQUEST --- */
-    // 'targetBtn' is the button element to show the spinner on
+    /* --- REQUEST OTP --- */
     async function requestLoginOtp(targetBtn = null) {
       const btn = targetBtn || document.getElementById('btn-req-otp');
       setBtnLoading(btn, true);
@@ -265,29 +297,45 @@
           method: 'POST',
           body: { email: userContext.email }
         });
-        
-        // --- UI TRANSITION ---
-        els.formPass.style.display = 'none';      // Hide Pass form
-        els.otpSection.style.display = 'block';   // Show OTP section wrapper
-        
-        els.otpReqState.style.display = 'none';   // Hide "Send Code" state
-        els.formOtp.style.display = 'block';      // Show "Enter Code" state
-        
+
+        els.formPass.style.display = 'none';
+        els.otpSection.style.display = 'block';
+        els.otpReqState.style.display = 'none';
+        els.formOtp.style.display = 'block';
+
         showToast(`Code sent to ${userContext.email}`, "success");
 
-        // Focus & Auto-submit
         const otpInput = document.getElementById('input-otp');
-        setTimeout(() => otpInput.focus(), 100);
-        
-        otpInput.oninput = (e) => {
-          if (e.target.value.length === 6) {
-             document.getElementById('form-otp').requestSubmit();
-             otpInput.blur();
-          }
-        };
+        setTimeout(() => {
+          if (otpInput) otpInput.focus();
+        }, 100);
+
+        // FIX v2: iOS auto-submit - requestSubmit() not supported on iOS < 15.4
+        // Use a safe wrapper that falls back to manual submit
+        if (otpInput) {
+          otpInput.addEventListener('input', function onOtpInput(e) {
+            // Strip non-digits (iOS may insert spaces)
+            const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+            if (e.target.value !== clean) e.target.value = clean;
+
+            if (clean.length === 6) {
+              otpInput.removeEventListener('input', onOtpInput);
+              otpInput.blur();
+              // FIX v2: safe submit for older iOS
+              const form = document.getElementById('form-otp');
+              try {
+                form.requestSubmit();
+              } catch (_) {
+                // Fallback: create and click a submit button
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.click();
+              }
+            }
+          });
+        }
 
       } catch (err) {
-        showToast(err.message, "error");
+        showToast(err.message || "Failed to send code", "error");
       } finally {
         setBtnLoading(btn, false);
       }
@@ -297,7 +345,10 @@
     function switchToPasswordMode() {
       els.otpSection.style.display = 'none';
       els.formPass.style.display = 'block';
-      setTimeout(() => document.getElementById('input-password').focus(), 100);
+      setTimeout(() => {
+        const pwInput = document.getElementById('input-password');
+        if (pwInput) pwInput.focus();
+      }, 100);
     }
 
     /* --- LOGIN: PASSWORD --- */
@@ -316,7 +367,7 @@
         });
         loginSuccess(data);
       } catch (err) {
-        showToast("Incorrect password", "error");
+        showToast("Incorrect password. Try OTP login if forgotten.", "error");
         els.authCard.classList.add('shake-card');
         setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
         document.getElementById('input-password').value = "";
@@ -328,23 +379,25 @@
     /* --- LOGIN: OTP VERIFY --- */
     async function handleOtpSubmit(e) {
       e.preventDefault();
-      const otp = document.getElementById('input-otp').value;
+      const otp = document.getElementById('input-otp').value.replace(/\D/g, '');
+      if (otp.length !== 6) {
+        showToast("Please enter the 6-digit code", "error");
+        return;
+      }
       const btn = document.getElementById('btn-verify-otp');
       setBtnLoading(btn, true);
 
       try {
-        // Single call — server now issues the session cookie directly
         const data = await apiFetch('/auth/login/otp-verify', {
           method: 'POST',
           body: { email: userContext.email, otp, rememberMe: true }
         });
-
         loginSuccess(data);
-
       } catch (err) {
         showToast(err.message || "Invalid Code", "error");
         els.authCard.classList.add('shake-card');
         setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
+        document.getElementById('input-otp').value = "";
       } finally {
         setBtnLoading(btn, false);
       }
@@ -356,5 +409,20 @@
       window.location.href = "dashboard.html";
     }
   </script>
+
+  <div id="pwa-install-prompt" class="pwa-popup hidden">
+    <div class="pwa-popup-content">
+      <div class="pwa-icon">📱</div>
+      <div class="pwa-text">
+        <h4>Install Hisaab</h4>
+        <p id="pwa-instructions">Add to your home screen for quick access!</p>
+      </div>
+      <div class="pwa-actions">
+        <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
+        <button id="pwa-close-btn" class="pwa-btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
