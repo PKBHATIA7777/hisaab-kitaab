@@ -1,14 +1,23 @@
+/* server/middleware/csrfMiddleware.js */
+/* FIX v2: Match cookie settings with jwt.js for iOS Safari compatibility
+   
+   CSRF cookie must use SAME sameSite/secure settings as auth cookie.
+   Mismatch was causing iOS Safari to accept auth cookie but block CSRF cookie,
+   making ALL write operations (POST/PUT/DELETE/PATCH) fail with 403 on iPhone.
+*/
 const crypto = require("crypto");
 
+const isProduction = process.env.NODE_ENV === "production";
+
 function csrfProtection(req, res, next) {
-  // Set cookie if missing
   if (!req.cookies.csrf_token) {
     const token = crypto.randomUUID();
     res.cookie("csrf_token", token, {
-      httpOnly: false,
-      secure: true,
-      sameSite: "none",
-      maxAge: 24 * 60 * 60 * 1000,
+      httpOnly: false,                              // Must be readable by JS
+      secure: isProduction,                         // HTTPS only in prod
+      sameSite: isProduction ? "none" : "lax",     // Match jwt.js setting
+      maxAge: 24 * 60 * 60 * 1000,                 // 24 hours
+      path: "/",
     });
     req.cookies.csrf_token = token;
   }
@@ -24,7 +33,6 @@ function csrfProtection(req, res, next) {
   const cookieToken = req.cookies.csrf_token;
 
   if (!headerToken || !cookieToken) {
-    // Token genuinely missing — reject
     return res.status(403).json({
       ok: false,
       message: "Security check failed (CSRF token missing). Please refresh the page.",

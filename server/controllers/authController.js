@@ -765,6 +765,16 @@
 /* MODIFICATION: Only registerComplete is changed — personal chapter auto-created after user creation */
 /* All other functions are 100% identical to original */
 
+/* server/controllers/authController.js */
+/* FIX v2: signup_token cookie now uses environment-aware sameSite/secure settings
+   The only change from the previous version is the signup_token cookie options in
+   registerVerifyOtp() — it now uses isProduction ? "none" : "lax" to match jwt.js.
+   
+   On iOS Safari, hardcoded sameSite:"none" in development caused the signup_token
+   cookie to be blocked, breaking the registration flow on iPhones using localhost.
+   In production (Render), sameSite:"none" + secure:true is correct.
+*/
+
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -781,8 +791,9 @@ const {
   normalizeEmail
 } = require("../utils/validation");
 
-// ✅ NEW IMPORT for Feature 3
 const { createPersonalChapterForUser } = require("./personalChapterController");
+
+const isProduction = process.env.NODE_ENV === "production";
 
 function generateOtpCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -800,8 +811,6 @@ async function findUserByIdentifier(identifier) {
   );
   return rows[0] || null;
 }
-
-// ── All functions below are IDENTICAL to original ────────────────────────────
 
 async function checkIdentifier(req, res) {
   try {
@@ -907,7 +916,17 @@ async function registerVerifyOtp(req, res) {
       { email: email.trim().toLowerCase(), purpose: "complete_signup", otpId: otpRow.id },
       process.env.JWT_SECRET, { expiresIn: "15m" }
     );
-    res.cookie("signup_token", tempToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 15 * 60 * 1000 });
+
+    // ✅ FIX: Use environment-aware cookie settings (was hardcoded to secure:true, sameSite:"none")
+    // On iOS Safari in dev (HTTP localhost), sameSite:none without Secure blocks the cookie
+    res.cookie("signup_token", tempToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 15 * 60 * 1000,
+      path: "/",
+    });
+
     return res.json({ ok: true, message: "Email verified successfully" });
   } catch (err) {
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
@@ -915,7 +934,6 @@ async function registerVerifyOtp(req, res) {
   }
 }
 
-// ✅ MODIFIED: registerComplete — only addition is auto-creating personal chapter after user creation
 async function registerComplete(req, res) {
   try {
     if (!process.env.JWT_SECRET) {
@@ -977,16 +995,22 @@ async function registerComplete(req, res) {
       await client.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
       await client.query("COMMIT");
 
-      // ✅ NEW Feature 3: Auto-create "My Expenses" personal chapter
-      // Done OUTSIDE the transaction so it doesn't block registration on failure
+      // Auto-create personal chapter (non-fatal)
       try {
         await createPersonalChapterForUser(user.id, null);
       } catch (chapErr) {
-        // Non-fatal: log but don't fail registration
         console.error("Warning: Could not auto-create personal chapter:", chapErr.message);
       }
 
-      res.clearCookie("signup_token");
+      // Clear signup cookie
+      res.cookie("signup_token", "", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        expires: new Date(0),
+        path: "/",
+      });
+
       const token = createToken({ userId: user.id.toString() });
       sendAuthCookie(res, token);
 
@@ -1007,8 +1031,6 @@ async function registerComplete(req, res) {
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
-
-// ── All remaining functions IDENTICAL to original ─────────────────────────────
 
 async function login(req, res) {
   try {
@@ -1051,19 +1073,16 @@ async function googleLogin(req, res) {
         [realName, email, googleId, now]
       );
       user = newUserRows[0];
-      // ✅ NEW Feature 3: Auto-create personal chapter for new Google users too
       try {
         await createPersonalChapterForUser(user.id, null);
       } catch (chapErr) {
         console.error("Warning: Could not auto-create personal chapter for Google user:", chapErr.message);
       }
     } else {
-      const now = new Date();
-      await db.query("UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2", [now, user.id]);
+      await db.query("UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2", [new Date(), user.id]);
     }
-    const rememberMe = true;
-    const token = createToken({ userId: user.id.toString() }, rememberMe);
-    sendAuthCookie(res, token, rememberMe);
+    const token = createToken({ userId: user.id.toString() }, true);
+    sendAuthCookie(res, token, true);
     return res.json({ ok: true, message: "Google login successful", isNewUser, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email } });
   } catch (err) {
     console.error("googleLogin error:", err);

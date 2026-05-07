@@ -1,5 +1,5 @@
 /* server/routes/categoryRoutes.js */
-/* Feature 4: Category CRUD routes */
+/* FIX: /monthly MUST come before /:id — otherwise Express treats "monthly" as the :id param */
 
 const express = require("express");
 const router = express.Router();
@@ -14,19 +14,13 @@ const {
 
 router.use(requireAuth);
 
-// GET    /api/categories         — System + user's custom categories
-router.get("/", getCategories);
-
-// POST   /api/categories         — Create custom category
-router.post("/", createCategory);
-
-// PUT    /api/categories/:id     — Edit custom category
-router.put("/:id", updateCategory);
-
-// DELETE /api/categories/:id     — Delete custom category
-router.delete("/:id", deleteCategory);
-
-// GET    /api/categories/monthly — Monthly + category breakdown for personal chapter
+// ✅ CRITICAL: /monthly MUST be declared before /:id
+// Otherwise Express matches GET /monthly as /:id with id="monthly"
 router.get("/monthly", getMonthlyBreakdown);
+
+router.get("/", getCategories);
+router.post("/", createCategory);
+router.put("/:id", updateCategory);
+router.delete("/:id", deleteCategory);
 
 module.exports = router;
