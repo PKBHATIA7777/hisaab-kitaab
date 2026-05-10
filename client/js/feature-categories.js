@@ -159,11 +159,16 @@ window.getSelectedCategoryId = function() {
       await injectCategoryRowInExpenseModal(null);
     };
 
-    const _origEdit = window.openEditExpenseModal;
-    if (typeof _origEdit === 'function') {
+    // Only patch edit if it exists
+    const patchEdit = () => {
+      if (typeof window.openEditExpenseModal !== 'function') {
+        setTimeout(patchEdit, 200);
+        return;
+      }
+      const _origEdit = window.openEditExpenseModal;
       window.openEditExpenseModal = async function(id) {
+        // Call original and wait a tick for modal to open
         await _origEdit(id);
-        // Get expense category after modal opens
         try {
           const data = await apiFetch(`/expenses/${id}`);
           const catId = data.expense?.category_id || null;
@@ -173,7 +178,8 @@ window.getSelectedCategoryId = function() {
           await injectCategoryRowInExpenseModal(null);
         }
       };
-    }
+    };
+    patchEdit();
   };
 
   if (document.getElementById('add-expense-modal')) {

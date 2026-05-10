@@ -1,7 +1,8 @@
 /* client/js/chapter.js */
 
 const urlParams = new URLSearchParams(window.location.search);
-const chapterId = urlParams.get("id");
+const chapterId = urlParams.get('id');
+window.chapterId = chapterId; // expose for feature scripts
 
 if (!chapterId) {
   window.location.href = "dashboard.html";
@@ -674,6 +675,7 @@ window.closeSettlementModal = function() {
 function renderSettlements(settlements) {
   if (!settlements || settlements.length === 0) {
     settlementEmpty.style.display = "block";
+    loadAndShowSettlementHistoryInModal();
     return;
   }
 
@@ -682,28 +684,170 @@ function renderSettlements(settlements) {
 
   settlements.forEach(item => {
     const row = document.createElement("div");
-    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:15px 0; border-bottom:1px solid #f0f0f0;";
-    
+    row.className = "settle-row-pending";
+
+    const fromSafe = item.from.replace(/'/g, "\\'");
+    const toSafe = item.to.replace(/'/g, "\\'");
+
     row.innerHTML = `
-      <div style="display:flex; align-items:center; gap:10px; flex:1;">
-        <div class="small-avatar" style="background:${getAvatarColor(item.from)}">
+      <div class="settle-people">
+        <div class="small-avatar" style="background:${getAvatarColor(item.from)}; width:28px; height:28px; font-size:0.75rem; flex-shrink:0;">
           ${getInitials(item.from)}
         </div>
-        
-        <div style="font-size:0.9rem; line-height:1.3;">
-          <span style="font-weight:600; color:#333;">${item.from}</span>
-          <div style="color:#888; font-size:0.8rem;">pays <span style="font-weight:600;">${item.to}</span></div>
-        </div>
+        <span><strong>${item.from}</strong> → <strong>${item.to}</strong></span>
       </div>
-
-      <div style="text-align:right;">
-        <div style="font-weight:700; font-size:1.1rem; color:#d000ff;">₹${item.amount}</div>
-        <div style="font-size:0.7rem; color:#ccc;">➔</div>
-      </div>
+      <span class="settle-amount-tag">₹${item.amount}</span>
+      <button class="btn-mark-settled" data-from="${fromSafe}" data-to="${toSafe}" data-amount="${item.amount}">✓ Mark</button>
     `;
+
+    row.querySelector('.btn-mark-settled').addEventListener('click', function() {
+      window._openMarkModal({
+        from: this.dataset.from,
+        to: this.dataset.to,
+        amount: parseFloat(this.dataset.amount)
+      });
+    });
 
     settlementList.appendChild(row);
   });
+
+  loadAndShowSettlementHistoryInModal();
+}
+
+async function loadAndShowSettlementHistoryInModal() {
+  try {
+    let url = `/chapters/${chapterId}/settlements/history`;
+    if (currentEventId) url += `?eventId=${currentEventId}`;
+    const data = await apiFetch(url);
+    const history = data.history || [];
+    if (history.length === 0) return;
+
+    const histSection = document.createElement('div');
+    histSection.style.marginTop = '20px';
+
+    const histTitle = document.createElement('div');
+    histTitle.style.cssText = 'font-size:0.85rem; font-weight:700; color:#888; margin-bottom:10px; text-transform:uppercase;';
+    histTitle.textContent = `✅ Completed (${history.length})`;
+    histSection.appendChild(histTitle);
+
+    history.forEach(rec => {
+      const row = document.createElement('div');
+      row.className = 'settled-record-row';
+      row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#f9f9f9; border-radius:8px; border:1px solid #eee; margin-bottom:6px; gap:8px;';
+      row.innerHTML = `
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:0.82rem; color:#555;">
+            <strong>${rec.from_name}</strong> → <strong>${rec.to_name}</strong>
+          </div>
+          <div style="font-size:0.72rem; color:#aaa; margin-top:2px;">
+            ${new Date(rec.marked_at).toLocaleDateString('en-IN')}${rec.note ? ' · ' + rec.note : ''}
+          </div>
+        </div>
+        <span style="font-weight:700; font-size:0.88rem; color:#00875a; flex-shrink:0;">₹${parseFloat(rec.amount).toFixed(2)}</span>
+        <button style="background:none; border:1px solid #ffcdd2; color:#e53935; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer; flex-shrink:0;" data-record-id="${rec.id}">Undo</button>
+      `;
+      row.querySelector('button').addEventListener('click', async function() {
+        const recordId = this.dataset.recordId;
+        if (!confirm('Undo this settlement?')) return;
+        try {
+          await apiFetch(`/chapters/${chapterId}/settlements/history/${recordId}`, { method: 'DELETE' });
+          showToast('Settlement undone', 'info');
+          openSettlementModal();
+        } catch (err) {
+          showToast(err.message || 'Failed', 'error');
+        }
+      });
+      histSection.appendChild(row);
+    });
+
+    settlementList.appendChild(histSection);
+  } catch(e) {
+    console.warn('Could not load settlement history in modal:', e.message);
+  }
+}
+
+window._openMarkModal = function(settlement) {
+  const existing = document.getElementById('mark-settle-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'mark-settle-modal';
+  modal.className = 'modal-overlay active';
+
+  const fromDisplay = settlement.from;
+  const toDisplay = settlement.to;
+  const amountDisplay = parseFloat(settlement.amount).toFixed(2);
+
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-header">
+        <h2>Mark as Settled</h2>
+        <button class="close-modal" type="button">×</button>
+      </div>
+      <div class="mark-settle-form">
+        <div class="mark-settle-summary">
+          <div class="from-to">
+            <strong>${fromDisplay}</strong> pays <strong>${toDisplay}</strong>
+          </div>
+          <div class="max-amount">Pending: ₹${amountDisplay}</div>
+        </div>
+        <div class="mark-settle-amount-input">
+          <span>₹</span>
+          <input type="number" id="settle-amount-input" value="${amountDisplay}" step="0.01" min="0.01">
+        </div>
+        <textarea class="mark-settle-note-input" id="settle-note-input" placeholder="Note (optional, e.g. Paid via GPay)" rows="2"></textarea>
+        <button class="btn-primary" id="btn-confirm-settle" type="button">
+          Confirm Settlement
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+
+  modal.querySelector('#btn-confirm-settle').addEventListener('click', async function() {
+    const btn = this;
+    const amount = parseFloat(document.getElementById('settle-amount-input').value);
+    const note = document.getElementById('settle-note-input').value.trim();
+
+    if (!amount || amount <= 0) {
+      showToast('Enter a valid amount', 'error');
+      return;
+    }
+
+    const fromMember = currentMembers.find(m => m.member_name === fromDisplay);
+    const toMember = currentMembers.find(m => m.member_name === toDisplay);
+
+    if (!fromMember || !toMember) {
+      showToast('Could not identify members', 'error');
+      return;
+    }
+
+    setBtnLoading(btn, true);
+
+    try {
+      await apiFetch(`/chapters/${chapterId}/settlements/mark`, {
+        method: 'POST',
+        body: {
+          fromMemberId: fromMember.id,
+          toMemberId: toMember.id,
+          amount,
+          note,
+          eventId: currentEventId || null
+        }
+      });
+      modal.remove();
+      showToast('Settlement marked ✓', 'success');
+      loadExpenses();
+      loadHeroSettlements();
+    } catch (err) {
+      showToast(err.message || 'Failed to mark settlement', 'error');
+      setBtnLoading(btn, false);
+    }
+  });
+
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('settle-amount-input')?.focus(), 100);
 };
 
 // ==========================================

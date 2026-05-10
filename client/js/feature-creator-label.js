@@ -34,38 +34,36 @@
 })();
 
 function injectCreatorRow() {
-  // Get current user from dashboard.js global
   const user = window.currentUser;
   if (!user) return;
 
   const memberContainer = document.getElementById('member-list-container');
   if (!memberContainer) return;
 
-  // Remove any existing creator row
   const existing = memberContainer.querySelector('.creator-member-row');
   if (existing) existing.remove();
 
-  const initials = getInitials(user.realName || user.username || '?');
-  const color = getAvatarColor(user.realName || '');
+  // Use safe fallbacks if helpers not loaded yet
+  const name = user.realName || user.username || '?';
+  const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  const colors = ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#f0932b','#6c5ce7'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const color = colors[Math.abs(hash) % colors.length];
 
-  // Create the row
   const row = document.createElement('div');
   row.className = 'creator-member-row';
   row.dataset.creatorAdded = 'true';
-
   row.innerHTML = `
     <div class="creator-member-avatar" style="background:${color};">${initials}</div>
     <div class="creator-member-name">
-      ${user.realName || user.username}
+      ${name}
       <span class="you-badge">You</span>
     </div>
     <div class="creator-tick" id="creator-tick-btn" title="Click to toggle your membership">✓</div>
   `;
 
-  // Prepend so it's first
   memberContainer.prepend(row);
-
-  // Wire up toggle
   row.querySelector('#creator-tick-btn').addEventListener('click', toggleCreatorMembership);
 }
 

@@ -871,3 +871,419 @@
 .event-assign-new .event-assign-name {
   color: #d000ff;
 }
+
+
+
+
+
+
+/* ── SETTLEMENT MARKING STYLES ─────────────────────────────── */
+
+.settle-row-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: nowrap;
+}
+
+.settle-row-pending:last-of-type {
+  border-bottom: none;
+}
+
+.settle-people {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settle-people span {
+  font-size: 0.85rem;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settle-amount-tag {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #d000ff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-mark-settled {
+  background: #f0fff4;
+  border: 1.5px solid #00e676;
+  color: #00875a;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  font-family: var(--font-main);
+  flex-shrink: 0;
+}
+
+.btn-mark-settled:hover {
+  background: #00e676;
+  color: #fff;
+}
+
+.settled-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 8px 0;
+  cursor: pointer;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-top: 8px;
+}
+
+.settled-history-toggle span {
+  font-size: 0.82rem;
+  color: #aaa;
+  font-weight: 600;
+}
+
+.settled-history-toggle .toggle-chevron {
+  font-size: 0.75rem;
+  color: #aaa;
+  transition: transform 0.2s;
+}
+
+.settled-history-toggle.open .toggle-chevron {
+  transform: rotate(180deg);
+}
+
+.settled-history-list {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.settled-history-list.open {
+  display: flex;
+}
+
+.settled-record-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  gap: 8px;
+}
+
+.settled-record-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settled-record-names {
+  font-size: 0.82rem;
+  color: #eee;
+}
+
+.settled-record-names strong {
+  color: #fff;
+}
+
+.settled-record-meta {
+  font-size: 0.72rem;
+  color: #888;
+  margin-top: 2px;
+}
+
+.settled-record-amount {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #00e676;
+  flex-shrink: 0;
+}
+
+.btn-undo-settle {
+  background: none;
+  border: 1px solid rgba(255, 99, 99, 0.4);
+  color: #ff6b6b;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: var(--font-main);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-undo-settle:hover {
+  background: rgba(255,99,99,0.15);
+}
+
+.mark-settle-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mark-settle-summary {
+  background: #f5f5f7;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.mark-settle-summary .from-to {
+  font-size: 0.95rem;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.mark-settle-summary .max-amount {
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.mark-settle-amount-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid #eee;
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+
+.mark-settle-amount-input:focus-within {
+  border-color: #d000ff;
+}
+
+.mark-settle-amount-input span {
+  font-size: 1.1rem;
+  color: #888;
+}
+
+.mark-settle-amount-input input {
+  border: none !important;
+  background: transparent !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  color: #333;
+  width: 100%;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.mark-settle-note-input {
+  border: 2px solid #eee;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--font-main);
+  font-size: 0.9rem;
+  width: 100%;
+  resize: none;
+  min-height: 60px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.mark-settle-note-input:focus {
+  border-color: #d000ff;
+  outline: none;
+}
+
+/* ── PERSONAL CHAPTER BADGE ────────────────────────────────── */
+.personal-chapter-badge {
+  position: absolute;
+  top: 10px;
+  right: 44px;
+  background: linear-gradient(135deg, #d000ff, #8a2be2);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  z-index: 5;
+}
+
+/* ── CATEGORY EXPENSE BADGE ────────────────────────────────── */
+.expense-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+/* ── SELECTION MODE ─────────────────────────────────────────── */
+.expense-card.selectable {
+  cursor: pointer;
+  padding-left: 44px !important;
+  position: relative;
+  transition: all 0.15s;
+}
+
+.expense-card.selected-card {
+  border: 2px solid #d000ff !important;
+  background: rgba(208, 0, 255, 0.04) !important;
+}
+
+.expense-select-check {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  font-size: 0.75rem;
+  color: #fff;
+  transition: all 0.15s;
+}
+
+.expense-card.selected-card .expense-select-check {
+  background: #d000ff;
+  border-color: #d000ff;
+}
+
+.selection-action-bar {
+  position: fixed;
+  bottom: max(90px, calc(80px + env(safe-area-inset-bottom)));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1a1a2e;
+  color: #fff;
+  border-radius: 30px;
+  padding: 10px 18px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+  z-index: 200;
+  white-space: nowrap;
+  max-width: 90vw;
+}
+
+.selection-count-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #d000ff;
+}
+
+.btn-assign-event {
+  background: #d000ff;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-main);
+}
+
+.btn-assign-event:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
+
+.btn-cancel-select {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.7);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: var(--font-main);
+}
+
+.btn-remove-from-event {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.7);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: var(--font-main);
+}
+
+.event-assign-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 4px;
+  border: 1.5px solid transparent;
+}
+
+.event-assign-option:hover {
+  background: #f5f5f7;
+}
+
+.event-assign-option.selected-event {
+  border-color: #d000ff;
+  background: rgba(208, 0, 255, 0.05);
+}
+
+.event-assign-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #d000ff22, #8a2be222);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.event-assign-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.event-assign-new {
+  border: 1.5px dashed #d000ff55;
+}
+
+.event-assign-new .event-assign-icon {
+  background: rgba(208,0,255,0.12);
+  color: #d000ff;
+  font-size: 1.2rem;
+}
+
+.event-assign-new .event-assign-name {
+  color: #d000ff;
+}
+
+.event-assign-sheet {
+  max-height: 60vh;
+  overflow-y: auto;
+}

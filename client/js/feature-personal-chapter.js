@@ -424,10 +424,15 @@ function addPersonalButtonsToSummary(data) {
 document.addEventListener('DOMContentLoaded', () => {
   // Dashboard page
   if (document.getElementById('chapters-grid')) {
-    setTimeout(async () => {
-      await checkAndRenderPersonalChapterBanner();
-      // Wait for grid to render then add badges
-      setTimeout(markPersonalChaptersOnGrid, 600);
-    }, 800);
+    // Wait for dashboard.js to finish loading chapters
+    const waitForChapters = setInterval(() => {
+      if (window.allChapters !== undefined) {
+        clearInterval(waitForChapters);
+        checkAndRenderPersonalChapterBanner();
+        setTimeout(markPersonalChaptersOnGrid, 800);
+      }
+    }, 200);
+    // Safety timeout
+    setTimeout(() => clearInterval(waitForChapters), 10000);
   }
 });

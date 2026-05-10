@@ -93,7 +93,7 @@ function renderExpensesInSelectMode() {
       <div class="expense-select-check" id="check-${ex.id}"></div>
       <div class="expense-info">
         <h4>${ex.description || 'Untitled Expense'}</h4>
-        <p>paid by <strong>${ex.payer_name || 'Unknown'}</strong> · ${timeAgo(ex.expense_date)}</p>
+        <p>paid by <strong>${ex.payer_name || 'Unknown'}</strong> · ${typeof window.timeAgo === 'function' ? window.timeAgo(ex.expense_date) : (typeof timeAgo === 'function' ? timeAgo(ex.expense_date) : '')}</p>
         ${ex.event_id ? `<span style="font-size:0.7rem; color:#d000ff; font-weight:600;">📌 In event</span>` : ''}
       </div>
       <div style="text-align:right;">
@@ -430,8 +430,15 @@ function attachLongPressToExpenseCards() {
 // ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('chapter-menu-dropdown')) {
-    // Inject "Select Expenses" option into the chapter dropdown
-    // Wait for chapter.js to finish setting up the dropdown
-    setTimeout(injectSelectModeButton, 300);
+    // Wait longer for chapter.js dropdown to fully initialize
+    const tryInject = () => {
+      const dropdown = document.getElementById('chapter-menu-dropdown');
+      if (dropdown && dropdown.querySelector('button')) {
+        injectSelectModeButton();
+      } else {
+        setTimeout(tryInject, 300);
+      }
+    };
+    setTimeout(tryInject, 500);
   }
 });
