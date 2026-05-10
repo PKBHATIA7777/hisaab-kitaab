@@ -86,33 +86,6 @@ function hideAppLoader() {
   /* ======================================
      1. NETWORK STACK
      ====================================== */
-  let csrfToken = null;
-  let csrfPromise = null;
-
-  function initCSRF(forceRefresh = false) {
-    if (forceRefresh) {
-      csrfToken = null;
-      csrfPromise = null;
-    }
-    if (!forceRefresh && csrfToken) return Promise.resolve(csrfToken);
-    if (!forceRefresh && csrfPromise) return csrfPromise;
-
-    csrfPromise = fetch(CONFIG.API_BASE + "/csrf-token", { credentials: "include" })
-      .then(res => res.json())
-      .then(data => {
-        if (data.csrfToken) {
-          csrfToken = data.csrfToken;
-          return csrfToken;
-        }
-        throw new Error("No token received");
-      })
-      .catch(err => {
-        console.warn("CSRF Init failed", err);
-        csrfPromise = null;
-        return null;
-      });
-    return csrfPromise;
-  }
 
   window.debounce = function(func, wait) {
     let timeout;
@@ -122,157 +95,153 @@ function hideAppLoader() {
     };
   };
 
+  // ── Exponential backoff helper ──────────────────────────────
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── CSRF token management ───────────────────────────────────
+  // Read from cookie (set by server) rather than doing a network round-trip.
+  // This eliminates the extra GET /csrf-token before every mutation.
+  function getCSRFFromCookie() {
+    const value = `; ${document.cookie}`;
+    const parts = value.split("; csrf_token=");
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return null;
+  }
+
+  // Pages where a 401 is EXPECTED and should NOT redirect
+  const AUTH_PAGES = ["login.html", "index.html", "signup.html", "forgot.html", "set-password.html"];
+  function isAuthPage() {
+    return AUTH_PAGES.some(p => window.location.pathname.includes(p));
+  }
+
   window.apiFetch = async function(path, options = {}) {
     const method = (options.method || "GET").toUpperCase();
     const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
 
-    if (isMutation) {
-      await initCSRF(true);
-    } else {
-      await initCSRF();
-    }
+    const makeRequest = async (attempt = 0) => {
+      // Read CSRF from cookie — no extra round-trip needed
+      const csrfToken = getCSRFFromCookie();
 
-    const headers = {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
+      const headers = {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      };
+      if (csrfToken && isMutation) {
+        headers["X-CSRF-Token"] = csrfToken;
+      }
+
+      const controller = new AbortController();
+      // Increase timeout for Render cold starts (can take 10-15s)
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      let res;
+      try {
+        res = await fetch(CONFIG.API_BASE + path, {
+          method,
+          headers,
+          credentials: "include",
+          body: options.body ? JSON.stringify(options.body) : undefined,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === "AbortError") {
+          const error = new Error("Request timed out. The server may be starting up — please try again.");
+          error.status = 408;
+          error.isTimeout = true;
+          throw error;
+        }
+        if (!navigator.onLine) {
+          const error = new Error("You appear to be offline. Please check your connection.");
+          error.status = 0;
+          error.isOffline = true;
+          throw error;
+        }
+        // Network error (fetch itself failed) — retry with backoff up to 2 times
+        if (attempt < 2) {
+          await sleep(Math.pow(2, attempt) * 800); // 800ms, 1600ms
+          return makeRequest(attempt + 1);
+        }
+        throw err;
+      }
+
+      // Server echoes the current CSRF token in every response header.
+      // Update our cookie if it rotated (e.g. after logout + re-login).
+      const freshCSRF = res.headers.get("X-CSRF-Token");
+      if (freshCSRF && freshCSRF !== csrfToken) {
+        // The server already set the cookie via Set-Cookie, but update our
+        // in-memory awareness by reading the cookie again on next call.
+        // Nothing to do explicitly — the cookie was set by the response.
+      }
+
+      // CSRF mismatch — server returns {csrfError: true}
+      // Retry once after a short wait (cookie needs time to propagate in Safari)
+      if (res.status === 403 && isMutation && attempt < 2) {
+        let body = {};
+        try { body = await res.clone().json(); } catch (_) {}
+        if (body.csrfError) {
+          await sleep(Math.pow(2, attempt) * 600); // 600ms, 1200ms
+          return makeRequest(attempt + 1);
+        }
+      }
+
+      // 401 handling — only redirect if NOT on an auth page and NOT a background check
+      if (res.status === 401) {
+        if (!isAuthPage() && !options._silent) {
+          window.location.href = "login.html?expired=true";
+          return; // Stop processing
+        }
+        // On auth pages: fall through to normal error handling below
+      }
+
+      // Rate limit
+      if (res.status === 429) {
+        // Retry after the server's suggested wait time
+        const retryAfter = parseInt(res.headers.get("Retry-After") || "60", 10);
+        if (attempt < 1) {
+          await sleep(Math.min(retryAfter * 1000, 5000)); // Max 5s wait in UI
+          return makeRequest(attempt + 1);
+        }
+        const error = new Error("You're doing this too fast — please wait a moment.");
+        error.status = 429;
+        error.isRateLimit = true;
+        throw error;
+      }
+
+      // Server errors — retry with backoff for transient failures
+      if (res.status >= 500 && attempt < 2) {
+        await sleep(Math.pow(2, attempt) * 1000); // 1s, 2s
+        return makeRequest(attempt + 1);
+      }
+      if (res.status >= 500) {
+        const error = new Error("Server is temporarily unavailable. Please try again.");
+        error.status = res.status;
+        error.isServerError = true;
+        throw error;
+      }
+
+      // Parse response
+      const contentType = res.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        try { data = await res.json(); }
+        catch (_) { data = { message: "Invalid response from server." }; }
+      } else {
+        await res.text(); // Drain body
+        data = { message: res.ok ? "OK" : `Server error (${res.status})` };
+      }
+
+      if (!res.ok) {
+        const error = new Error(data.message || `Request failed (${res.status})`);
+        error.status = res.status;
+        error.data = data;
+        throw error;
+      }
+      return data;
     };
 
-    if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUTS.REQUEST_TIMEOUT);
-
-    let res;
-    try {
-      res = await fetch(CONFIG.API_BASE + path, {
-        method: method,
-        headers: headers,
-        credentials: "include",
-        body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-    } catch (err) {
-      clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        const error = new Error("Request timed out. Please check your connection and try again.");
-        error.status = 408;
-        error.isTimeout = true;
-        throw error;
-      }
-      if (!window.navigator.onLine || err.message.includes('Failed to fetch')) {
-        const error = new Error("Network error. Please check your internet connection.");
-        error.status = 0;
-        error.isNetworkError = true;
-        throw error;
-      }
-      throw err;
-    }
-
-    // FIX v2: Retry CSRF up to 2 times for Safari which may not send cookie on first request
-    if (res.status === 403) {
-      let shouldRetry = false;
-      if (isMutation) {
-        shouldRetry = true;
-      } else {
-        const contentType = res.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-          const json = await res.clone().json().catch(() => ({}));
-          shouldRetry = json.message && json.message.includes("CSRF");
-        }
-      }
-
-      if (shouldRetry) {
-        csrfToken = null;
-        csrfPromise = null;
-        await initCSRF(true);
-
-        const retryHeaders = {
-          "Content-Type": "application/json",
-          ...(options.headers || {}),
-        };
-        if (csrfToken) retryHeaders["X-CSRF-Token"] = csrfToken;
-
-        const retryController = new AbortController();
-        const retryTimeoutId = setTimeout(() => retryController.abort(), CONFIG.TIMEOUTS.REQUEST_TIMEOUT);
-
-        try {
-          res = await fetch(CONFIG.API_BASE + path, {
-            method: method,
-            headers: retryHeaders,
-            credentials: "include",
-            body: options.body ? JSON.stringify(options.body) : undefined,
-            signal: retryController.signal,
-          });
-          clearTimeout(retryTimeoutId);
-        } catch (err) {
-          clearTimeout(retryTimeoutId);
-          if (err.name === 'AbortError') {
-            const error = new Error("Request timed out. Please check your connection and try again.");
-            error.status = 408;
-            error.isTimeout = true;
-            throw error;
-          }
-          throw err;
-        }
-      }
-    }
-
-    if (isMutation && res.ok) {
-      const newToken = res.headers.get("X-CSRF-Token");
-      if (newToken && newToken !== csrfToken) {
-        csrfToken = newToken;
-      }
-    }
-
-    // FIX v2: avoid redirect loops on iOS — only redirect if NOT already on auth page
-    if (res.status === 401) {
-      const authPages = ["login.html", "index.html", "signup.html", "forgot.html"];
-      const isAuthPage = authPages.some(p => window.location.pathname.includes(p));
-      if (!isAuthPage) {
-        window.location.href = "login.html?expired=true";
-        return;
-      }
-    }
-
-    if (res.status === 429) {
-      const error = new Error("You're doing this too fast, please wait a moment.");
-      error.status = 429;
-      error.isRateLimit = true;
-      throw error;
-    }
-
-    if (res.status >= 500 && res.status < 600) {
-      const error = new Error("Server is temporarily unavailable. Please try again.");
-      error.status = res.status;
-      error.isServerError = true;
-      throw error;
-    }
-
-    const contentType = res.headers.get("content-type") || "";
-    let data;
-
-    if (contentType.includes("application/json")) {
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        data = { message: "Invalid response format from server" };
-      }
-    } else {
-      const text = await res.text().catch(() => "");
-      console.warn("Expected JSON but received:", contentType);
-      if (res.status >= 500) data = { message: "Server is temporarily unavailable. Please try again." };
-      else if (res.status === 404) data = { message: "Endpoint not found. Please refresh the page." };
-      else data = { message: "Invalid server response. Please try again." };
-    }
-
-    if (!res.ok) {
-      const error = new Error(data.message || "Request failed");
-      error.status = res.status;
-      error.data = data;
-      throw error;
-    }
-    return data;
+    return makeRequest(0);
   };
 
   /* ======================================
@@ -559,7 +528,7 @@ function hideAppLoader() {
      ====================================== */
   async function initializeApp() {
     try {
-      await initCSRF();
+      // CSRF is now read from cookie directly in apiFetch — no init needed here
     } catch (err) {
       console.error("App initialization failed", err);
     } finally {

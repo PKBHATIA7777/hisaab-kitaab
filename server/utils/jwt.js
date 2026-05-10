@@ -1,30 +1,28 @@
 /* server/utils/jwt.js */
-/* FIX v2: Cookie settings hardened for iOS Safari ITP + cross-origin Render deployment
-   
-   ROOT CAUSE OF iOS AUTH FAILURES:
-   - Safari's ITP (Intelligent Tracking Prevention) blocks SameSite=None cookies
-     when the backend is on a different domain (Render) than the frontend (Vercel)
-   - This means auth_token and csrf_token cookies get blocked on iOS Safari
-   
-   PRODUCTION FIX:
-   - SameSite=None + Secure=true is required for cross-origin cookies
-   - Add __Host- prefix to cookies for extra security (forces Secure + no domain)
-   - Set the domain explicitly if frontend/backend share a root domain
-   - For Render + Vercel (different domains): SameSite=None is unavoidable
-     but we add extra headers to help iOS not classify Render as a tracker
-   
-   DEVELOPMENT:
-   - SameSite=Lax works on localhost because same-origin
-*/
 const jwt = require("jsonwebtoken");
 
 const SHORT_AGE = "15d";
 const LONG_AGE  = "90d";
-
-const SHORT_MS = 15 * 24 * 60 * 60 * 1000;
-const LONG_MS  = 90 * 24 * 60 * 60 * 1000;
+const SHORT_MS  = 15 * 24 * 60 * 60 * 1000;
+const LONG_MS   = 90 * 24 * 60 * 60 * 1000;
 
 const isProduction = process.env.NODE_ENV === "production";
+
+// Single source of truth for all cookie options
+function getCookieOptions(maxAgeMs, httpOnly = true) {
+  return {
+    httpOnly,
+    secure: isProduction,
+    // sameSite "none" is REQUIRED for cross-origin (Render backend + Vercel frontend).
+    // "lax" works on localhost. Never use "strict" — it blocks cookies on
+    // cross-origin redirects from Google OAuth.
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: maxAgeMs,
+    path: "/",
+    // Do NOT set domain — letting the browser infer it works across subdomains
+    // and avoids the "domain mismatch" bug on Render's *.onrender.com URLs.
+  };
+}
 
 function createToken(payload, remember = false) {
   const secret = process.env.JWT_SECRET;
@@ -34,46 +32,23 @@ function createToken(payload, remember = false) {
 
 function sendAuthCookie(res, token, remember = false) {
   const maxAgeMs = remember ? LONG_MS : SHORT_MS;
-
-  // Production (Render + Vercel cross-origin): SameSite=None + Secure required
-  // Dev (localhost): SameSite=Lax + Secure=false works without HTTPS
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: maxAgeMs,
-    path: "/",
-  };
-
-  res.cookie("auth_token", token, cookieOptions);
-
-  // Readable "expiry shadow" cookie for client-side session warning
-  res.cookie("session_expiry", String(Date.now() + maxAgeMs), {
-    httpOnly: false,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: maxAgeMs,
-    path: "/",
-  });
+  res.cookie("auth_token", token, getCookieOptions(maxAgeMs, true));
+  // session_expiry is intentionally httpOnly:false so JS can read it for the
+  // "session expiring soon" warning. But we keep all other options identical
+  // so iOS ITP treats it the same as the auth cookie.
+  res.cookie("session_expiry", String(Date.now() + maxAgeMs), getCookieOptions(maxAgeMs, false));
 }
 
 function clearAuthCookies(res) {
-  const clearOptions = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
+  const expiredOptions = {
+    ...getCookieOptions(0, true),
     expires: new Date(0),
-    path: "/",
+    maxAge: 0,
   };
-
-  res.cookie("auth_token", "", clearOptions);
-  res.cookie("session_expiry", "", { ...clearOptions, httpOnly: false });
+  res.cookie("auth_token",    "", expiredOptions);
+  res.cookie("session_expiry","", { ...expiredOptions, httpOnly: false });
+  // Also clear CSRF token so next login gets a fresh one
+  res.cookie("csrf_token",    "", { ...expiredOptions, httpOnly: false });
 }
 
-module.exports = {
-  createToken,
-  sendAuthCookie,
-  clearAuthCookies,
-  SHORT_MS,
-  LONG_MS,
-};
+module.exports = { createToken, sendAuthCookie, clearAuthCookies, SHORT_MS, LONG_MS };

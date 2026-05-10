@@ -71,7 +71,16 @@ async function getPersonalChapterStatus(req, res) {
       "SELECT id, name FROM chapters WHERE created_by = $1 AND is_personal = TRUE LIMIT 1",
       [userId]
     );
-    res.json({ ok: true, hasPersonalChapter: rows.length > 0, chapter: rows[0] || null });
+    if (rows.length > 0) {
+      return res.json({ ok: true, hasPersonalChapter: true, chapter: rows[0] });
+    }
+    // Lazily create for existing users — fire and forget, respond immediately
+    setImmediate(() => {
+      createPersonalChapterForUser(userId, null).catch(err =>
+        console.error(`Lazy personal chapter for user ${userId}:`, err.message)
+      );
+    });
+    res.json({ ok: true, hasPersonalChapter: false, chapter: null });
   } catch (err) {
     console.error("getPersonalChapterStatus error:", err);
     res.status(500).json({ ok: false, message: "Server error" });

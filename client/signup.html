@@ -14,10 +14,39 @@
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="theme-color" content="#ffffff">
   <style>
+    /* FIX v2: iOS Safari step transitions need will-change for smooth animation */
     .step-wrapper {
       will-change: transform, opacity;
       -webkit-transform: translateZ(0);
       transform: translateZ(0);
+      width: 100%;
+      transition: transform 0.32s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.32s ease;
+    }
+    /* Prevent iOS rubber-band scroll inside auth card */
+    .auth-card {
+      -webkit-overflow-scrolling: touch;
+    }
+    /* Visible step: in normal flow */
+    .step-active {
+      display: block;
+      transform: translateX(0) translateZ(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Hidden steps: use visibility:hidden + pointer-events:none instead of
+       position:absolute (which collapses the card height on iOS) */
+    .step-hidden-left,
+    .step-hidden-right {
+      display: none;
+      pointer-events: none;
+    }
+    /* During transition, briefly show both as overlay */
+    .step-transitioning .step-hidden-left,
+    .step-transitioning .step-hidden-right {
+      display: block;
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      opacity: 0;
     }
   </style>
 </head>
@@ -40,7 +69,8 @@
 
   <main id="main-content">
     <div class="auth-wrapper">
-      <section class="auth-card" style="overflow: hidden; position: relative; min-height: 400px;">
+      <!-- FIX: Removed overflow:hidden and transition from inline style to prevent height collapse -->
+      <section class="auth-card" style="position: relative; min-height: 400px;">
 
         <!-- Step 1: Email -->
         <div id="step-1" class="step-wrapper step-active">
@@ -50,11 +80,12 @@
           <form id="form-email" onsubmit="handleEmailSubmit(event)">
             <label>
               Email address
+              <!-- FIX: Proper autocomplete for iOS Keychain -->
               <input type="email"
                 name="email"
                 id="input-email"
                 required
-                autocomplete="email"
+                autocomplete="username email"
                 autocapitalize="none"
                 autocorrect="off"
                 inputmode="email"
@@ -89,14 +120,14 @@
           <form id="form-otp" onsubmit="handleOtpSubmit(event)">
             <label>
               Enter 6-digit Code
-              <!-- FIX v2: one-time-code enables iOS email/SMS OTP autofill -->
+              <!-- FIX: Added pattern for iOS numeric pad -->
               <input type="text"
                 name="otp"
                 id="input-otp"
                 inputmode="numeric"
+                pattern="[0-9]{6}"
                 autocomplete="one-time-code"
-                pattern="[0-9]*"
-                placeholder="123456"
+                placeholder="000000"
                 maxlength="6"
                 style="letter-spacing: 6px; font-size: 1.4rem; text-align: center; padding: 14px;">
             </label>
@@ -116,23 +147,26 @@
           <form id="form-details" onsubmit="handleDetailsSubmit(event)">
             <label>
               Full Name
-              <!-- FIX v2: name autocomplete lets iOS suggest from Contacts -->
+              <!-- FIX: name autocomplete + autocapitalize for iOS Contacts -->
               <input type="text"
                 name="realName"
+                id="input-name"
                 required
                 autocomplete="name"
                 autocapitalize="words"
-                placeholder="John Doe"
-                id="input-name">
+                autocorrect="off"
+                placeholder="John Doe">
             </label>
             <label>
               Create Password
               <div class="password-wrapper">
-                <!-- FIX v2: new-password triggers iOS Keychain "Strong Password" suggestion -->
+                <!-- FIX: new-password triggers iOS Keychain "Strong Password" + added id -->
                 <input type="password"
                   name="password"
+                  id="input-new-password"
                   required
                   autocomplete="new-password"
+                  inputmode="text"
                   placeholder="••••••••">
                 <button type="button" class="btn-toggle-pass" tabindex="-1">👁️</button>
               </div>
@@ -227,28 +261,25 @@
 
     /* --- OTP AUTO-SUBMIT (safe for all iOS versions) --- */
     function attachOtpAutoSubmit() {
-      const otpInput = els.inputOtp;
-      if (!otpInput) return;
+      // Clone to remove all stale listeners (called again on Resend)
+      const old = els.inputOtp;
+      if (!old) return;
+      const fresh = old.cloneNode(true);
+      old.parentNode.replaceChild(fresh, old);
+      els.inputOtp = fresh; // Update reference
 
-      // Remove any previous listener by replacing the element
-      otpInput.addEventListener('input', function onInput(e) {
-        // Strip non-digits (iOS may paste with spaces from Messages)
-        const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
-        if (e.target.value !== clean) e.target.value = clean;
-
+      fresh.addEventListener('input', function onInput() {
+        const clean = this.value.replace(/\D/g, '').slice(0, 6);
+        if (this.value !== clean) this.value = clean;
         if (clean.length === 6) {
-          otpInput.removeEventListener('input', onInput);
-          otpInput.blur();
-          // FIX v2: safe requestSubmit with fallback for iOS < 15.4
-          const form = document.getElementById('form-otp');
-          try {
-            form.requestSubmit();
-          } catch (_) {
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.click();
-          }
+          this.removeEventListener('input', onInput);
+          this.blur();
+          // Click the submit button — universally safe on all iOS versions
+          document.getElementById('btn-otp')?.click();
         }
       });
+
+      setTimeout(() => fresh.focus(), 80);
     }
 
     /* --- STEP 2: OTP VERIFY --- */

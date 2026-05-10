@@ -19,10 +19,34 @@
       will-change: transform, opacity;
       -webkit-transform: translateZ(0);
       transform: translateZ(0);
+      width: 100%;
+      transition: transform 0.32s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.32s ease;
     }
     /* Prevent iOS rubber-band scroll inside auth card */
     .auth-card {
       -webkit-overflow-scrolling: touch;
+    }
+    /* Visible step: in normal flow */
+    .step-active {
+      display: block;
+      transform: translateX(0) translateZ(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Hidden steps: use visibility:hidden + pointer-events:none instead of
+       position:absolute (which collapses the card height on iOS) */
+    .step-hidden-left,
+    .step-hidden-right {
+      display: none;
+      pointer-events: none;
+    }
+    /* During transition, briefly show both as overlay */
+    .step-transitioning .step-hidden-left,
+    .step-transitioning .step-hidden-right {
+      display: block;
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      opacity: 0;
     }
   </style>
 </head>
@@ -47,7 +71,8 @@
 
   <main id="main-content">
     <div class="auth-wrapper">
-      <section class="auth-card" style="overflow: hidden; position: relative; min-height: 420px; transition: min-height 0.3s ease;">
+      <!-- FIX B: Removed overflow:hidden and transition from inline style to prevent height collapse -->
+      <section class="auth-card" style="position: relative; min-height: 420px;">
 
         <!-- Step 1: Email/Identifier -->
         <div id="step-1" class="step-wrapper step-active">
@@ -57,12 +82,12 @@
           <form id="form-identifier" onsubmit="handleIdentifierSubmit(event)">
             <label>
               Email address
-              <!-- FIX v2: proper autocomplete attributes for iOS keyboard -->
+              <!-- FIX A: Proper autocomplete attributes for iOS Keychain -->
               <input type="email"
                 name="identifier"
                 id="input-identifier"
                 required
-                autocomplete="email"
+                autocomplete="username email"
                 autocapitalize="none"
                 autocorrect="off"
                 spellcheck="false"
@@ -91,11 +116,11 @@
             <label>
               Password
               <div class="password-wrapper">
-                <!-- FIX v2: current-password helps iOS Keychain autofill -->
+                <!-- FIX A: Added webauthn for passkey support -->
                 <input type="password"
                   name="password"
                   id="input-password"
-                  autocomplete="current-password"
+                  autocomplete="current-password webauthn"
                   placeholder="••••••••">
                 <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">👁️</button>
               </div>
@@ -129,14 +154,14 @@
             <form id="form-otp" onsubmit="handleOtpSubmit(event)" style="display:none;">
               <label>
                 Enter 6-digit Code
-                <!-- FIX v2: one-time-code triggers iOS SMS/email autofill for OTPs -->
+                <!-- FIX A: Added pattern for iOS numeric pad -->
                 <input type="text"
                   name="otp"
                   id="input-otp"
                   inputmode="numeric"
+                  pattern="[0-9]{6}"
                   autocomplete="one-time-code"
-                  pattern="[0-9]*"
-                  placeholder="123456"
+                  placeholder="000000"
                   maxlength="6"
                   style="letter-spacing: 6px; font-size: 1.4rem; text-align: center; padding: 14px;">
               </label>
@@ -253,28 +278,40 @@
       }
     }
 
+    /* FIX C: New transitionToStep2 with height measurement and rAF batching */
     function transitionToStep2() {
-      els.welcomeUser.textContent = `Hi, ${userContext.email.split('@')[0]}`;
+      const card = document.querySelector('.auth-card');
+      const currentHeight = card.offsetHeight;
+      card.style.minHeight = currentHeight + 'px';
 
-      if (userContext.provider === 'google' || !userContext.hasPassword) {
-        els.formPass.style.display = 'none';
-        els.otpSection.style.display = 'block';
-        els.otpReqState.style.display = 'block';
-        els.formOtp.style.display = 'none';
-        els.googleContainer.style.display = 'block';
-        els.btnBackPass.style.display = 'none';
-      } else {
-        els.formPass.style.display = 'block';
-        els.otpSection.style.display = 'none';
-        els.googleContainer.style.display = 'none';
-        setTimeout(() => {
-          const pwInput = document.getElementById('input-password');
-          if (pwInput) pwInput.focus();
-        }, 400);
-      }
+      // Use rAF to batch DOM changes so iOS doesn't drop frames
+      requestAnimationFrame(() => {
+        els.welcomeUser.textContent = `Hi, ${userContext.email.split('@')[0]}`;
 
-      els.step1.classList.replace('step-active', 'step-hidden-left');
-      els.step2.classList.replace('step-hidden-right', 'step-active');
+        if (userContext.provider === 'google' || !userContext.hasPassword) {
+          els.formPass.style.display = 'none';
+          els.otpSection.style.display = 'block';
+          els.otpReqState.style.display = 'block';
+          els.formOtp.style.display = 'none';
+          els.googleContainer.style.display = 'block';
+          els.btnBackPass.style.display = 'none';
+        } else {
+          els.formPass.style.display = 'block';
+          els.otpSection.style.display = 'none';
+          els.googleContainer.style.display = 'none';
+        }
+
+        els.step1.classList.replace('step-active', 'step-hidden-left');
+        els.step2.classList.replace('step-hidden-right', 'step-active');
+
+        // After content settles, release the fixed height
+        requestAnimationFrame(() => {
+          card.style.minHeight = '';
+          if (userContext.hasPassword && userContext.provider !== 'google') {
+            setTimeout(() => document.getElementById('input-password')?.focus(), 50);
+          }
+        });
+      });
     }
 
     function goToStep1() {
@@ -310,26 +347,22 @@
           if (otpInput) otpInput.focus();
         }, 100);
 
-        // FIX v2: iOS auto-submit - requestSubmit() not supported on iOS < 15.4
-        // Use a safe wrapper that falls back to manual submit
+        // FIX D: iOS-safe OTP auto-submit — cloneNode trick + button click fallback
         if (otpInput) {
-          otpInput.addEventListener('input', function onOtpInput(e) {
-            // Strip non-digits (iOS may insert spaces)
-            const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
-            if (e.target.value !== clean) e.target.value = clean;
+          // Remove any stale listener from a previous send
+          const newInput = otpInput.cloneNode(true);
+          otpInput.parentNode.replaceChild(newInput, otpInput);
+          // Re-focus
+          setTimeout(() => newInput.focus(), 100);
 
+          newInput.addEventListener('input', function onOtpInput() {
+            const clean = this.value.replace(/\D/g, '').slice(0, 6);
+            if (this.value !== clean) this.value = clean;
             if (clean.length === 6) {
-              otpInput.removeEventListener('input', onOtpInput);
-              otpInput.blur();
-              // FIX v2: safe submit for older iOS
-              const form = document.getElementById('form-otp');
-              try {
-                form.requestSubmit();
-              } catch (_) {
-                // Fallback: create and click a submit button
-                const submitBtn = form.querySelector('button[type="submit"]');
-                if (submitBtn) submitBtn.click();
-              }
+              this.removeEventListener('input', onOtpInput);
+              this.blur();
+              // Universal safe submit — works on all iOS versions
+              document.getElementById('btn-verify-otp')?.click();
             }
           });
         }

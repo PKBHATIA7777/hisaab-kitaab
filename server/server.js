@@ -147,11 +147,15 @@
 //   }
 // });
 // app.use("/api/auth/login", authLimiter);
+// app.use("/api/auth/login/otp-request", authLimiter);
+// app.use("/api/auth/login/otp-verify", authLimiter);
 // app.use("/api/auth/register/request-otp", authLimiter);
 // app.use("/api/auth/register/verify-otp", authLimiter);
 // app.use("/api/auth/register/complete", authLimiter);
 // app.use("/api/auth/forgot/request-otp", authLimiter);
-// app.use("/api/auth", authLimiter); // Apply to all auth routes for safety
+// app.use("/api/auth/forgot/reset", authLimiter);
+// app.use("/api/auth/google", authLimiter);
+// NOTE: /api/auth/me, /api/auth/logout, /api/auth/check-identifier deliberately excluded
 
 // // ✅ FIX S4: Write Limiter - ADJUSTED FOR EXPENSE ENTRY WORKFLOW (STEP 3)
 // const writeLimiter = rateLimit({
@@ -429,11 +433,15 @@ const authLimiter = rateLimit({
   keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req)
 });
 app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/login/otp-request", authLimiter);
+app.use("/api/auth/login/otp-verify", authLimiter);
 app.use("/api/auth/register/request-otp", authLimiter);
 app.use("/api/auth/register/verify-otp", authLimiter);
 app.use("/api/auth/register/complete", authLimiter);
 app.use("/api/auth/forgot/request-otp", authLimiter);
-app.use("/api/auth", authLimiter);
+app.use("/api/auth/forgot/reset", authLimiter);
+app.use("/api/auth/google", authLimiter);
+// NOTE: /api/auth/me, /api/auth/logout, /api/auth/check-identifier deliberately excluded
 
 const writeLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -476,8 +484,11 @@ app.use("/api/expenses/chapter/:chapterId/summary", readHeavyLimiter);
 // ── MIDDLEWARE (identical to original) ───────────────────────
 app.use(express.json());
 app.use(cookieParser());
-app.use((req, res, next) => {
-  if (req.path === '/ping') return next();
+app.use((req, res, next) => {  // Authenticated routes vary by cookie — critical for any CDN layer
+  res.setHeader('Vary', 'Cookie, Accept-Encoding');
+  next();
+});
+app.use((req, res, next) => {  if (req.path === '/ping') return next();
   csrfProtection(req, res, next);
 });
 

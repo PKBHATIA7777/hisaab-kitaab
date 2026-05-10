@@ -49,7 +49,7 @@ router.post("/forgot/request-otp", forgotRequestOtp);
 router.post("/forgot/reset", resetPassword);
 
 // user
-router.get("/me", me); // Cache removed in Phase 2
+router.get("/me", cache(30), me);  // 30-second cache, keyed per user cookie
 router.patch("/profile", requireAuth, updateProfile);
 
 router.post("/logout", logout);
