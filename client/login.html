@@ -190,6 +190,9 @@
               data-logo_alignment="left"
               data-width="100%">
             </div>
+            <p id="google-blocked-msg" style="display:none; text-align:center; font-size:0.8rem; color:#999; margin-top:8px;">
+              Google Sign-In is blocked by your browser. Please use email + password or OTP instead.
+            </p>
           </div>
         </div>
 
@@ -294,6 +297,13 @@
           els.otpReqState.style.display = 'block';
           els.formOtp.style.display = 'none';
           els.googleContainer.style.display = 'block';
+          // Show fallback message if Google button didn't render
+          setTimeout(() => {
+            const googleBtn = document.querySelector('.g_id_signin iframe');
+            if (!googleBtn) {
+              document.getElementById('google-blocked-msg').style.display = 'block';
+            }
+          }, 2000);
           els.btnBackPass.style.display = 'none';
         } else {
           els.formPass.style.display = 'block';
@@ -350,7 +360,9 @@
         // FIX D: iOS-safe OTP auto-submit — cloneNode trick + button click fallback
         if (otpInput) {
           // Remove any stale listener from a previous send
+          const existingValue = otpInput.value; // Save any typed value
           const newInput = otpInput.cloneNode(true);
+          newInput.value = existingValue; // Restore typed value after clone
           otpInput.parentNode.replaceChild(newInput, otpInput);
           // Re-focus
           setTimeout(() => newInput.focus(), 100);

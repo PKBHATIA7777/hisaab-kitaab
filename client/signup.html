@@ -264,7 +264,9 @@
       // Clone to remove all stale listeners (called again on Resend)
       const old = els.inputOtp;
       if (!old) return;
+      const existingValue = old.value; // Save any typed value
       const fresh = old.cloneNode(true);
+      fresh.value = existingValue; // Restore typed value after clone
       old.parentNode.replaceChild(fresh, old);
       els.inputOtp = fresh; // Update reference
 

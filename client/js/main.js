@@ -58,14 +58,14 @@ function hideAppLoader() {
   /* ======================================
      0. CONSTANTS & CONFIG
      ====================================== */
-  const CONFIG = {
+const CONFIG = {
     isLocal: window.location.hostname === "localhost" ||
              window.location.hostname === "127.0.0.1" ||
              window.location.port === "5500",
     get API_BASE() {
       return this.isLocal
         ? `http://${window.location.hostname}:5001/api`
-        : "https://hisaab-kitaab-service-app.onrender.com/api";
+        : "/api";
     },
     TIMEOUTS: {
       TOAST_DURATION: 4000,

@@ -13,14 +13,10 @@ function getCookieOptions(maxAgeMs, httpOnly = true) {
   return {
     httpOnly,
     secure: isProduction,
-    // sameSite "none" is REQUIRED for cross-origin (Render backend + Vercel frontend).
-    // "lax" works on localhost. Never use "strict" — it blocks cookies on
-    // cross-origin redirects from Google OAuth.
     sameSite: isProduction ? "none" : "lax",
     maxAge: maxAgeMs,
     path: "/",
-    // Do NOT set domain — letting the browser infer it works across subdomains
-    // and avoids the "domain mismatch" bug on Render's *.onrender.com URLs.
+    ...(isProduction && { domain: undefined }),
   };
 }
 
