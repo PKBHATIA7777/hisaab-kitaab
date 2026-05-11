@@ -692,27 +692,50 @@ if (confirmDeleteBtn) {
   });
 }
 
-// 4. The "Undo" Logic
+// 4. The "Undo" Logic — ✅ STEP 3.4: Fixed with beforeunload guarantee
 function performDeleteWithUndo(id) {
   let isUndoClicked = false;
+  let deleteExecuted = false;
+
+  const executeDelete = async () => {
+    if (isUndoClicked || deleteExecuted) return;
+    deleteExecuted = true;
+    try {
+      await apiFetch(`/chapters/${id}`, { method: "DELETE" });
+      reloadChaptersGrid();
+    } catch (err) {
+      showToast("Failed to delete chapter", "error");
+    }
+  };
+
+  // Handle page navigation/close — execute delete immediately
+  const beforeUnloadHandler = (e) => {
+    if (!isUndoClicked && !deleteExecuted) {
+      // Send a synchronous beacon so delete fires even on tab close
+      const csrfToken = window.__csrfToken || 
+        document.cookie.split("; ").find(r => r.startsWith("csrf_token="))?.split("=")[1] || "";
+      navigator.sendBeacon(
+        `/api/chapters/${id}/beacon-delete`,
+        new Blob([JSON.stringify({ _beacon: true })], { type: "application/json" })
+      );
+    }
+    window.removeEventListener("beforeunload", beforeUnloadHandler);
+  };
+  window.addEventListener("beforeunload", beforeUnloadHandler);
 
   showToast("Chapter deleted", "info", {
     label: "UNDO ↩️",
     callback: () => {
       isUndoClicked = true;
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
       showToast("Deletion cancelled", "success");
+      reloadChaptersGrid();
     }
   });
 
-  setTimeout(async () => {
-    if (!isUndoClicked) {
-      try {
-        await apiFetch(`/chapters/${id}`, { method: "DELETE" });
-        reloadChaptersGrid();
-      } catch (err) {
-        showToast("Failed to delete", "error");
-      }
-    }
+  setTimeout(() => {
+    window.removeEventListener("beforeunload", beforeUnloadHandler);
+    executeDelete();
   }, 4000);
 }
 
@@ -798,14 +821,17 @@ window.closeProfileModal = function() {
 // Re-bind Logout (since ID changed to logout-btn-profile)
 const profileLogoutBtn = document.getElementById("logout-btn-profile");
 if (profileLogoutBtn) {
+  // ✅ STEP 3.5: Fixed logout race condition
   profileLogoutBtn.addEventListener("click", async () => {
     try {
       setBtnLoading(profileLogoutBtn, true);
+      // Close profile modal immediately to prevent any further API calls
+      closeProfileModal();
       await apiFetch("/auth/logout", { method: "POST" });
-      showToast("Logged out successfully", "success");
-      setTimeout(() => window.location.href = "login.html", 500);
+      // Replace the entire page state so no further navigation can trigger 401
+      window.location.replace("login.html");
     } catch(e) {
-      window.location.href = "login.html";
+      window.location.replace("login.html");
     }
   });
 }

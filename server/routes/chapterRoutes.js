@@ -66,6 +66,14 @@ router.put("/:id", chapterController.updateChapter);
 router.patch("/:id/archive", chapterController.toggleArchiveChapter);
 router.delete("/:id", chapterController.deleteChapter);
 
+// Beacon-based delete (for beforeunload scenarios)
+router.post("/:id/beacon-delete", async (req, res) => {
+  // Reuse the existing deleteChapter logic via direct call
+  req.method = "DELETE";
+  req.params.id = req.params.id;
+  return chapterController.deleteChapter(req, res);
+});
+
 // ── EXISTING MEMBER ROUTES (unchanged) ───────────────────────
 router.post("/:id/members", chapterController.addMember);
 router.delete("/:id/members/:memberId", chapterController.deleteMember);

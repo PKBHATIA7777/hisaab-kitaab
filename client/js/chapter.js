@@ -230,18 +230,44 @@ function renderExpenses() {
     card.className = "expense-card";
     if (ex.isTemp) card.style.opacity = "0.7";
 
-    card.innerHTML = `
-      <div class="expense-info">
-        <h4>${ex.description || "Untitled Expense"}</h4>
-        <p>paid by <strong>${ex.payer_name || "Unknown"}</strong> • ${timeAgo(ex.expense_date)}</p>
-      </div>
-      <div style="text-align:right;">
-        <div class="expense-amount">₹${ex.amount}</div>
-        <button onclick="openEditExpenseModal('${ex.id}')" style="background:none; border:none; color:#d000ff; font-size:0.8rem; cursor:pointer; margin-top:5px; padding:0;">
-          View / Edit
-        </button>
-      </div>
-    `;
+    const descText = document.createTextNode(ex.description || "Untitled Expense");
+    const payerText = document.createTextNode(ex.payer_name || "Unknown");
+    const timeText = document.createTextNode(timeAgo(ex.expense_date));
+    const amountText = document.createTextNode("₹" + ex.amount);
+
+    const h4 = document.createElement("h4");
+    h4.appendChild(descText);
+
+    const payerStrong = document.createElement("strong");
+    payerStrong.appendChild(payerText);
+
+    const p = document.createElement("p");
+    p.appendChild(document.createTextNode("paid by "));
+    p.appendChild(payerStrong);
+    p.appendChild(document.createTextNode(" • "));
+    p.appendChild(timeText);
+
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "expense-info";
+    infoDiv.appendChild(h4);
+    infoDiv.appendChild(p);
+
+    const amountDiv = document.createElement("div");
+    amountDiv.className = "expense-amount";
+    amountDiv.appendChild(amountText);
+
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "View / Edit";
+    editBtn.style.cssText = "background:none; border:none; color:#d000ff; font-size:0.8rem; cursor:pointer; margin-top:5px; padding:0;";
+    editBtn.addEventListener("click", () => openEditExpenseModal(ex.id));
+
+    const rightDiv = document.createElement("div");
+    rightDiv.style.textAlign = "right";
+    rightDiv.appendChild(amountDiv);
+    rightDiv.appendChild(editBtn);
+
+    card.appendChild(infoDiv);
+    card.appendChild(rightDiv);
     expenseListEl.appendChild(card);
   });
 }
@@ -462,14 +488,22 @@ addExpenseForm.addEventListener('submit', async (e) => {
   
   const formData = new FormData(addExpenseForm);
   
-  const amount = parseFloat(formData.get("amount"));
+  // Normalize: remove commas, currency symbols, spaces
+  const rawAmount = formData.get("amount");
+  const normalizedAmount = String(rawAmount).replace(/,/g, "").replace(/[^\d.]/g, "").trim();
+  const amount = parseFloat(normalizedAmount);
   const description = formData.get("description") || "";
   const payerId = parseInt(formData.get("payerMemberId"));
   const involvedIds = [];
   splitContainer.querySelectorAll("input:checked").forEach(cb => involvedIds.push(parseInt(cb.value)));
 
   // --- Validation ---
-  if (!amount || amount <= 0) return showToast("Please enter a valid amount", "error");
+  if (!amount || amount <= 0 || isNaN(amount)) {
+    return showToast("Please enter a valid amount", "error");
+  }
+  if (amount > 9999999) {
+    return showToast("Amount seems too large. Please check and try again.", "error");
+  }
   if (involvedIds.length === 0) return showToast("Select at least one person to split with", "error");
 
   // --- STEP 1: PREVENT DOUBLE CLICK & INSTANT FEEDBACK ---

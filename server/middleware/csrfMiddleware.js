@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const isProduction = process.env.NODE_ENV === "production";
 
 const CSRF_COOKIE_OPTIONS = {
-  httpOnly: false,             // Must be readable by JS
+  httpOnly: false,
   secure: isProduction,
   sameSite: isProduction ? "none" : "lax",
   maxAge: 24 * 60 * 60 * 1000,

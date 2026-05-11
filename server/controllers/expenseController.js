@@ -136,15 +136,38 @@ async function getChapterExpenses(req, res) {
     `;
     const params = [chapterId];
 
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
     if (eventId) {
       queryText += ` AND e.event_id = $2`;
       params.push(eventId);
     }
 
-    queryText += ` ORDER BY e.expense_date DESC`;
+    queryText += ` ORDER BY e.expense_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
 
     const { rows } = await db.query(queryText, params);
-    res.json({ ok: true, expenses: rows });
+
+    let countQuery = `SELECT COUNT(*) FROM expenses e WHERE e.chapter_id = $1`;
+    const countParams = [chapterId];
+    if (eventId) {
+      countQuery += ` AND e.event_id = $2`;
+      countParams.push(eventId);
+    }
+    const { rows: countRows } = await db.query(countQuery, countParams);
+    const totalCount = parseInt(countRows[0].count, 10);
+
+    res.json({ 
+      ok: true, 
+      expenses: rows,
+      pagination: {
+        limit,
+        offset,
+        total: totalCount,
+        hasMore: offset + limit < totalCount
+      }
+    });
   } catch (err) {
     console.error("getExpenses error:", err);
     res.status(500).json({ ok: false, message: "Server error" });
@@ -346,9 +369,9 @@ function calculateSettlements(balances) {
   let creditors = [];
 
   balances.forEach(person => {
-    const balanceCents = Math.round(person.balance * 100);
-    if (balanceCents < 0) debtors.push({ ...person, balanceCents });
-    else if (balanceCents > 0) creditors.push({ ...person, balanceCents });
+    const balanceCents = Math.round(parseFloat(person.balance) * 100);
+    if (balanceCents < -1) debtors.push({ ...person, id: Number(person.id), balanceCents });
+    else if (balanceCents > 1) creditors.push({ ...person, id: Number(person.id), balanceCents });
   });
 
   debtors.sort((a, b) => a.balanceCents - b.balanceCents);
@@ -367,8 +390,8 @@ function calculateSettlements(balances) {
       from: debtor.name,
       to: creditor.name,
       amount: (amountCents / 100).toFixed(2),
-      fromId: debtor.id,
-      toId: creditor.id
+      fromId: Number(debtor.id),
+      toId: Number(creditor.id)
     });
 
     debtor.balanceCents += amountCents;

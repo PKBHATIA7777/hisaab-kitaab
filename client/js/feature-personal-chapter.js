@@ -35,6 +35,17 @@ async function checkAndRenderPersonalChapterBanner() {
 
     if (!data.hasPersonalChapter) {
       renderPersonalChapterBanner();
+      // Poll once after 3 seconds to check if background creation completed
+      setTimeout(async () => {
+        try {
+          const recheck = await apiFetch('/chapters/personal/status');
+          if (recheck.hasPersonalChapter) {
+            document.getElementById('personal-chapter-banner')?.remove();
+            personalChapterData = recheck.chapter;
+            await reloadChaptersGrid();
+          }
+        } catch(_) {}
+      }, 3000);
     }
   } catch (err) {
     console.warn('Could not check personal chapter status:', err.message);

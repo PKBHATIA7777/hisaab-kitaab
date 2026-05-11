@@ -102,11 +102,20 @@ const CONFIG = {
   // Read from cookie (set by server) rather than doing a network round-trip.
   // This eliminates the extra GET /csrf-token before every mutation.
   function getCSRFFromCookie() {
+    // Primary: read from cookie
     const value = `; ${document.cookie}`;
     const parts = value.split("; csrf_token=");
-    if (parts.length === 2) return parts.pop().split(";").shift();
-    return null;
+    if (parts.length === 2) {
+      const token = parts.pop().split(";").shift();
+      if (token && token.length >= 32) return token;
+    }
+    // Fallback: read from in-memory store (populated from response headers)
+    return window.__csrfToken || null;
   }
+
+  // Persist CSRF token from response headers for iOS ITP environments
+  // where cookies may be blocked or evicted
+  window.__csrfToken = null;
 
   // Pages where a 401 is EXPECTED and should NOT redirect
   const AUTH_PAGES = ["login.html", "index.html", "signup.html", "forgot.html", "set-password.html"];
@@ -167,12 +176,13 @@ const CONFIG = {
       }
 
       // Server echoes the current CSRF token in every response header.
-      // Update our cookie if it rotated (e.g. after logout + re-login).
       const freshCSRF = res.headers.get("X-CSRF-Token");
-      if (freshCSRF && freshCSRF !== csrfToken) {
-        // The server already set the cookie via Set-Cookie, but update our
-        // in-memory awareness by reading the cookie again on next call.
-        // Nothing to do explicitly — the cookie was set by the response.
+      if (freshCSRF && freshCSRF.length >= 32) {
+        window.__csrfToken = freshCSRF;
+        // Also try to update the cookie if possible
+        try {
+          document.cookie = `csrf_token=${freshCSRF}; path=/; max-age=86400; samesite=lax`;
+        } catch (e) { /* ignore in restricted environments */ }
       }
 
       // CSRF mismatch — server returns {csrfError: true}
@@ -189,10 +199,13 @@ const CONFIG = {
       // 401 handling — only redirect if NOT on an auth page and NOT a background check
       if (res.status === 401) {
         if (!isAuthPage() && !options._silent) {
-          window.location.href = "login.html?expired=true";
-          return; // Stop processing
+          // Small delay to prevent redirect loops on slow cold starts
+          setTimeout(() => {
+            window.location.href = "login.html?expired=true";
+          }, 100);
+          return;
         }
-        // On auth pages: fall through to normal error handling below
+        // On auth pages or silent calls: fall through to normal error
       }
 
       // Rate limit

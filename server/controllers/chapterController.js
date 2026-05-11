@@ -345,6 +345,19 @@ async function deleteChapter(req, res) {
         return res.status(404).json({ ok: false, message: "Chapter not found" });
       }
 
+      // Block deletion of personal chapter
+      const { rows: chapInfo } = await client.query(
+        "SELECT is_personal FROM chapters WHERE id = $1",
+        [id]
+      );
+      if (chapInfo[0]?.is_personal) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          ok: false,
+          message: "Your 'My Expenses' chapter cannot be deleted. It is your personal expense tracker."
+        });
+      }
+
       // 2. Delete in correct order: splits → expenses → members → chapter
       // (or rely entirely on DB CASCADE — all child tables have ON DELETE CASCADE)
       // Explicit order used here as a safety net in case CASCADE is misconfigured.
