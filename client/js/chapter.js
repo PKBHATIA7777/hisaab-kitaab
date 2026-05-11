@@ -870,10 +870,13 @@ window.downloadReport = async function() {
       : "Generating Full Report...";
     showToast(label, "info");
 
-    const { csrfToken } = await apiFetch("/csrf-token");
+    // Read CSRF from cookie directly (same as apiFetch does internally)
+    const csrfToken = document.cookie.split('; ')
+      .find(row => row.startsWith('csrf_token='))
+      ?.split('=')[1] || '';
 
     // ✅ Append eventId if selected
-    let url = `${APP_CONFIG.API_BASE}/chapters/${chapterId}/export`;
+    let url = `/api/chapters/${chapterId}/export`;
     if (currentEventId) {
       url += `?eventId=${currentEventId}`;
     }

@@ -412,12 +412,16 @@ const rateLimitHandler = (req, res, next, options) => {
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProduction ? 100 : 1000,
+  max: isProduction ? 500 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please try again later." },
-  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req)
+  keyGenerator: (req) => {
+    if (req.user?.userId) return req.user.userId;
+    const forwarded = req.headers['x-forwarded-for'];
+    return forwarded ? forwarded.split(',')[0].trim() : ipKeyGenerator(req);
+  }
 });
 app.use((req, res, next) => {
   if (req.path === '/ping') return next();
@@ -431,7 +435,11 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many login attempts. Try again in 15 mins." },
-  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req)
+  keyGenerator: (req) => {
+    if (req.user?.userId) return req.user.userId;
+    const forwarded = req.headers['x-forwarded-for'];
+    return forwarded ? forwarded.split(',')[0].trim() : ipKeyGenerator(req);
+  }
 });
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/login/otp-request", authLimiter);
@@ -451,7 +459,11 @@ const writeLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitHandler,
   message: { ok: false, message: "You're adding expenses too fast, please wait a moment." },
-  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req),
+  keyGenerator: (req) => {
+    if (req.user?.userId) return req.user.userId;
+    const forwarded = req.headers['x-forwarded-for'];
+    return forwarded ? forwarded.split(',')[0].trim() : ipKeyGenerator(req);
+  },
   skipSuccessfulRequests: false,
 });
 
