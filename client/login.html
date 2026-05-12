@@ -227,6 +227,21 @@
 
   <script src="js/main.js"></script>
   <script>
+    // Pre-fetch CSRF token on page load for iOS Safari
+    // iOS ITP may block the cookie on first visit, so we fetch it explicitly
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch(window.APP_CONFIG?.API_BASE + '/auth/me' || '/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        // This request's response will set the csrf_token cookie via the middleware
+        // and store it in window.__csrfToken via the X-CSRF-Token header handler in apiFetch
+        const csrfHeader = res.headers.get('X-CSRF-Token');
+        if (csrfHeader) window.__csrfToken = csrfHeader;
+      } catch(_) { /* ignore — just priming the cookie */ }
+    });
+
     /* --- STATE --- */
     let userContext = { identifier: '', email: '', provider: 'local', hasPassword: false };
 
@@ -353,28 +368,30 @@
         showToast(`Code sent to ${userContext.email}`, "success");
 
         const otpInput = document.getElementById('input-otp');
-        setTimeout(() => {
-          if (otpInput) otpInput.focus();
-        }, 100);
-
-        // FIX D: iOS-safe OTP auto-submit — cloneNode trick + button click fallback
         if (otpInput) {
-          // Remove any stale listener from a previous send
-          const existingValue = otpInput.value; // Save any typed value
+          // Remove stale listeners via clone
           const newInput = otpInput.cloneNode(true);
-          newInput.value = existingValue; // Restore typed value after clone
           otpInput.parentNode.replaceChild(newInput, otpInput);
-          // Re-focus
-          setTimeout(() => newInput.focus(), 100);
+          
+          setTimeout(() => newInput.focus(), 120);
 
-          newInput.addEventListener('input', function onOtpInput() {
+          newInput.addEventListener('input', function() {
+            // Sanitize to digits only
             const clean = this.value.replace(/\D/g, '').slice(0, 6);
             if (this.value !== clean) this.value = clean;
+            
             if (clean.length === 6) {
-              this.removeEventListener('input', onOtpInput);
               this.blur();
-              // Universal safe submit — works on all iOS versions
-              document.getElementById('btn-verify-otp')?.click();
+              // Use both methods for maximum iOS compatibility
+              const form = document.getElementById('form-otp');
+              if (form) {
+                // iOS 15.4+: requestSubmit works
+                if (typeof form.requestSubmit === 'function') {
+                  try { form.requestSubmit(); return; } catch(_) {}
+                }
+                // iOS < 15.4: manually call handler
+                handleOtpSubmit({ preventDefault: () => {} });
+              }
             }
           });
         }

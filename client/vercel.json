@@ -4,5 +4,13 @@
       "source": "/api/:path*",
       "destination": "https://hisaab-kitaab-service-app.onrender.com/api/:path*"
     }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" }
+      ]
+    }
   ]
 }

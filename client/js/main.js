@@ -306,15 +306,18 @@ const CONFIG = {
 
   function initSessionMonitor() {
     setInterval(() => {
-      const expiryStr = getCookie("session_expiry");
+      // Try cookie first, then sessionStorage fallback
+      const expiryStr = getCookie("session_expiry") || sessionStorage.getItem("session_expiry_fallback");
       if (!expiryStr) return;
+      
       const expiresAt = parseInt(expiryStr, 10);
-      if (isNaN(expiresAt)) return;
+      if (!expiresAt || isNaN(expiresAt) || expiresAt <= 0) return;
+      
       const timeLeft = expiresAt - Date.now();
       if (timeLeft > 0 && timeLeft < CONFIG.TIMEOUTS.SESSION_WARN) {
         const lastWarned = sessionStorage.getItem("sessionWarned");
         if (!lastWarned) {
-          window.showToast("⚠️ Session expires soon. Please save work.", "info");
+          showToast("⚠️ Session expires soon. Please save your work.", "info");
           sessionStorage.setItem("sessionWarned", "true");
         }
       }

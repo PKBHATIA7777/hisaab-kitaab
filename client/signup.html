@@ -207,6 +207,21 @@
 
   <script src="js/main.js"></script>
   <script>
+    // Pre-fetch CSRF token on page load for iOS Safari
+    // iOS ITP may block the cookie on first visit, so we fetch it explicitly
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch(window.APP_CONFIG?.API_BASE + '/auth/me' || '/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        // This request's response will set the csrf_token cookie via the middleware
+        // and store it in window.__csrfToken via the X-CSRF-Token header handler in apiFetch
+        const csrfHeader = res.headers.get('X-CSRF-Token');
+        if (csrfHeader) window.__csrfToken = csrfHeader;
+      } catch(_) { /* ignore — just priming the cookie */ }
+    });
+
     let signupEmail = "";
 
     const els = {
@@ -261,27 +276,29 @@
 
     /* --- OTP AUTO-SUBMIT (safe for all iOS versions) --- */
     function attachOtpAutoSubmit() {
-      // Clone to remove all stale listeners (called again on Resend)
       const old = els.inputOtp;
       if (!old) return;
-      const existingValue = old.value; // Save any typed value
       const fresh = old.cloneNode(true);
-      fresh.value = existingValue; // Restore typed value after clone
       old.parentNode.replaceChild(fresh, old);
-      els.inputOtp = fresh; // Update reference
+      els.inputOtp = fresh;
 
-      fresh.addEventListener('input', function onInput() {
+      setTimeout(() => fresh.focus(), 120);
+
+      fresh.addEventListener('input', function() {
         const clean = this.value.replace(/\D/g, '').slice(0, 6);
         if (this.value !== clean) this.value = clean;
+        
         if (clean.length === 6) {
-          this.removeEventListener('input', onInput);
           this.blur();
-          // Click the submit button — universally safe on all iOS versions
-          document.getElementById('btn-otp')?.click();
+          const form = document.getElementById('form-otp');
+          if (form) {
+            if (typeof form.requestSubmit === 'function') {
+              try { form.requestSubmit(); return; } catch(_) {}
+            }
+            handleOtpSubmit({ preventDefault: () => {} });
+          }
         }
       });
-
-      setTimeout(() => fresh.focus(), 80);
     }
 
     /* --- STEP 2: OTP VERIFY --- */
@@ -300,6 +317,10 @@
           method: "POST",
           body: { email: signupEmail, otp }
         });
+
+        // Store verification proof in sessionStorage as fallback for iOS ITP
+        sessionStorage.setItem('email_verified', signupEmail);
+        sessionStorage.setItem('verify_time', Date.now().toString());
 
         slide(els.step2, els.step3);
         setTimeout(() => {
