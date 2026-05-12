@@ -9,6 +9,7 @@
 
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/features.css">
+  <link rel="stylesheet" href="css/chapter-page.css">
   <link rel="preconnect" href="https://fonts.googleapis.com        " />
   <link rel="preconnect" href="https://fonts.gstatic.com        " crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins        :wght@300;400;600;700&display=swap" rel="stylesheet" />
@@ -19,252 +20,235 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  <div class="chapter-container">
-    <!-- Main Content -->
-    <main class="chapter-wrapper" id="main-content">
-      <!-- Polished Sticky Mobile Header -->
-      <nav class="chapter-nav" style="
-        backdrop-filter: blur(20px);
-        background: rgba(0,0,0,0.7);
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-      ">
-        <a href="dashboard.html" class="nav-icon-btn" aria-label="Back to Dashboard">‹</a>
-        <div class="nav-header-center">
-          <span id="nav-chapter-name" style="font-weight: 600; font-size: 0.95rem; color: #fff;"></span>
-        </div>
-        <div class="nav-actions">
-          <!-- This button opens the GENERAL menu (Summary, Settle Up, etc.) -->
-          <button id="chapter-menu-btn" class="nav-icon-btn" aria-label="More options">⋮</button>
-        </div>
-      </nav>
+  <div class="chapter-page-wrapper" id="main-content">
 
-      <!-- General Menu Dropdown (opened by three-dots) -->
-      <div id="chapter-menu-dropdown" class="nav-dropdown">
-        <button type="button" onclick="openSummaryModal()">
-          <span>📊</span> Summary
-        </button>
-        <button type="button" onclick="openSettlementModal()">
-          <span>🤝</span> Settle Up
-        </button>
-        <button type="button" onclick="downloadReport()">
-          <span>📥</span> Export Report
-        </button>
-        <hr />
-        <button type="button" id="nav-members-trigger">
-          <span>👥</span> Members
+    <!-- Sticky Top Navigation -->
+    <nav class="chapter-nav" id="chapter-nav" aria-label="Chapter navigation">
+      <a href="dashboard.html" class="nav-icon-btn" aria-label="Back to Dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </a>
+      <div class="chapter-nav-title">
+        <span id="nav-chapter-name"></span>
+      </div>
+      <div class="chapter-nav-actions">
+        <button id="chapter-menu-btn" class="nav-icon-btn" aria-label="More options" aria-haspopup="true" aria-expanded="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
         </button>
       </div>
+    </nav>
 
-      <!-- Member Dropdown (includes admin actions if applicable) -->
-      <div id="member-dropdown" class="member-dropdown" style="display:none;">
-        <h4 style="margin:0 0 10px 0; font-size:0.9rem; color:#888;">Group Members</h4>
-        <div id="member-list-content"></div>
-        <!-- Admin-only section: shown only if user is chapter creator -->
-        <div id="admin-actions" style="display:none; border-top:1px solid #eee; margin-top:10px; padding-top:10px;">
-          <button class="btn-add-member" type="button" onclick="openAddMemberModal()">+ Add Member</button>
-        </div>
+    <!-- Dropdown Menu -->
+    <div id="chapter-menu-dropdown" class="chapter-dropdown" role="menu" aria-hidden="true">
+      <button type="button" role="menuitem" onclick="openSummaryModal()"><span aria-hidden="true">📊</span> Summary</button>
+      <button type="button" role="menuitem" onclick="openSettlementModal()"><span aria-hidden="true">🤝</span> Settle Up</button>
+      <button type="button" role="menuitem" onclick="downloadReport()"><span aria-hidden="true">📥</span> Export Report</button>
+      <div class="dropdown-divider"></div>
+      <button type="button" role="menuitem" id="nav-members-trigger"><span aria-hidden="true">👥</span> Members</button>
+    </div>
+
+    <!-- Members Panel -->
+    <div id="member-dropdown" class="member-panel" aria-hidden="true">
+      <div class="member-panel-header">
+        <h3>Members</h3>
+        <button onclick="document.getElementById('member-dropdown').classList.remove('active')" class="panel-close-btn" aria-label="Close members panel">×</button>
       </div>
+      <div id="member-list-content" class="member-panel-list"></div>
+      <div id="admin-actions" class="member-panel-admin" style="display:none;">
+        <button class="btn-add-member" type="button" onclick="openAddMemberModal()">+ Add Member</button>
+      </div>
+    </div>
 
-      <!-- Skeleton Loader -->
-      <div id="chapter-skeleton" style="padding:0 15px;">
-        <div style="display:flex; flex-direction:column; align-items:center; margin-bottom:40px;">
-          <div class="skeleton" style="width:80px; height:80px; border-radius:50%; margin-bottom:15px;"></div>
-          <div class="skeleton" style="width:60%; height:30px; border-radius:8px; margin-bottom:10px;"></div>
-          <div class="skeleton" style="width:40%; height:15px; border-radius:4px;"></div>
-        </div>
-        <div class="skeleton-list">
-          <div class="skeleton skeleton-expense-card"></div>
-          <div class="skeleton skeleton-expense-card"></div>
-          <div class="skeleton skeleton-expense-card"></div>
+    <!-- Page Content -->
+    <main class="chapter-main">
+
+      <!-- Chapter Header -->
+      <div id="chapter-skeleton" class="chapter-skeleton-wrapper">
+        <div class="skeleton skeleton-avatar"></div>
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-subtitle"></div>
+        <div class="skeleton-cards-row">
+          <div class="skeleton skeleton-card-sm"></div>
+          <div class="skeleton skeleton-card-sm"></div>
+          <div class="skeleton skeleton-card-sm"></div>
         </div>
       </div>
 
-      <!-- Chapter Header Card -->
-      <div id="chapter-content" class="chapter-header-card" style="display:none;">
-        <div class="chapter-icon-large" id="chapter-icon-display">?</div>
-        <h1 id="chapter-title"></h1>
-        <p id="chapter-desc"></p>
+      <div id="chapter-content" class="chapter-hero" style="display:none;" aria-label="Chapter details">
+        <div class="chapter-hero-icon" id="chapter-icon-display" aria-hidden="true"></div>
+        <h1 class="chapter-hero-title" id="chapter-title"></h1>
+        <p class="chapter-hero-desc" id="chapter-desc"></p>
       </div>
 
-      <!-- 
-        STEP 1 & 2 IMPLEMENTATION:
-        - Unified header row with title, refresh, and toggle buttons
-        - Increased "Current Settlement" font size (1.1rem) and weight (700)
-        - Removed "Balanced" status text
-        - Removed "Who pays whom?" header (set to display:none)
-        - Removed "Categories" label entirely
-        - Added margin-top to events strip container
-      -->
-      <section class="settlement-hero" id="settlement-hero-section">
-        <div class="hero-card" id="hero-summary-card">
-          <div class="hero-main-info" style="flex-direction: row; align-items: center; justify-content: space-between; width: 100%;">
-            <div class="hero-label" style="color:#d000ff; font-weight:700; font-size:1.1rem;">Current Settlement</div>
-            
-            <div class="hero-actions" style="display: flex; align-items: center; gap: 12px;">
-              <button class="refresh-mini-btn" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh settlements" style="background: none; border: none; padding: 0;">
-                <span class="refresh-icon" style="font-size: 1.2rem; color: #888;">↻</span>
-              </button>
-              <button class="hero-toggle-btn" id="hero-expand-btn" aria-label="Toggle settlement details" style="position: static; padding: 0;">
-                <span class="chevron" style="font-size: 1rem;">▼</span>
-              </button>
-            </div>
+      <!-- Settlement Hero Card -->
+      <section class="settlement-section" id="settlement-hero-section" aria-label="Current settlements">
+        <div class="settlement-card-header" id="hero-summary-card" role="button" tabindex="0" aria-expanded="true">
+          <div class="settlement-card-label">
+            <span class="settlement-dot" aria-hidden="true"></span>
+            Settlements
+          </div>
+          <div class="settlement-card-actions">
+            <button class="icon-btn-sm refresh-mini-btn" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh settlements">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+            <button class="icon-btn-sm hero-toggle-btn" id="hero-expand-btn" aria-label="Toggle settlement details">
+              <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
           </div>
         </div>
-
-        <div class="hero-details-collapse" id="hero-details-content">
-          <div class="hero-details-header" style="display: none;">
-          </div>
-          <div id="hero-settlement-list" class="mini-settlement-list"></div>
+        <div class="settlement-collapse" id="hero-details-content">
+          <div id="hero-settlement-list" class="settlement-list-inner"></div>
         </div>
       </section>
 
-      <div id="events-strip-container" class="events-scroll-snap" style="margin-top: 15px;"></div>
+      <!-- Event Tabs -->
+      <div id="events-strip-container" class="events-strip" role="tablist" aria-label="Filter by event"></div>
 
-      <!-- Expense List Container (for dynamic rendering) - PRESERVED AS INSTRUCTED -->
-      <div id="expense-list-container" class="expense-list"></div>
-<div id="load-more-container" style="text-align: center; padding: 20px 0;"></div>
-
-      <!-- Empty State -->
-      <div class="empty-state-placeholder" id="chapter-empty-state" style="display:none;">
-        <p>No expenses yet. Tap + to add one.</p>
-      </div>
-
-      <!-- Floating Action Button -->
-      <button class="fab-btn" type="button" onclick="openAddExpenseModal()">+</button>
-
-      <!-- === MODALS === -->
-
-      <!-- Add Member Modal -->
-      <div class="modal-overlay" id="add-member-modal">
-        <div class="modal-box" style="max-width:400px;">
-          <div class="modal-header">
-            <h2>Add Member</h2>
-            <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddMemberModal()">×</button>
-          </div>
-          <form id="add-member-form">
-            <div class="form-group">
-              <label for="new-member-name">Member Name</label>
-              <input
-                type="text"
-                id="new-member-name"
-                class="form-input"
-                placeholder="Enter name or select friend..."
-                list="friends-datalist"
-                required
-              />
-              <datalist id="friends-datalist"></datalist>
-            </div>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-text" onclick="closeModal('add-member-modal')">Cancel</button>
-              <button type="submit" class="btn btn-primary">Add</button>
-            </div>
-          </form>
+      <!-- Expenses -->
+      <section class="expenses-section" aria-label="Expense list">
+        <div id="expense-list-container" class="expense-list"></div>
+        <div class="empty-state-placeholder" id="chapter-empty-state" style="display:none;" role="status">
+          <div class="empty-state-icon" aria-hidden="true">💸</div>
+          <p class="empty-state-title">No expenses yet</p>
+          <p class="empty-state-subtitle">Tap the + button to add your first expense</p>
         </div>
-      </div>
+      </section>
 
-      <!-- Add Expense Modal -->
-      <div class="modal-overlay" id="add-expense-modal">
-        <div class="modal-box" style="max-width:500px; padding:0;">
-          <div style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-            <h2 style="margin:0; font-size:1.2rem;" id="expense-modal-title">Add Expense</h2>
-            <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddExpenseModal()">×</button>
-          </div>
-          <form id="add-expense-form" style="padding:20px; overflow-y:auto; max-height:70vh;">
-            <div style="text-align:center; margin-bottom:25px;">
-              <label style="font-size:0.9rem; color:#888; display:block; margin-bottom:5px;">AMOUNT</label>
-              <div style="display:flex; justify-content:center; align-items:center; gap:5px;">
-                <span style="font-size:2rem; color:#333;">₹</span>
-                <input type="number" name="amount" placeholder="0" required class="big-amount-input" inputmode="decimal" />
-              </div>
-            </div>
-            <label>Description <span style="font-weight:400; color:#888;">(Optional)</span>
-              <input type="text" name="description" placeholder="e.g. Dinner at Taj" maxlength="100" />
-            </label>
-            <label style="margin-top:15px;">Paid By</label>
-            <div class="payer-scroll-container" id="payer-selection-container"></div>
-            <label style="margin-top:20px; display:flex; justify-content:space-between;">
-              Split Among
-              <span style="color:#d000ff; cursor:pointer; font-size:0.85rem;" onclick="toggleSelectAll()">Select All</span>
-            </label>
-            <div class="split-list-container" id="split-selection-container"></div>
-            <div style="margin-top:25px; display:flex; gap:10px;">
-              <button type="submit" class="btn-primary" id="btn-save-expense">Save Expense</button>
-              <button type="button" id="btn-delete-expense" class="btn-secondary" style="background:#ffebee; color:#d32f2f; border:none; display:none;" onclick="handleDeleteExpense()">
-                Delete
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Summary Modal -->
-      <div class="modal-overlay" id="summary-modal">
-        <div class="modal-box" style="max-width:450px;">
-          <div class="modal-header">
-            <h2>Chapter Summary</h2>
-            <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeSummaryModal()">×</button>
-          </div>
-          <div style="text-align:center; margin-bottom:25px;">
-            <div style="font-size:0.9rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Total Spent</div>
-            <div id="summary-grand-total" style="font-size:2.5rem; font-weight:700; color:#333;">₹0.00</div>
-          </div>
-          <div id="summary-list" style="max-height:300px; overflow-y:auto;"></div>
-        </div>
-      </div>
-
-      <!-- Settlement Modal -->
-      <div class="modal-overlay" id="settlement-modal">
-        <div class="modal-box" style="max-width:450px;">
-          <div class="modal-header">
-            <h2>Who Pays Whom?</h2>
-            <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeSettlementModal()">×</button>
-          </div>
-          <div id="settlement-loading" style="text-align:center; padding:20px; display:none;">
-            <div class="spinner" style="margin:0 auto; width:30px; height:30px; border-width:3px;"></div>
-            <p style="margin-top:10px; color:#888; font-size:0.9rem;">Calculating debts...</p>
-          </div>
-          <div id="settlement-list" style="max-height:350px; overflow-y:auto;"></div>
-          <div id="settlement-empty" style="text-align:center; padding:30px; display:none;">
-            <div style="font-size:3rem;">🎉</div>
-            <h3 style="margin:10px 0 5px 0;">All Settled Up!</h3>
-            <p style="color:#888; font-size:0.9rem;">No one owes anything to anyone.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Create Event Modal -->
-      <div class="modal-overlay" id="create-event-modal">
-        <div class="modal-box" style="max-width:400px;">
-          <div class="modal-header">
-            <h2>New Event</h2>
-            <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeCreateEventModal()">×</button>
-          </div>
-          <form id="create-event-form">
-            <p style="color:#666; font-size:0.9rem; margin-bottom:20px; line-height:1.5;">
-              Events are sub-folders inside this chapter (like "Goa Trip" or "Diwali Party").<br><br>
-              <strong>Note:</strong> All chapter members are automatically included.
-            </p>
-            <label>Event Name <span style="color:red">*</span></label>
-            <input type="text" name="name" required placeholder="e.g. Weekend Getaway" maxlength="50" />
-            <div style="margin-top:25px;">
-              <button type="submit" class="btn-primary">Create Event</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Scripts -->
-     <script src="js/main.js"></script>
-      <script src="js/chapter.js"></script>
-      <script src="js/feature-settlements.js"></script>
-      <script src="js/feature-creator-label.js"></script>
-      <script src="js/feature-personal-chapter.js"></script>
-      <script src="js/feature-categories.js"></script>
-      <script src="js/feature-bulk-event.js"></script>
     </main>
   </div>
+
+  <!-- FAB -->
+  <button class="fab-btn" type="button" onclick="openAddExpenseModal()" aria-label="Add new expense">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+
+  <!-- === MODALS === -->
+
+  <!-- Add Member Modal -->
+  <div class="modal-overlay" id="add-member-modal">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-header">
+        <h2>Add Member</h2>
+        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddMemberModal()">×</button>
+      </div>
+      <form id="add-member-form">
+        <div class="form-group">
+          <label for="new-member-name">Member Name</label>
+          <input
+            type="text"
+            id="new-member-name"
+            class="form-input"
+            placeholder="Enter name or select friend..."
+            list="friends-datalist"
+            required
+          />
+          <datalist id="friends-datalist"></datalist>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-text" onclick="closeModal('add-member-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Expense Modal -->
+  <div class="modal-overlay" id="add-expense-modal">
+    <div class="modal-box" style="max-width:500px; padding:0;">
+      <div style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0; font-size:1.2rem;" id="expense-modal-title">Add Expense</h2>
+        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddExpenseModal()">×</button>
+      </div>
+      <form id="add-expense-form" style="padding:20px; overflow-y:auto; max-height:70vh;">
+        <div style="text-align:center; margin-bottom:25px;">
+          <label style="font-size:0.9rem; color:#888; display:block; margin-bottom:5px;">AMOUNT</label>
+          <div style="display:flex; justify-content:center; align-items:center; gap:5px;">
+            <span style="font-size:2rem; color:#333;">₹</span>
+            <input type="number" name="amount" placeholder="0" required class="big-amount-input" inputmode="decimal" />
+          </div>
+        </div>
+        <label>Description <span style="font-weight:400; color:#888;">(Optional)</span>
+          <input type="text" name="description" placeholder="e.g. Dinner at Taj" maxlength="100" />
+        </label>
+        <label style="margin-top:15px;">Paid By</label>
+        <div class="payer-scroll-container" id="payer-selection-container"></div>
+        <label style="margin-top:20px; display:flex; justify-content:space-between;">
+          Split Among
+          <span style="color:#d000ff; cursor:pointer; font-size:0.85rem;" onclick="toggleSelectAll()">Select All</span>
+        </label>
+        <div class="split-list-container" id="split-selection-container"></div>
+        <div style="margin-top:25px; display:flex; gap:10px;">
+          <button type="submit" class="btn-primary" id="btn-save-expense">Save Expense</button>
+          <button type="button" id="btn-delete-expense" class="btn-secondary" style="background:#ffebee; color:#d32f2f; border:none; display:none;" onclick="handleDeleteExpense()">
+            Delete
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Summary Modal -->
+  <div class="modal-overlay" id="summary-modal">
+    <div class="modal-box" style="max-width:450px;">
+      <div class="modal-header">
+        <h2>Chapter Summary</h2>
+        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeSummaryModal()">×</button>
+      </div>
+      <div style="text-align:center; margin-bottom:25px;">
+        <div style="font-size:0.9rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Total Spent</div>
+        <div id="summary-grand-total" style="font-size:2.5rem; font-weight:700; color:#333;">₹0.00</div>
+      </div>
+      <div id="summary-list" style="max-height:300px; overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Settlement Modal -->
+  <div class="modal-overlay" id="settlement-modal">
+    <div class="modal-box" style="max-width:450px;">
+      <div class="modal-header">
+        <h2>Who Pays Whom?</h2>
+        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeSettlementModal()">×</button>
+      </div>
+      <div id="settlement-loading" style="text-align:center; padding:20px; display:none;">
+        <div class="spinner" style="margin:0 auto; width:30px; height:30px; border-width:3px;"></div>
+        <p style="margin-top:10px; color:#888; font-size:0.9rem;">Calculating debts...</p>
+      </div>
+      <div id="settlement-list" style="max-height:350px; overflow-y:auto;"></div>
+      <div id="settlement-empty" style="text-align:center; padding:30px; display:none;">
+        <div style="font-size:3rem;">🎉</div>
+        <h3 style="margin:10px 0 5px 0;">All Settled Up!</h3>
+        <p style="color:#888; font-size:0.9rem;">No one owes anything to anyone.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Event Modal -->
+  <div class="modal-overlay" id="create-event-modal">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-header">
+        <h2>New Event</h2>
+        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeCreateEventModal()">×</button>
+      </div>
+      <form id="create-event-form">
+        <p style="color:#666; font-size:0.9rem; margin-bottom:20px; line-height:1.5;">
+          Events are sub-folders inside this chapter (like "Goa Trip" or "Diwali Party").<br><br>
+          <strong>Note:</strong> All chapter members are automatically included.
+        </p>
+        <label>Event Name <span style="color:red">*</span></label>
+        <input type="text" name="name" required placeholder="e.g. Weekend Getaway" maxlength="50" />
+        <div style="margin-top:25px;">
+          <button type="submit" class="btn-primary">Create Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/main.js"></script>
+  <script src="js/chapter.js"></script>
+  <script src="js/feature-settlements.js"></script>
+  <script src="js/feature-creator-label.js"></script>
+  <script src="js/feature-personal-chapter.js"></script>
+  <script src="js/feature-categories.js"></script>
+  <script src="js/feature-bulk-event.js"></script>
 </body>
 </html>

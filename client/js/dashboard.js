@@ -436,6 +436,7 @@ function renderGrid(chapters) {
   addCard.onclick = openModal;
   addCard.setAttribute("role", "button");
   addCard.setAttribute("tabindex", "0");
+  addCard.setAttribute("aria-label", "Create new chapter");
   addCard.innerHTML = `
     <div class="plus-icon">+</div>
     <div style="margin-top:10px; font-weight:600; color:#888;">Create Chapter</div>
@@ -601,14 +602,18 @@ window.addMemberInput = function() {
   btn.type = "button";
   btn.innerHTML = "✕";
   btn.style.cssText = "color:red; border:none; background:none; font-weight:bold; cursor:pointer; position:absolute; right:10px; top:12px; z-index:10;";
-  btn.onclick = () => div.remove();
+  btn.onclick = () => {
+    // Clean up autocomplete instance before removing
+    if (input._autocomplete) input._autocomplete.destroy();
+    div.remove();
+  };
 
   div.appendChild(input);
   div.appendChild(btn);
   memberListContainer.appendChild(div);
 
   // 3. Attach Autocomplete
-  new MemberAutocomplete(input, {
+  const ac = new MemberAutocomplete(input, {
     friends: cachedFriends,
     onSelect: (result) => {
       // Optional: Add visual feedback (Green border if friend selected)
@@ -621,6 +626,7 @@ window.addMemberInput = function() {
       }
     }
   });
+  input._autocomplete = ac; // Store reference for cleanup
 };
 
 /* ======================================

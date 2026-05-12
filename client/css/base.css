@@ -967,7 +967,7 @@
   }
   
   .empty-subtitle {
-    color: #bbb; /* ✅ FIXED A2: Darkened from #ccc */
+    color: rgba(255,255,255,0.65); /* ✅ FIXED A2: Improved contrast for dark background */
     font-size: 1rem;
     max-width: 400px;
     margin-bottom: 25px;
@@ -1123,7 +1123,7 @@
   
   /* ✅ FIX A2: Contrast Improvements */
   .text-muted {
-    color: #b0b0b0 !important; /* Was #888, now lighter for dark bg */
+    color: rgba(255,255,255,0.6) !important; /* Improved contrast with rgba for dark background */
   }
   
   /* =========================

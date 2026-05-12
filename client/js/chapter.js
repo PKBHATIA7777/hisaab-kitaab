@@ -1,5 +1,3 @@
-
-
 /* client/js/chapter.js */
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -241,7 +239,7 @@ async function loadExpenses(append = false) {
   }
 }
 
-// --- UPDATED: Render Expenses ---
+// --- UPDATED: Render Expenses (Step 6.4 - New Card Structure) ---
 function renderExpenses() {
   expenseListEl.innerHTML = "";
   
@@ -261,46 +259,52 @@ function renderExpenses() {
   expenses.forEach(ex => {
     const card = document.createElement("div");
     card.className = "expense-card";
-    if (ex.isTemp) card.style.opacity = "0.7";
+    if (ex.isTemp) { card.style.opacity = "0.6"; card.style.pointerEvents = "none"; }
 
-    const descText = document.createTextNode(ex.description || "Untitled Expense");
-    const payerText = document.createTextNode(ex.payer_name || "Unknown");
-    const timeText = document.createTextNode(timeAgo(ex.expense_date));
-    const amountText = document.createTextNode("₹" + ex.amount);
+    // Icon cell
+    const iconDiv = document.createElement("div");
+    iconDiv.className = "expense-icon";
+    iconDiv.textContent = ex.category_icon || "💰";
 
-    const h4 = document.createElement("h4");
-    h4.appendChild(descText);
-
-    const payerStrong = document.createElement("strong");
-    payerStrong.appendChild(payerText);
-
-    const p = document.createElement("p");
-    p.appendChild(document.createTextNode("paid by "));
-    p.appendChild(payerStrong);
-    p.appendChild(document.createTextNode(" • "));
-    p.appendChild(timeText);
-
+    // Info cell
     const infoDiv = document.createElement("div");
     infoDiv.className = "expense-info";
+
+    const h4 = document.createElement("h4");
+    h4.textContent = ex.description || "Untitled Expense";
+
+    const p = document.createElement("p");
+    const strong = document.createElement("strong");
+    strong.textContent = ex.payer_name || "Unknown";
+    p.appendChild(strong);
+    p.appendChild(document.createTextNode(" • " + timeAgo(ex.expense_date)));
+
     infoDiv.appendChild(h4);
     infoDiv.appendChild(p);
 
+    // Right cell
+    const rightDiv = document.createElement("div");
+    rightDiv.className = "expense-right";
+
     const amountDiv = document.createElement("div");
     amountDiv.className = "expense-amount";
-    amountDiv.appendChild(amountText);
+    amountDiv.textContent = "₹" + parseFloat(ex.amount).toLocaleString("en-IN");
 
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "View / Edit";
-    editBtn.style.cssText = "background:none; border:none; color:#d000ff; font-size:0.8rem; cursor:pointer; margin-top:5px; padding:0;";
-    editBtn.addEventListener("click", () => openEditExpenseModal(ex.id));
+    const hintDiv = document.createElement("div");
+    hintDiv.className = "expense-edit-hint";
+    hintDiv.textContent = "Tap to edit";
 
-    const rightDiv = document.createElement("div");
-    rightDiv.style.textAlign = "right";
     rightDiv.appendChild(amountDiv);
-    rightDiv.appendChild(editBtn);
+    rightDiv.appendChild(hintDiv);
 
+    card.appendChild(iconDiv);
     card.appendChild(infoDiv);
     card.appendChild(rightDiv);
+
+    if (!ex.isTemp) {
+      card.addEventListener("click", () => openEditExpenseModal(ex.id));
+    }
+
     expenseListEl.appendChild(card);
   });
 }

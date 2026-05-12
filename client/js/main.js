@@ -410,6 +410,56 @@ const CONFIG = {
     return check;
   };
 
+  window.trapFocus = function(modalElement) {
+    const focusableSelectors = [
+      'a[href]', 'button:not([disabled])', 'input:not([disabled])',
+      'select:not([disabled])', 'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])'
+    ].join(', ');
+
+    const getFocusable = () => Array.from(modalElement.querySelectorAll(focusableSelectors));
+
+    const handler = (e) => {
+      if (e.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+
+    // Return cleanup function
+    modalElement.addEventListener('keydown', handler);
+    return () => modalElement.removeEventListener('keydown', handler);
+  };
+
+  window.openModalWithFocus = function(modalEl, firstFocusSelector) {
+    modalEl.classList.add('active');
+    const cleanup = window.trapFocus(modalEl);
+    modalEl._focusTrapCleanup = cleanup;
+
+    // Focus first interactive element
+    setTimeout(() => {
+      const target = firstFocusSelector 
+        ? modalEl.querySelector(firstFocusSelector) 
+        : modalEl.querySelector('button, input, select, textarea, [tabindex]');
+      target?.focus();
+    }, 50);
+  };
+
+  window.closeModalWithFocus = function(modalEl, returnFocusEl) {
+    modalEl.classList.remove('active');
+    if (modalEl._focusTrapCleanup) {
+      modalEl._focusTrapCleanup();
+      delete modalEl._focusTrapCleanup;
+    }
+    returnFocusEl?.focus();
+  };
+
   function initPasswordToggles() {
     document.querySelectorAll('.btn-toggle-pass').forEach(btn => {
       const newBtn = btn.cloneNode(true);
@@ -585,6 +635,31 @@ const CONFIG = {
     });
 
     window.addEventListener('resize', window.debounce(initMobileTweaks, CONFIG.TIMEOUTS.DEBOUNCE_DELAY));
+
+    // Step 5.3 — Fix offline indicator: Persistent offline banner
+    function updateOnlineStatus() {
+      const existingBanner = document.getElementById('offline-banner');
+      if (!navigator.onLine) {
+        if (!existingBanner) {
+          const banner = document.createElement('div');
+          banner.id = 'offline-banner';
+          banner.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
+            background: #ff1744; color: #fff; text-align: center;
+            padding: 8px 16px; font-family: var(--font-main); font-size: 0.85rem;
+            font-weight: 600; letter-spacing: 0.3px;
+          `;
+          banner.textContent = "⚠️ You are offline. Changes may not be saved.";
+          document.body.prepend(banner);
+        }
+      } else {
+        existingBanner?.remove();
+      }
+    }
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    // Initial check
+    updateOnlineStatus();
   });
 
   /* ======================================
@@ -592,9 +667,23 @@ const CONFIG = {
      ====================================== */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
-        console.log('ServiceWorker registration failed: ', err);
-      });
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available
+              showToast("App updated! Reload for the latest version.", "info", {
+                label: "Reload",
+                callback: () => {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  window.location.reload();
+                }
+              });
+            }
+          });
+        });
+      }).catch(err => console.log('ServiceWorker registration failed:', err));
     });
   }
 
@@ -840,11 +929,16 @@ class MemberAutocomplete {
     this.dropdown.className = 'autocomplete-dropdown';
     this.wrapper.appendChild(this.dropdown);
 
-    this.input.addEventListener('input', () => this.handleInput());
-    this.input.addEventListener('focus', () => this.handleInput());
-    this.input.addEventListener('blur', () => {
+    // Store handler references for cleanup
+    this._inputHandler = () => this.handleInput();
+    this._focusHandler = () => this.handleInput();
+    this._blurHandler = () => {
       setTimeout(() => this.dropdown.classList.remove('active'), 200);
-    });
+    };
+
+    this.input.addEventListener('input', this._inputHandler);
+    this.input.addEventListener('focus', this._focusHandler);
+    this.input.addEventListener('blur', this._blurHandler);
   }
 
   handleInput() {
@@ -939,6 +1033,13 @@ class MemberAutocomplete {
         friendId: this.input.dataset.friendId
       });
     }
+  }
+
+  destroy() {
+    this.input.removeEventListener('input', this._inputHandler);
+    this.input.removeEventListener('focus', this._focusHandler);
+    this.input.removeEventListener('blur', this._blurHandler);
+    this.dropdown?.remove();
   }
 }
 
