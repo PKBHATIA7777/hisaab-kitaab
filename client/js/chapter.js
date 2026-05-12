@@ -1,3 +1,5 @@
+
+
 /* client/js/chapter.js */
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -19,6 +21,11 @@ let myFriendsCache = [];
 // ✅ NEW: Event State
 let events = [];
 let currentEventId = null; // null means "All"
+
+// ✅ NEW: Pagination State for Load More
+let expensesOffset = 0;
+const EXPENSES_PAGE_SIZE = 50;
+let expensesTotal = 0;
 
 // Edit Mode State
 let isEditingExpense = false;
@@ -188,23 +195,49 @@ window.switchEvent = function(eventId) {
 };
 
 // --- UPDATED: Load Expenses (Accepts Event Filter) ---
-async function loadExpenses() {
-  try {
-    let url = `/expenses/chapter/${chapterId}`;
-    if (currentEventId) url += `?eventId=${currentEventId}`;
+// UPDATED: Robust loadExpenses function
+async function loadExpenses(append = false) {
+  if (!append) {
+    expensesOffset = 0;
+    expenses = [];
+  }
 
-    // REMOVED: Reference to deleted hero-status-amount element
-    // document.getElementById('hero-status-amount').innerHTML = '<span class="spinner-small"></span>';
+  try {
+    let url = `/expenses/chapter/${chapterId}?limit=${EXPENSES_PAGE_SIZE}&offset=${expensesOffset}`;
+    if (currentEventId) url += `&eventId=${currentEventId}`;
     
     const data = await apiFetch(url);
-    expenses = data.expenses;
     
-    // Sync UI components
+    // 1. SAFETY CHECK: Use '?.' so it doesn't crash if pagination is missing
+    expensesTotal = data.pagination?.total || 0;
+    
+    // 2. SAFETY CHECK: Ensure data.expenses is an array
+    const fetchedExpenses = Array.isArray(data.expenses) ? data.expenses : [];
+    
+    if (append) {
+      expenses = [...expenses, ...fetchedExpenses];
+    } else {
+      expenses = fetchedExpenses;
+    }
+    
     renderExpenses();
-    loadHeroSettlements(); // Sync the Hero section with new data
+    
+    // 3. Pass boolean safely
+    // renderLoadMoreButton(data.pagination?.hasMore || false);
+    renderLoadMoreButton(true); // Temporarily forcing it to true
+    
+    loadHeroSettlements();
+    
   } catch (err) {
-    console.error("Failed to load expenses");
-    expenseListEl.innerHTML = '<div style="color:red; text-align:center;">Error loading expenses</div>';
+    // 4. LOG THE ACTUAL ERROR to the F12 developer console
+    console.error("Failed to load expenses detailed error:", err);
+    
+    const listEl = document.getElementById("expense-list-container");
+    if (listEl) {
+      listEl.innerHTML = `<div style="color:red; text-align:center; padding:20px;">
+        Error: ${err.message || "Failed to load expenses"}. Check console.
+      </div>`;
+    }
   }
 }
 
@@ -270,6 +303,51 @@ function renderExpenses() {
     card.appendChild(rightDiv);
     expenseListEl.appendChild(card);
   });
+}
+
+// UPDATED: Load More Button
+// UPDATED: Load More Button (Fixed DOM Insertion)
+function renderLoadMoreButton(hasMore) {
+  const container = document.getElementById('load-more-container');
+  if (!container) return; // Failsafe if HTML isn't updated
+  
+  // Clear any existing button first
+  container.innerHTML = '';
+  
+  if (!hasMore) return;
+  
+  const btn = document.createElement('button');
+  btn.id = 'load-more-btn';
+  btn.textContent = `Load more expenses`;
+  
+  // Strong inline styles to guarantee visibility over any other CSS
+  btn.style.cssText = `
+    display: inline-block !important; 
+    width: 90% !important; 
+    max-width: 400px !important; 
+    margin: 10px auto 80px auto !important; /* Huge bottom margin to clear the FAB */
+    padding: 14px 20px !important; 
+    background: #d000ff !important; 
+    color: white !important; 
+    border: none !important;
+    border-radius: 12px !important; 
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    cursor: pointer !important; 
+    position: relative !important;
+    z-index: 100 !important;
+    box-shadow: 0 4px 12px rgba(208, 0, 255, 0.3) !important;
+  `;
+  
+  btn.addEventListener('click', () => {
+    btn.innerHTML = '<span class="spinner-small" style="border-top-color: white;"></span> Loading...';
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    expensesOffset += EXPENSES_PAGE_SIZE;
+    loadExpenses(true);
+  });
+  
+  container.appendChild(btn);
 }
 
 // --- RENDER FUNCTIONS ---
