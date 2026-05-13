@@ -241,12 +241,23 @@
     });
 
     /* --- STEP 1: EMAIL --- */
-    async function handleEmailSubmit(e) {
+   async function handleEmailSubmit(e) {
       e.preventDefault();
       const email = els.inputEmail.value.trim();
       const btn = document.getElementById('btn-email');
       if (!email) return;
       setBtnLoading(btn, true);
+
+      // Wake server before OTP request
+      if (window.wakeUpServer && !window.isServerAwake()) {
+        btn.innerHTML = 'Connecting...';
+        try {
+          await Promise.race([
+            window.wakeUpServer(),
+            new Promise(resolve => setTimeout(resolve, 40000))
+          ]);
+        } catch (_) {}
+      }
 
       try {
         await apiFetch("/auth/register/request-otp", {

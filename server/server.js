@@ -31,7 +31,7 @@ const isProduction = process.env.NODE_ENV === "production";
 app.set("trust proxy", 1);
 app.use(logger);
 
-// ── CORS (identical to original) ─────────────────────────────
+// ── CORS (FIX v2: Enhanced for credentialed cross-origin requests) ─────────────────────────────
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:5500",
@@ -42,12 +42,36 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow any vercel.app subdomain for preview deployments
+    if (origin && origin.endsWith('.vercel.app')) return callback(null, true);
     console.warn(`⚠️ CORS Blocked Origin: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization'],
+  exposedHeaders: ['X-CSRF-Token', 'Retry-After'],
+  optionsSuccessStatus: 204, // Some old browsers choke on 200 for OPTIONS
+  maxAge: 86400, // Cache preflight for 24 hours
+}));
+
+// Handle preflight for all routes explicitly
+app.options('*', cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (origin && origin.endsWith('.vercel.app')) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization'],
+  exposedHeaders: ['X-CSRF-Token'],
+  optionsSuccessStatus: 204,
+  maxAge: 86400,
 }));
 
 // ── SECURITY (identical to original) ─────────────────────────

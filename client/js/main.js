@@ -140,8 +140,11 @@ const CONFIG = {
       }
 
       const controller = new AbortController();
-      // Increase timeout for Render cold starts (can take 10-15s)
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      // Render cold starts can take 30-60s on free tier.
+      // Auth endpoints get extra time; other endpoints stay shorter.
+      const isAuthEndpoint = path.includes('/auth/');
+      const timeoutMs = isAuthEndpoint ? 65000 : 25000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       let res;
       try {
@@ -156,7 +159,17 @@ const CONFIG = {
       } catch (err) {
         clearTimeout(timeoutId);
         if (err.name === "AbortError") {
-          const error = new Error("Request timed out. The server may be starting up — please try again.");
+          // If server might be sleeping, retry automatically for auth endpoints
+          const isAuthPath = path.includes('/auth/');
+          if (isAuthPath && attempt < 2) {
+            console.log(`Auth request timed out, retrying (attempt ${attempt + 1})...`);
+            await sleep(3000);
+            return makeRequest(attempt + 1);
+          }
+          const error = new Error(
+            "The server is starting up (this takes ~30 seconds on first use). " +
+            "Please wait a moment and try again."
+          );
           error.status = 408;
           error.isTimeout = true;
           throw error;
@@ -167,9 +180,13 @@ const CONFIG = {
           error.isOffline = true;
           throw error;
         }
-        // Network error (fetch itself failed) — retry with backoff up to 2 times
-        if (attempt < 2) {
-          await sleep(Math.pow(2, attempt) * 800); // 800ms, 1600ms
+        // Network error — retry with backoff. Auth endpoints get more attempts
+        // because the server may be cold-starting.
+        const maxNetworkRetries = path.includes('/auth/') ? 3 : 2;
+        if (attempt < maxNetworkRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+          console.log(`Network error, retrying in ${delay}ms (attempt ${attempt + 1})...`);
+          await sleep(delay);
           return makeRequest(attempt + 1);
         }
         throw err;
@@ -256,6 +273,63 @@ const CONFIG = {
 
     return makeRequest(0);
   };
+
+  /* ── Server Wake-Up System ──────────────────────────────────
+   * Render free tier sleeps after 15min inactivity. This pings
+   * the server as soon as the page loads so it's awake by the
+   * time the user fills the form (30-60 seconds to wake up).
+   */
+  let serverIsAwake = false;
+  let wakeUpPromise = null;
+
+  async function wakeUpServer() {
+    if (serverIsAwake) return true;
+    if (wakeUpPromise) return wakeUpPromise;
+
+    wakeUpPromise = (async () => {
+      const maxAttempts = 6;
+      const delayBetween = 10000; // 10 seconds between attempts
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          
+          const res = await fetch(CONFIG.API_BASE + '/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          // Any response (even 401) means server is awake
+          if (res.status !== 0) {
+            serverIsAwake = true;
+            console.log(`Server awake after ${attempt} attempt(s)`);
+            
+            // Capture CSRF from response header
+            const csrfHeader = res.headers.get('X-CSRF-Token');
+            if (csrfHeader && csrfHeader.length >= 32) {
+              window.__csrfToken = csrfHeader;
+            }
+            return true;
+          }
+        } catch (err) {
+          console.log(`Wake-up attempt ${attempt}/${maxAttempts} failed:`, err.message);
+          if (attempt < maxAttempts) {
+            await sleep(delayBetween);
+          }
+        }
+      }
+      console.warn('Server may still be starting. Proceeding anyway.');
+      return false;
+    })();
+
+    return wakeUpPromise;
+  }
+
+  window.wakeUpServer = wakeUpServer;
+  window.isServerAwake = () => serverIsAwake;
 
   /* ======================================
      2. SESSION & AUTH
@@ -594,7 +668,9 @@ const CONFIG = {
      ====================================== */
   async function initializeApp() {
     try {
-      // CSRF is now read from cookie directly in apiFetch — no init needed here
+      // Start waking up the server immediately in the background
+      // so it's ready by the time user fills the form
+      wakeUpServer().catch(() => {}); // fire and forget, never block UI
     } catch (err) {
       console.error("App initialization failed", err);
     } finally {
@@ -660,6 +736,60 @@ const CONFIG = {
     window.addEventListener('offline', updateOnlineStatus);
     // Initial check
     updateOnlineStatus();
+
+    // ── Server Status Banner ───────────────────────────────────
+    // Shows a non-intrusive banner while the server is cold-starting
+    function showServerStartingBanner() {
+      if (document.getElementById('server-starting-banner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'server-starting-banner';
+      banner.style.cssText = `
+        position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.85); color: #fff;
+        padding: 12px 20px; border-radius: 12px;
+        font-family: var(--font-main); font-size: 0.85rem;
+        z-index: 99998; text-align: center;
+        border: 1px solid rgba(208,0,255,0.4);
+        backdrop-filter: blur(10px);
+        display: flex; align-items: center; gap: 10px;
+        max-width: 90vw;
+        animation: slideIn 0.3s ease-out;
+      `;
+      banner.innerHTML = `
+        <div style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);
+          border-top:2px solid #d000ff;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+        <span>Server is starting up... (~30 sec on first use)</span>
+      `;
+      document.body.appendChild(banner);
+    }
+
+    function hideServerStartingBanner() {
+      const banner = document.getElementById('server-starting-banner');
+      if (banner) {
+        banner.style.animation = 'fadeOut 0.3s ease-out forwards';
+        setTimeout(() => banner.remove(), 300);
+      }
+    }
+
+    window.showServerStartingBanner = showServerStartingBanner;
+    window.hideServerStartingBanner = hideServerStartingBanner;
+
+    // Show banner if server isn't awake and we're on an auth page
+    const isAuthPage = ['login.html', 'signup.html', 'forgot.html', 'index.html']
+      .some(p => window.location.pathname.includes(p));
+    
+    if (isAuthPage) {
+      // Check server status after a short delay
+      setTimeout(async () => {
+        if (!window.isServerAwake || !window.isServerAwake()) {
+          showServerStartingBanner();
+          if (window.wakeUpServer) {
+            await window.wakeUpServer().catch(() => {});
+          }
+          hideServerStartingBanner();
+        }
+      }, 1500);
+    }
   });
 
   /* ======================================

@@ -85,7 +85,14 @@
     const forgotForm = document.getElementById("forgot-form");
     const resetStep = document.getElementById("reset-step");
     const resetForm = document.getElementById("reset-form");
-  
+
+    // Wake up server immediately so it's ready when user submits
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.wakeUpServer) {
+        window.wakeUpServer().catch(() => {});
+      }
+    });
+
     let resetEmail = "";
   
     if (forgotForm) {
@@ -94,6 +101,19 @@
         const formData = new FormData(forgotForm);
         const email = formData.get("email");
         resetEmail = email;
+
+        const submitBtn = forgotForm.querySelector('button[type="submit"]');
+        if (submitBtn) setBtnLoading(submitBtn, true);
+
+        // Ensure server is awake
+        if (window.wakeUpServer && !window.isServerAwake()) {
+          try {
+            await Promise.race([
+              window.wakeUpServer(),
+              new Promise(resolve => setTimeout(resolve, 40000))
+            ]);
+          } catch (_) {}
+        }
   
         try {
           await apiFetch("/auth/forgot/request-otp", {

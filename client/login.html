@@ -274,6 +274,24 @@
       const btn = document.getElementById('btn-next');
       setBtnLoading(btn, true);
 
+      // If server isn't confirmed awake yet, show user-friendly message
+      // and wait. This prevents the 60s timeout surprise.
+      if (!window.isServerAwake || !window.isServerAwake()) {
+        const originalText = btn.dataset.originalText || btn.textContent;
+        btn.innerHTML = 'Connecting to server...';
+        btn.disabled = true;
+        
+        try {
+          await Promise.race([
+            window.wakeUpServer ? window.wakeUpServer() : Promise.resolve(),
+            new Promise(resolve => setTimeout(resolve, 35000)) // max wait 35s
+          ]);
+        } catch (_) { /* proceed regardless */ }
+        
+        btn.disabled = false;
+        // setBtnLoading will restore text
+      }
+
       try {
         const res = await apiFetch('/auth/check-identifier', {
           method: 'POST',
@@ -353,6 +371,16 @@
     async function requestLoginOtp(targetBtn = null) {
       const btn = targetBtn || document.getElementById('btn-req-otp');
       setBtnLoading(btn, true);
+
+      // Ensure server is awake before sending OTP request
+      if (window.wakeUpServer && !window.isServerAwake()) {
+        try {
+          await Promise.race([
+            window.wakeUpServer(),
+            new Promise(resolve => setTimeout(resolve, 40000))
+          ]);
+        } catch (_) {}
+      }
 
       try {
         await apiFetch('/auth/login/otp-request', {

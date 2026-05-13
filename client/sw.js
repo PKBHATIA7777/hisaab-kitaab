@@ -1,6 +1,6 @@
 // Cache version — increment this on every deployment
 // Format: v{MAJOR}.{DEPLOY_TIMESTAMP} for easy debugging
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `hisaab-kitaab-${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
@@ -50,13 +50,24 @@ self.addEventListener("fetch", (e) => {
 
   // Never cache API calls
   if (url.pathname.startsWith("/api/")) {
+    // NEVER cache API calls. Always network-only, no fallback cache.
+    // Auth endpoints especially must never be served from cache.
     e.respondWith(
-      fetch(e.request).catch(() =>
-        new Response(JSON.stringify({ ok: false, message: "You are offline." }), {
-          status: 503,
-          headers: { "Content-Type": "application/json" }
-        })
-      )
+      fetch(e.request, { credentials: 'include' }).catch((err) => {
+        // Only return offline message for non-auth endpoints
+        // Auth endpoints should fail transparently so the UI handles it
+        const isAuthEndpoint = url.pathname.includes('/auth/');
+        if (isAuthEndpoint) {
+          return new Response(
+            JSON.stringify({ ok: false, message: "Network error. Please check your connection." }),
+            { status: 0, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ ok: false, message: "You are offline." }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        );
+      })
     );
     return;
   }

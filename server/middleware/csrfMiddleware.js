@@ -14,10 +14,16 @@ const CSRF_COOKIE_OPTIONS = {
 function csrfProtection(req, res, next) {
   // Step 1: Ensure cookie exists. Regenerate if missing or suspiciously short.
   let token = req.cookies.csrf_token;
-  if (!token || token.length < 32) {
+  const needsNewToken = !token || token.length < 32;
+  
+  if (needsNewToken) {
     token = crypto.randomUUID();
-    res.cookie("csrf_token", token, CSRF_COOKIE_OPTIONS);
   }
+  
+  // ALWAYS re-set the cookie on every response to combat iOS ITP eviction.
+  // iOS Safari can evict cookies after 7 days of no interaction; refreshing
+  // the cookie on every request resets that timer.
+  res.cookie("csrf_token", token, CSRF_COOKIE_OPTIONS);
   req.csrf_token = token;
 
   // Step 2: Always echo the current token back in a response header so the

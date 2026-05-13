@@ -10,14 +10,17 @@ const isProduction = process.env.NODE_ENV === "production";
 
 // Single source of truth for all cookie options
 function getCookieOptions(maxAgeMs, httpOnly = true) {
-  return {
+  const opts = {
     httpOnly,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
     maxAge: maxAgeMs,
     path: "/",
-    ...(isProduction && { domain: undefined }),
   };
+  // NEVER set domain for cross-origin Vercel→Render setup.
+  // Setting domain to .onrender.com would break cross-origin cookies entirely.
+  // Leave domain undefined so the browser sets it to the exact request host.
+  return opts;
 }
 
 function createToken(payload, remember = false) {
