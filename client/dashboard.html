@@ -205,6 +205,13 @@
 
           </div>
 
+          <!-- PWA Install Section in Profile -->
+<div id="profile-install-section" class="profile-section-title" style="cursor:pointer;" onclick="handleProfileInstallClick()">
+  <span>📲 Install App</span>
+  <span id="profile-install-badge" style="font-size:0.75rem; background:rgba(208,0,255,0.1); color:#d000ff; padding:2px 8px; border-radius:6px; font-weight:600;">Get App</span>
+</div>
+<div id="profile-install-hint" style="font-size:0.82rem; color:#888; margin-bottom:16px; padding:0 4px; line-height:1.5;"></div>
+
           <div class="profile-section-title">Account</div>
           <button type="button" class="btn-secondary" id="logout-btn-profile" style="color: #ff1744; border-color: #ffcdd2; background: #fff;">
             Log Out
@@ -296,8 +303,19 @@
       &copy; 2025 Hisaab-Kitaab. All rights reserved.
     </div>
   </footer>
-
-    <div id="pwa-install-prompt" class="pwa-popup hidden">
+<div id="pwa-install-prompt" class="pwa-popup hidden">
+  <div class="pwa-popup-content">
+    <div class="pwa-icon">📱</div>
+    <div class="pwa-text">
+      <h4>Install Hisaab-Kitaab</h4>
+      <p id="pwa-instructions">Get quick access from your home screen!</p>
+    </div>
+    <div class="pwa-actions">
+      <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
+      <button id="pwa-close-btn" class="pwa-btn-secondary">Later</button>
+    </div>
+  </div>
+</div>
       <div class="pwa-popup-content">
         <div class="pwa-icon">📱</div>
         <div class="pwa-text">
@@ -311,5 +329,8 @@
       </div>
     </div>
 
+
+
+    <script src="js/pwa-install.js"></script>
 </body>
 </html>

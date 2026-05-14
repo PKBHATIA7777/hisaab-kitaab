@@ -4111,3 +4111,29 @@ input:focus {
 }
 .divider::before { margin-right: 10px; }
 .divider::after { margin-left: 10px; }
+
+
+
+
+/* PWA Install Guide */
+#pwa-guide-modal {
+  animation: fadeInOverlay 0.2s ease;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Profile install section */
+#profile-install-section {
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 8px;
+  padding: 4px;
+  margin: 0 -4px;
+}
+
+#profile-install-section:hover {
+  background: rgba(208, 0, 255, 0.05);
+}

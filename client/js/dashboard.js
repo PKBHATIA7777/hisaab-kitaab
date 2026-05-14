@@ -816,6 +816,9 @@ window.openProfileModal = function() {
   // Ensure we start in list mode (not stuck in edit mode)
   window.cancelFriendEdit();
 
+  // Update profile install hint
+  updateProfileInstallHint();
+
   modal.classList.add("active");
 };
 
@@ -823,6 +826,53 @@ window.closeProfileModal = function() {
   const modal = document.getElementById("profile-modal");
   if (modal) modal.classList.remove("active");
 };
+
+// ==========================================
+// ✅ STEP 1.4 — Add profile install handler in dashboard.js
+// ==========================================
+// PWA Install from profile
+window.handleProfileInstallClick = function() {
+  if (!window.PWAInstall) return;
+  const config = window.PWAInstall.getConfig();
+  
+  if (config.type === 'installed') {
+    showToast('App is already installed!', 'success');
+    return;
+  }
+  
+  if (config.canInstallDirectly && window.PWAInstall.detect && 
+      !window.PWAInstall.detect.isStandalone) {
+    window.PWAInstall.triggerInstall();
+  } else {
+    // Close profile modal first, then show guide
+    closeProfileModal();
+    setTimeout(() => window.PWAInstall.showGuide(), 200);
+  }
+};
+
+// Update the profile install hint text when profile opens
+function updateProfileInstallHint() {
+  const hintEl = document.getElementById('profile-install-hint');
+  const sectionEl = document.getElementById('profile-install-section');
+  
+  if (!window.PWAInstall || !hintEl || !sectionEl) return;
+  
+  if (window.PWAInstall.detect.isStandalone) {
+    sectionEl.style.display = 'none';
+    return;
+  }
+  
+  sectionEl.style.display = '';
+  const detect = window.PWAInstall.detect;
+  
+  if (detect.isIOS) {
+    hintEl.textContent = 'Add to your iPhone/iPad home screen for offline access';
+  } else if (detect.isAndroid) {
+    hintEl.textContent = 'Install for a native app-like experience';
+  } else {
+    hintEl.textContent = 'Install on your computer for quick access';
+  }
+}
 
 // Re-bind Logout (since ID changed to logout-btn-profile)
 const profileLogoutBtn = document.getElementById("logout-btn-profile");
