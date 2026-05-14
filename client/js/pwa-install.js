@@ -482,15 +482,28 @@
   }
 
   // ─── PROFILE MENU INSTALL BUTTON ────────────────────────────
+ // ─── PROFILE MENU INSTALL BUTTON ────────────────────────────
   function updateInstallUI() {
-    // Update profile install option
     const profileInstallSection = document.getElementById('profile-install-section');
     if (!profileInstallSection) return;
     
     if (detect.isStandalone || installState.hasInstalled) {
       profileInstallSection.style.display = 'none';
     } else {
-      profileInstallSection.style.display = '';
+      profileInstallSection.style.display = ''; // Make visible
+      
+      // FIX: Actually make the profile button trigger the install logic
+      profileInstallSection.onclick = () => {
+        const config = getInstallConfig();
+        if (config.canInstallDirectly && deferredPrompt) {
+          triggerNativeInstall();
+        } else {
+          showFullGuide(config);
+        }
+        // Close the profile dropdown if it's open
+        const dropdown = document.querySelector('.nav-dropdown.active');
+        if (dropdown) dropdown.classList.remove('active');
+      };
     }
   }
 

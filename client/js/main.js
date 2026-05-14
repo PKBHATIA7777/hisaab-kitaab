@@ -832,82 +832,82 @@ const CONFIG = {
      FIX: Show iOS users a clear visual step-by-step guide with an animated
      arrow pointing to where the Share button actually is on their screen.
      ====================================== */
-  document.addEventListener("DOMContentLoaded", () => {
-    let deferredPrompt;
-    const pwaPopup = document.getElementById('pwa-install-prompt');
-    if (!pwaPopup) return;
+  // document.addEventListener("DOMContentLoaded", () => {
+  //   let deferredPrompt;
+  //   const pwaPopup = document.getElementById('pwa-install-prompt');
+  //   if (!pwaPopup) return;
 
-    const pwaInstallBtn = document.getElementById('pwa-install-btn');
-    const pwaCloseBtn = document.getElementById('pwa-close-btn');
-    const pwaInstructions = document.getElementById('pwa-instructions');
-    const pwaIcon = pwaPopup.querySelector('.pwa-icon');
-    const pwaTitle = pwaPopup.querySelector('h4');
+  //   const pwaInstallBtn = document.getElementById('pwa-install-btn');
+  //   const pwaCloseBtn = document.getElementById('pwa-close-btn');
+  //   const pwaInstructions = document.getElementById('pwa-instructions');
+  //   const pwaIcon = pwaPopup.querySelector('.pwa-icon');
+  //   const pwaTitle = pwaPopup.querySelector('h4');
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  //   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  //   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  //   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
-    // Already installed — don't show
-    if (isStandalone) return;
+  //   // Already installed — don't show
+  //   if (isStandalone) return;
 
-    // Check if dismissed recently (don't annoy users)
-    const lastDismissed = localStorage.getItem('pwa_dismissed_at');
-    if (lastDismissed && Date.now() - parseInt(lastDismissed) < 3 * 24 * 60 * 60 * 1000) return;
+  //   // Check if dismissed recently (don't annoy users)
+  //   const lastDismissed = localStorage.getItem('pwa_dismissed_at');
+  //   if (lastDismissed && Date.now() - parseInt(lastDismissed) < 3 * 24 * 60 * 60 * 1000) return;
 
-    function showPopup() {
-      setTimeout(() => {
-        pwaPopup.classList.remove('hidden');
-      }, 3000); // FIX v2: increased to 3s so page loads first
-    }
+  //   function showPopup() {
+  //     setTimeout(() => {
+  //       pwaPopup.classList.remove('hidden');
+  //     }, 3000); // FIX v2: increased to 3s so page loads first
+  //   }
 
-    if (isIOS && isSafari) {
-      // ── iOS Safari: Show visual step-by-step guide ──────────
-      if (pwaTitle) pwaTitle.textContent = 'Install Hisaab';
-      if (pwaIcon) pwaIcon.textContent = '📲';
+  //   if (isIOS && isSafari) {
+  //     // ── iOS Safari: Show visual step-by-step guide ──────────
+  //     if (pwaTitle) pwaTitle.textContent = 'Install Hisaab';
+  //     if (pwaIcon) pwaIcon.textContent = '📲';
 
-      // Replace the install button with a "How to Install" button
-      if (pwaInstallBtn) {
-        pwaInstallBtn.textContent = 'How to Install';
-        pwaInstallBtn.style.background = '#007AFF'; // iOS blue
-        pwaInstallBtn.addEventListener('click', showIOSInstallGuide);
-      }
+  //     // Replace the install button with a "How to Install" button
+  //     if (pwaInstallBtn) {
+  //       pwaInstallBtn.textContent = 'How to Install';
+  //       pwaInstallBtn.style.background = '#007AFF'; // iOS blue
+  //       pwaInstallBtn.addEventListener('click', showIOSInstallGuide);
+  //     }
 
-      if (pwaInstructions) {
-        pwaInstructions.innerHTML = 'Tap <strong>Share ↑</strong> → <strong>Add to Home Screen</strong>';
-      }
+  //     if (pwaInstructions) {
+  //       pwaInstructions.innerHTML = 'Tap <strong>Share ↑</strong> → <strong>Add to Home Screen</strong>';
+  //     }
 
-      showPopup();
+  //     showPopup();
 
-    } else {
-      // ── Android/Chrome: Use native beforeinstallprompt ──────
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        if (pwaInstructions) pwaInstructions.textContent = "Add to your home screen for quick access!";
-        if (pwaInstallBtn) pwaInstallBtn.textContent = 'Install';
-        showPopup();
-      });
+  //   } else {
+  //     // ── Android/Chrome: Use native beforeinstallprompt ──────
+  //     window.addEventListener('beforeinstallprompt', (e) => {
+  //       e.preventDefault();
+  //       deferredPrompt = e;
+  //       if (pwaInstructions) pwaInstructions.textContent = "Add to your home screen for quick access!";
+  //       if (pwaInstallBtn) pwaInstallBtn.textContent = 'Install';
+  //       showPopup();
+  //     });
 
-      if (pwaInstallBtn) {
-        pwaInstallBtn.addEventListener('click', async () => {
-          pwaPopup.classList.add('hidden');
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`PWA install outcome: ${outcome}`);
-            deferredPrompt = null;
-          }
-        });
-      }
-    }
+  //     if (pwaInstallBtn) {
+  //       pwaInstallBtn.addEventListener('click', async () => {
+  //         pwaPopup.classList.add('hidden');
+  //         if (deferredPrompt) {
+  //           deferredPrompt.prompt();
+  //           const { outcome } = await deferredPrompt.userChoice;
+  //           console.log(`PWA install outcome: ${outcome}`);
+  //           deferredPrompt = null;
+  //         }
+  //       });
+  //     }
+  //   }
 
-    if (pwaCloseBtn) {
-      pwaCloseBtn.addEventListener('click', () => {
-        pwaPopup.classList.add('hidden');
-        localStorage.setItem('pwa_dismissed_at', Date.now().toString());
-      });
-    }
-  });
+  //   if (pwaCloseBtn) {
+  //     pwaCloseBtn.addEventListener('click', () => {
+  //       pwaPopup.classList.add('hidden');
+  //       localStorage.setItem('pwa_dismissed_at', Date.now().toString());
+  //     });
+  //   }
+  // });
 
   /* ======================================
      8. iOS INSTALL GUIDE MODAL
