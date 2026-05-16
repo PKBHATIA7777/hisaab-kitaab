@@ -1,5 +1,3 @@
-
-
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -138,6 +136,8 @@ async function registerVerifyOtp(req, res) {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
     const otpRow = await verifyOtpLogic(email, otp, "signup");
+    
+    // STEP 7: Create short-lived token for iOS ITP fallback
     const tempToken = jwt.sign(
       { email: email.trim().toLowerCase(), purpose: "complete_signup", otpId: otpRow.id },
       process.env.JWT_SECRET, { expiresIn: "15m" }
@@ -153,7 +153,13 @@ async function registerVerifyOtp(req, res) {
       path: "/",
     });
 
-    return res.json({ ok: true, message: "Email verified successfully" });
+    // STEP 7: Also return token in response body for iOS ITP environments
+    // Frontend stores this in sessionStorage as fallback when cookies are blocked
+    return res.json({ 
+      ok: true, 
+      message: "Email verified successfully",
+      _signupToken: tempToken
+    });
   } catch (err) {
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
     return res.status(status).json({ ok: false, message: err.message });
@@ -170,7 +176,12 @@ async function registerComplete(req, res) {
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
 
     const { realName, password } = result.data;
-    const signupToken = req.cookies.signup_token;
+    
+    // STEP 7: Read signup token from cookie OR Authorization header (iOS ITP fallback)
+    const signupToken = req.cookies.signup_token || 
+      (req.headers.authorization?.startsWith('Bearer ') ? 
+        req.headers.authorization.slice(7) : null);
+    
     if (!signupToken) return res.status(401).json({ ok: false, message: "Email verification required." });
 
     let payload;
