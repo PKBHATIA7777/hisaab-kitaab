@@ -25,7 +25,7 @@
     // Browser detections
     isChrome: /Chrome/.test(ua) && !/Chromium|EdgA?\/|OPR\/|SamsungBrowser/.test(ua),
     isEdge: /Edg\/|EdgA?\//.test(ua),
-    isSafari: /Safari/.test(ua) && !/Chrome|Chromium|Android/.test(ua),
+    isSafari: /Safari/.test(ua) && !/Chrome|Chromium|Android|CriOS|FxiOS|EdgiOS|OPiOS/.test(ua),
     isFirefox: /Firefox/.test(ua) && !/Seamonkey/.test(ua),
     isSamsung: /SamsungBrowser/.test(ua),
     isOpera: /OPR\/|Opera/.test(ua),
@@ -81,10 +81,17 @@
     try {
       const dismissed = localStorage.getItem('pwa_dismissed_at');
       const installed = localStorage.getItem('pwa_installed');
-      installState.hasInstalled = installed === 'true';
+      
+      // iOS never fires 'appinstalled' event, so detect standalone mode
+      // and persist it so subsequent page loads know the app is installed
+      if (detect.isStandalone && !installed) {
+        localStorage.setItem('pwa_installed', 'true');
+      }
+      
+      installState.hasInstalled = installed === 'true' || detect.isStandalone;
       if (dismissed) {
         installState.dismissedAt = parseInt(dismissed);
-        installState.hasBeenDismissed = 
+        installState.hasBeenDismissed =
           Date.now() - installState.dismissedAt < DISMISS_COOLDOWN;
       }
     } catch(e) {}
@@ -311,13 +318,13 @@
     e.preventDefault();
     deferredPrompt = e;
     installState.canUseNativePrompt = true;
-    
-    // Update any existing UI
     updateInstallUI();
     
-    // Show popup after a delay if user hasn't dismissed
-    if (shouldShowAutoPopup()) {
-      setTimeout(showInstallPopup, 4000);
+    // Only auto-show on dashboard
+    const isMainAppPage = window.location.pathname.includes('dashboard.html') ||
+                          window.location.pathname === '/';
+    if (shouldShowAutoPopup() && isMainAppPage) {
+      setTimeout(showInstallPopup, 5000);
     }
   });
 
@@ -482,7 +489,6 @@
   }
 
   // ─── PROFILE MENU INSTALL BUTTON ────────────────────────────
- // ─── PROFILE MENU INSTALL BUTTON ────────────────────────────
   function updateInstallUI() {
     const profileInstallSection = document.getElementById('profile-install-section');
     if (!profileInstallSection) return;
@@ -546,18 +552,22 @@
       };
     }
 
-    // If no beforeinstallprompt fires within 2.5s, check if manual instructions needed
-    if (!detect.isStandalone && !installState.hasInstalled) {
+    // Only auto-show on dashboard, never on auth/info pages
+    const isMainAppPage = window.location.pathname.includes('dashboard.html') ||
+                          window.location.pathname === '/' ||
+                          window.location.pathname === '/index.html';
+
+    if (!detect.isStandalone && !installState.hasInstalled && isMainAppPage) {
       setTimeout(() => {
         const config = getInstallConfig();
-        if (config.type === 'manual' && shouldShowAutoPopup()) {
+        if ((config.type === 'manual' || config.type === 'prompt') && shouldShowAutoPopup()) {
           const popup = document.getElementById('pwa-install-prompt');
           if (popup) {
             updatePopupContent(popup, config);
             popup.classList.remove('hidden');
           }
         }
-      }, 4000);
+      }, 5000); // 5s so page content fully loads first
     }
 
     updateInstallUI();

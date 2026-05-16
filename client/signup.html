@@ -210,22 +210,28 @@
   <script src="js/pwa-install.js"></script>
   <script src="js/main.js"></script>
   <script>
-    // Pre-fetch CSRF token on page load for iOS Safari
+    // STEP 6: Pre-fetch CSRF token on page load for iOS Safari
     // iOS ITP may block the cookie on first visit, so we fetch it explicitly
+    // and store fallback in sessionStorage
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         const res = await fetch(window.APP_CONFIG?.API_BASE + '/auth/me' || '/api/auth/me', {
           method: 'GET',
           credentials: 'include',
         });
-        // This request's response will set the csrf_token cookie via the middleware
-        // and store it in window.__csrfToken via the X-CSRF-Token header handler in apiFetch
         const csrfHeader = res.headers.get('X-CSRF-Token');
-        if (csrfHeader) window.__csrfToken = csrfHeader;
+        if (csrfHeader) {
+          window.__csrfToken = csrfHeader;
+          // Fallback for iOS ITP cookie blocking
+          try { sessionStorage.setItem('__csrf_fallback', csrfHeader); } catch(_) {}
+        }
       } catch(_) { /* ignore — just priming the cookie */ }
     });
 
     let signupEmail = "";
+    
+    // STEP 5 Part C: Prevent duplicate OTP/email submissions
+    let otpRequestInFlight = false;
 
     const els = {
       step1: document.getElementById('step-1'),
@@ -244,25 +250,29 @@
     });
 
     /* --- STEP 1: EMAIL --- */
-   async function handleEmailSubmit(e) {
+    async function handleEmailSubmit(e) {
+      // STEP 5 Part C: Prevent duplicate submissions
+      if (otpRequestInFlight) return;
+      otpRequestInFlight = true;
+      
       e.preventDefault();
       const email = els.inputEmail.value.trim();
       const btn = document.getElementById('btn-email');
       if (!email) return;
       setBtnLoading(btn, true);
 
-      // Wake server before OTP request
-      if (window.wakeUpServer && !window.isServerAwake()) {
-        btn.innerHTML = 'Connecting...';
-        try {
-          await Promise.race([
-            window.wakeUpServer(),
-            new Promise(resolve => setTimeout(resolve, 40000))
-          ]);
-        } catch (_) {}
-      }
-
       try {
+        // Wake server before OTP request
+        if (window.wakeUpServer && !window.isServerAwake()) {
+          btn.innerHTML = 'Connecting...';
+          try {
+            await Promise.race([
+              window.wakeUpServer(),
+              new Promise(resolve => setTimeout(resolve, 40000))
+            ]);
+          } catch (_) {}
+        }
+
         await apiFetch("/auth/register/request-otp", {
           method: "POST",
           body: { email }
@@ -284,6 +294,8 @@
         document.querySelector('.auth-card').classList.add('shake-card');
         setTimeout(() => document.querySelector('.auth-card').classList.remove('shake-card'), 500);
       } finally {
+        // STEP 5 Part C: Reset the in-flight flag
+        otpRequestInFlight = false;
         setBtnLoading(btn, false);
       }
     }
@@ -327,10 +339,16 @@
       setBtnLoading(btn, true);
 
       try {
-        await apiFetch("/auth/register/verify-otp", {
+        // STEP 7: Handle signup token fallback for iOS ITP
+        const data = await apiFetch("/auth/register/verify-otp", {
           method: "POST",
           body: { email: signupEmail, otp }
         });
+
+        // Store fallback token for iOS ITP environments
+        if (data._signupToken) {
+          try { sessionStorage.setItem('_st', data._signupToken); } catch(_) {}
+        }
 
         // Store verification proof in sessionStorage as fallback for iOS ITP
         sessionStorage.setItem('email_verified', signupEmail);
@@ -359,8 +377,14 @@
       setBtnLoading(btn, true);
 
       try {
+        // STEP 7: Get fallback token for iOS ITP environments
+        let signupToken = null;
+        try { signupToken = sessionStorage.getItem('_st'); } catch(_) {}
+
         await apiFetch("/auth/register/complete", {
           method: "POST",
+          // Pass token as Authorization header if cookie might not work on iOS
+          headers: signupToken ? { 'Authorization': `Bearer ${signupToken}` } : {},
           body: {
             realName: formData.get("realName"),
             password: formData.get("password")
@@ -425,27 +449,15 @@
   </script>
 
   <div id="pwa-install-prompt" class="pwa-popup hidden">
-  <div class="pwa-popup-content">
-    <div class="pwa-icon">📱</div>
-    <div class="pwa-text">
-      <h4>Install Hisaab-Kitaab</h4>
-      <p id="pwa-instructions">Get quick access from your home screen!</p>
-    </div>
-    <div class="pwa-actions">
-      <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
-      <button id="pwa-close-btn" class="pwa-btn-secondary">Later</button>
-    </div>
-  </div>
-</div>
     <div class="pwa-popup-content">
       <div class="pwa-icon">📱</div>
       <div class="pwa-text">
-        <h4>Install Hisaab</h4>
-        <p id="pwa-instructions">Add to your home screen for quick access!</p>
+        <h4>Install Hisaab-Kitaab</h4>
+        <p id="pwa-instructions">Get quick access from your home screen!</p>
       </div>
       <div class="pwa-actions">
         <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
-        <button id="pwa-close-btn" class="pwa-btn-secondary">Close</button>
+        <button id="pwa-close-btn" class="pwa-btn-secondary">Later</button>
       </div>
     </div>
   </div>

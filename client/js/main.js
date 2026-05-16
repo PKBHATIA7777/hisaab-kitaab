@@ -109,8 +109,14 @@ const CONFIG = {
       const token = parts.pop().split(";").shift();
       if (token && token.length >= 32) return token;
     }
-    // Fallback: read from in-memory store (populated from response headers)
-    return window.__csrfToken || null;
+    // Secondary: in-memory (populated from response headers)
+    if (window.__csrfToken && window.__csrfToken.length >= 32) return window.__csrfToken;
+    // Tertiary: sessionStorage fallback for iOS ITP
+    try {
+      const ssToken = sessionStorage.getItem('__csrf_fallback');
+      if (ssToken && ssToken.length >= 32) return ssToken;
+    } catch(_) {}
+    return null;
   }
 
   // Persist CSRF token from response headers for iOS ITP environments
@@ -141,9 +147,11 @@ const CONFIG = {
 
       const controller = new AbortController();
       // Render cold starts can take 30-60s on free tier.
-      // Auth endpoints get extra time; other endpoints stay shorter.
+      // OTP endpoints need extra time for cold Render starts (can take 60s)
+      // We give 90s for OTP specifically, 70s for other auth, 30s for data
       const isAuthEndpoint = path.includes('/auth/');
-      const timeoutMs = isAuthEndpoint ? 65000 : 25000;
+      const isOtpEndpoint = path.includes('/otp') || path.includes('request-otp');
+      const timeoutMs = isOtpEndpoint ? 90000 : (isAuthEndpoint ? 70000 : 30000);
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       let res;
