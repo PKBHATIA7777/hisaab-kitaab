@@ -1,4 +1,6 @@
 /* client/js/chapter.js */
+/* ✅ XSS PROTECTION: All user-generated strings in innerHTML are wrapped with escapeHTML() */
+/* Ensure <script src="js/core/sanitize.js"></script> is loaded BEFORE this file in HTML */
 
 const urlParams = new URLSearchParams(window.location.search);
 const chapterId = urlParams.get('id');
@@ -122,8 +124,9 @@ async function loadFriendsForAutocomplete() {
       
       const dataList = document.getElementById("friends-datalist");
       if (dataList) {
+        // ✅ XSS FIX: Escape user-generated friend data
         dataList.innerHTML = myFriendsCache
-          .map(f => `<option value="${f.name}">${f.username}</option>`)
+          .map(f => `<option value="${escapeHTML(f.name)}">${escapeHTML(f.username)}</option>`)
           .join("");
       }
     }
@@ -161,10 +164,11 @@ function renderEventTabs() {
 
   // 2. Event Pills
   events.forEach(ev => {
+    // ✅ XSS FIX: Escape event name
     html += `
       <button class="event-pill ${currentEventId === ev.id ? 'active' : ''}" 
         onclick="switchEvent(${ev.id})">
-        ${ev.name}
+        ${escapeHTML(ev.name)}
       </button>
     `;
   });
@@ -233,7 +237,7 @@ async function loadExpenses(append = false) {
     const listEl = document.getElementById("expense-list-container");
     if (listEl) {
       listEl.innerHTML = `<div style="color:red; text-align:center; padding:20px;">
-        Error: ${err.message || "Failed to load expenses"}. Check console.
+        Error: ${escapeHTML(err.message || "Failed to load expenses")}. Check console.
       </div>`;
     }
   }
@@ -271,11 +275,13 @@ function renderExpenses() {
     infoDiv.className = "expense-info";
 
     const h4 = document.createElement("h4");
-    h4.textContent = ex.description || "Untitled Expense";
+    // ✅ XSS FIX: Escape description
+    h4.textContent = escapeHTML(ex.description || "Untitled Expense");
 
     const p = document.createElement("p");
     const strong = document.createElement("strong");
-    strong.textContent = ex.payer_name || "Unknown";
+    // ✅ XSS FIX: Escape payer_name
+    strong.textContent = escapeHTML(ex.payer_name || "Unknown");
     p.appendChild(strong);
     p.appendChild(document.createTextNode(" • " + timeAgo(ex.expense_date)));
 
@@ -373,7 +379,7 @@ function renderChapterInfo() {
   }
 }
 
-// ✅ UPDATED: renderMembers() - Async with deletability check
+// ✅ UPDATED: renderMembers() - Async with deletability check + XSS protection
 async function renderMembers() {
   memberListEl.innerHTML = "";
 
@@ -397,13 +403,14 @@ async function renderMembers() {
     const row = document.createElement("div");
     row.className = "dropdown-member-item";
 
+    // ✅ XSS FIX: Escape all user-generated content in innerHTML
     row.innerHTML = `
-      <div class="small-avatar" style="background:${getAvatarColor(m.member_name)}">${getInitials(m.member_name)}</div>
+      <div class="small-avatar" style="background:${getAvatarColor(m.member_name)}">${escapeHTML(getInitials(m.member_name))}</div>
       <div class="member-name-text" style="flex:1;">
-        ${m.member_name}
+        ${escapeHTML(m.member_name)}
         ${isMemberAdmin ? '<span class="admin-badge">Admin</span>' : ''}
       </div>
-      ${canDelete ? `<button class="btn-delete-member" onclick="deleteMember(${m.id})" title="Remove member" aria-label="Remove ${m.member_name}">×</button>` : ''}
+      ${canDelete ? `<button class="btn-delete-member" onclick="deleteMember(${m.id})" title="Remove member" aria-label="Remove ${escapeHTML(m.member_name)}">×</button>` : ''}
     `;
     memberListEl.appendChild(row);
   });
@@ -417,9 +424,10 @@ function renderPayerAndSplitOptions(selectedPayerId = null, selectedSplitIds = [
     
     const el = document.createElement("label");
     el.className = `payer-option ${isSelected ? 'selected' : ''}`;
+    // ✅ XSS FIX: Escape member_name
     el.innerHTML = `
       <input type="radio" name="payerMemberId" value="${m.id}" ${isSelected ? 'checked' : ''}>
-      <div style="font-weight:600; font-size:0.9rem;">${m.member_name}</div>
+      <div style="font-weight:600; font-size:0.9rem;">${escapeHTML(m.member_name)}</div>
     `;
     el.addEventListener("click", () => {
       document.querySelectorAll(".payer-option").forEach(x => x.classList.remove("selected"));
@@ -436,10 +444,11 @@ function renderPayerAndSplitOptions(selectedPayerId = null, selectedSplitIds = [
     
     const el = document.createElement("label");
     el.className = `split-option ${isChecked ? 'selected' : ''}`;
+    // ✅ XSS FIX: Escape member_name
     el.innerHTML = `
       <input type="checkbox" name="involvedMemberIds[]" value="${m.id}" ${isChecked ? 'checked' : ''}>
       <div class="custom-check"></div>
-      <span>${m.member_name}</span>
+      <span>${escapeHTML(m.member_name)}</span>
     `;
     el.addEventListener("change", () => {
       if (el.querySelector("input").checked) el.classList.add("selected");
@@ -718,13 +727,14 @@ function renderSummary(data) {
     const row = document.createElement("div");
     row.style.marginBottom = "20px";
     
+    // ✅ XSS FIX: Escape member_name
     row.innerHTML = `
       <div class="summary-row" style="border:none; padding-bottom:5px;">
         <div class="summary-name">
           <div class="small-avatar" style="width:30px; height:30px; font-size:0.8rem; background:${getAvatarColor(item.member_name)}">
-            ${getInitials(item.member_name)}
+            ${escapeHTML(getInitials(item.member_name))}
           </div>
-          ${item.member_name}
+          ${escapeHTML(item.member_name)}
         </div>
       </div>
       
@@ -802,15 +812,16 @@ function renderSettlements(settlements) {
     const row = document.createElement("div");
     row.className = "settle-row-pending";
 
-    const fromSafe = item.from.replace(/'/g, "\\'");
-    const toSafe = item.to.replace(/'/g, "\\'");
+    // ✅ XSS FIX: Escape from/to names
+    const fromSafe = escapeHTML(item.from).replace(/'/g, "\\'");
+    const toSafe = escapeHTML(item.to).replace(/'/g, "\\'");
 
     row.innerHTML = `
       <div class="settle-people">
         <div class="small-avatar" style="background:${getAvatarColor(item.from)}; width:28px; height:28px; font-size:0.75rem; flex-shrink:0;">
-          ${getInitials(item.from)}
+          ${escapeHTML(getInitials(item.from))}
         </div>
-        <span><strong>${item.from}</strong> → <strong>${item.to}</strong></span>
+        <span><strong>${escapeHTML(item.from)}</strong> → <strong>${escapeHTML(item.to)}</strong></span>
       </div>
       <span class="settle-amount-tag">₹${item.amount}</span>
       <button class="btn-mark-settled" data-from="${fromSafe}" data-to="${toSafe}" data-amount="${item.amount}">✓ Mark</button>
@@ -850,13 +861,14 @@ async function loadAndShowSettlementHistoryInModal() {
       const row = document.createElement('div');
       row.className = 'settled-record-row';
       row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#f9f9f9; border-radius:8px; border:1px solid #eee; margin-bottom:6px; gap:8px;';
+      // ✅ XSS FIX: Escape from_name, to_name, note
       row.innerHTML = `
         <div style="flex:1; min-width:0;">
           <div style="font-size:0.82rem; color:#555;">
-            <strong>${rec.from_name}</strong> → <strong>${rec.to_name}</strong>
+            <strong>${escapeHTML(rec.from_name)}</strong> → <strong>${escapeHTML(rec.to_name)}</strong>
           </div>
           <div style="font-size:0.72rem; color:#aaa; margin-top:2px;">
-            ${new Date(rec.marked_at).toLocaleDateString('en-IN')}${rec.note ? ' · ' + rec.note : ''}
+            ${new Date(rec.marked_at).toLocaleDateString('en-IN')}${rec.note ? ' · ' + escapeHTML(rec.note) : ''}
           </div>
         </div>
         <span style="font-weight:700; font-size:0.88rem; color:#00875a; flex-shrink:0;">₹${parseFloat(rec.amount).toFixed(2)}</span>
@@ -890,8 +902,9 @@ window._openMarkModal = function(settlement) {
   modal.id = 'mark-settle-modal';
   modal.className = 'modal-overlay active';
 
-  const fromDisplay = settlement.from;
-  const toDisplay = settlement.to;
+  // ✅ XSS FIX: Escape from/to display names
+  const fromDisplay = escapeHTML(settlement.from);
+  const toDisplay = escapeHTML(settlement.to);
   const amountDisplay = parseFloat(settlement.amount).toFixed(2);
 
   modal.innerHTML = `
@@ -1347,9 +1360,9 @@ function renderHeroSettlements(settlements) {
         <div class="mini-settle-item" style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
             <div class="settle-info" style="display:flex; align-items:center; gap:10px;">
                 <div class="small-avatar" style="background:${getAvatarColor(item.from)}; width:24px; height:24px; font-size:0.7rem;">
-                    ${getInitials(item.from)}
+                  ${escapeHTML(getInitials(item.from))}
                 </div>
-                <span style="font-size:0.85rem;"><strong>${item.from}</strong> <span style="color:#ccc;">→</span> <strong>${item.to}</strong></span>
+                <span style="font-size:0.85rem;"><strong>${escapeHTML(item.from)}</strong> <span style="color:#ccc;">→</span> <strong>${escapeHTML(item.to)}</strong></span>
             </div>
             <span class="settle-amount" style="font-weight:600; color:#d000ff; font-size:0.9rem;">₹${item.amount}</span>
         </div>

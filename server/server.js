@@ -85,40 +85,68 @@ app.use((req, res, next) => {
 });
 
 app.use(helmet({
- contentSecurityPolicy: {
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: [
-      "'self'",
-      "https://accounts.google.com",
-      "https://apis.google.com",
-      "https://www.gstatic.com",
-    ],
-    frameSrc: [
-      "'self'",
-      "https://accounts.google.com",
-    ],
-    connectSrc: [
-      "'self'",
-      "https://accounts.google.com",
-      "https://www.googleapis.com",
-    ],
-    imgSrc: [
-      "'self'",
-      "data:",
-      "https://lh3.googleusercontent.com",
-      "https://www.gstatic.com",
-    ],
-    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-    fontSrc: ["'self'", "https://fonts.gstatic.com"],
-    frameAncestors: ["'self'"],
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "https://accounts.google.com",
+        "https://apis.google.com",
+        "https://www.gstatic.com",
+        // 'unsafe-inline' removed after script extraction
+      ],
+      frameSrc: [
+        "'self'",
+        "https://accounts.google.com",
+      ],
+      connectSrc: [
+        "'self'",
+        "https://accounts.google.com",
+        "https://www.googleapis.com",
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "https://lh3.googleusercontent.com",
+        "https://www.gstatic.com",
+      ],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      frameAncestors: ["'self'"],
+      // CSP violation reporting endpoint
+      reportUri: ["/api/csp-report"],
+    },
+    // Modern report-to directive (also keep report-uri for broader compatibility)
+    reportTo: "csp-endpoint",
   },
-},
+  // Configure the report-to endpoint for modern browsers
+  reportTo: {
+    endpoints: [
+      {
+        group: "csp-endpoint",
+        url: "/api/csp-report",
+        include_subdomains: true,
+        max_age: 3600,
+      },
+    ],
+  },
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true },
 }));
 
-// ── RATE LIMITING (identical to original) ────────────────────
+// ── CSP VIOLATION REPORTING ENDPOINT ─────────────────────────
+// ADD before route registrations to capture CSP violations
+app.post("/api/csp-report", express.json({ type: "application/csp-report" }), (req, res) => {
+  // Log CSP violations for monitoring
+  if (req.body && req.body["csp-report"]) {
+    console.warn("CSP Violation:", JSON.stringify(req.body["csp-report"]));
+    // In production, send to your monitoring service (Datadog, Sentry, etc.)
+    // Example: sentry.captureMessage(JSON.stringify(req.body["csp-report"]), { level: 'warning' });
+  }
+  res.status(204).end();
+});
+
+// ── RATE LIMITING (SECURITY FIX AUTH-002: Remove unverified jwt.decode()) ────────────────────
 const rateLimitHandler = (req, res, next, options) => {
   const retryAfter = Math.ceil(options.resetTime / 1000) - Math.floor(Date.now() / 1000);
   console.warn(`⚠️ Rate Limit Hit: IP=${req.ip} | Path=${req.originalUrl}`);
@@ -131,6 +159,7 @@ const rateLimitHandler = (req, res, next, options) => {
   });
 };
 
+// GLOBAL LIMITER: Use IP only — no unverified JWT claims
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProduction ? 500 : 1000,
@@ -139,18 +168,10 @@ const globalLimiter = rateLimit({
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many requests, please try again later." },
   keyGenerator: (req) => {
-    // At middleware level req.user may not be populated yet.
-    // Parse JWT manually here without throwing.
-    try {
-      const token = req.cookies?.auth_token;
-      if (token) {
-        const jwt = require("jsonwebtoken");
-        const payload = jwt.decode(token); // decode only, no verify (fast)
-        if (payload?.userId) return String(payload.userId);
-      }
-    } catch (_) { /* fall through */ }
-    const forwarded = req.headers["x-forwarded-for"];
-    return forwarded ? forwarded.split(",")[0].trim() : (req.ip || "unknown");
+    // Use Vercel's verified IP header (set by trusted proxy)
+    // app.set("trust proxy", 1) ensures req.ip is the real client IP
+    // X-Forwarded-For is already unwrapped correctly by Express
+    return req.ip || "unknown";
   }
 });
 app.use((req, res, next) => {
@@ -158,6 +179,7 @@ app.use((req, res, next) => {
   globalLimiter(req, res, next);
 });
 
+// AUTH LIMITER: Use IP only — login/register endpoints have no verified user yet
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
@@ -166,18 +188,8 @@ const authLimiter = rateLimit({
   handler: rateLimitHandler,
   message: { ok: false, message: "Too many login attempts. Try again in 15 mins." },
   keyGenerator: (req) => {
-    // At middleware level req.user may not be populated yet.
-    // Parse JWT manually here without throwing.
-    try {
-      const token = req.cookies?.auth_token;
-      if (token) {
-        const jwt = require("jsonwebtoken");
-        const payload = jwt.decode(token); // decode only, no verify (fast)
-        if (payload?.userId) return String(payload.userId);
-      }
-    } catch (_) { /* fall through */ }
-    const forwarded = req.headers["x-forwarded-for"];
-    return forwarded ? forwarded.split(",")[0].trim() : (req.ip || "unknown");
+    // Use verified IP address only — never trust unverified JWT claims
+    return req.ip || "unknown";
   }
 });
 app.use("/api/auth/login", authLimiter);
@@ -191,6 +203,7 @@ app.use("/api/auth/forgot/reset", authLimiter);
 app.use("/api/auth/google", authLimiter);
 // NOTE: /api/auth/me, /api/auth/logout, /api/auth/check-identifier deliberately excluded
 
+// WRITE LIMITER: Runs AFTER requireAuth middleware — req.user is cryptographically verified
 const writeLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: isProduction ? 30 : 100,
@@ -199,18 +212,9 @@ const writeLimiter = rateLimit({
   handler: rateLimitHandler,
   message: { ok: false, message: "You're adding expenses too fast, please wait a moment." },
   keyGenerator: (req) => {
-    // At middleware level req.user may not be populated yet.
-    // Parse JWT manually here without throwing.
-    try {
-      const token = req.cookies?.auth_token;
-      if (token) {
-        const jwt = require("jsonwebtoken");
-        const payload = jwt.decode(token); // decode only, no verify (fast)
-        if (payload?.userId) return String(payload.userId);
-      }
-    } catch (_) { /* fall through */ }
-    const forwarded = req.headers["x-forwarded-for"];
-    return forwarded ? forwarded.split(",")[0].trim() : (req.ip || "unknown");
+    // req.user is set by requireAuth middleware — cryptographically verified
+    if (req.user && req.user.userId) return `user:${req.user.userId}`;
+    return req.ip || "unknown";
   },
   skipSuccessfulRequests: false,
 });
@@ -242,7 +246,8 @@ const readHeavyLimiter = rateLimit({
 app.use("/api/expenses/chapter/:chapterId/settlements", readHeavyLimiter);
 app.use("/api/expenses/chapter/:chapterId/summary", readHeavyLimiter);
 
-// ── EXPORT ENDPOINT RATE LIMIT (Step 2.6) ────────────────────
+// ── EXPORT ENDPOINT RATE LIMIT (SECURITY FIX AUTH-002) ────────────────────
+// Export endpoint runs after requireAuth, so req.user is safe to use
 const exportLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: isProduction ? 5 : 20,
@@ -251,14 +256,8 @@ const exportLimiter = rateLimit({
   handler: rateLimitHandler,
   message: { ok: false, message: "Please wait before downloading another report." },
   keyGenerator: (req) => {
-    try {
-      const token = req.cookies?.auth_token;
-      if (token) {
-        const jwt = require("jsonwebtoken");
-        const payload = jwt.decode(token);
-        if (payload?.userId) return String(payload.userId);
-      }
-    } catch (_) {}
+    // req.user is set by requireAuth middleware — cryptographically verified
+    if (req.user && req.user.userId) return `user:${req.user.userId}`;
     return req.ip || "unknown";
   }
 });

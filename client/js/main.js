@@ -98,31 +98,6 @@ const CONFIG = {
   // ── Exponential backoff helper ──────────────────────────────
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  // ── CSRF token management ───────────────────────────────────
-  // Read from cookie (set by server) rather than doing a network round-trip.
-  // This eliminates the extra GET /csrf-token before every mutation.
-  function getCSRFFromCookie() {
-    // Primary: read from cookie
-    const value = `; ${document.cookie}`;
-    const parts = value.split("; csrf_token=");
-    if (parts.length === 2) {
-      const token = parts.pop().split(";").shift();
-      if (token && token.length >= 32) return token;
-    }
-    // Secondary: in-memory (populated from response headers)
-    if (window.__csrfToken && window.__csrfToken.length >= 32) return window.__csrfToken;
-    // Tertiary: sessionStorage fallback for iOS ITP
-    try {
-      const ssToken = sessionStorage.getItem('__csrf_fallback');
-      if (ssToken && ssToken.length >= 32) return ssToken;
-    } catch(_) {}
-    return null;
-  }
-
-  // Persist CSRF token from response headers for iOS ITP environments
-  // where cookies may be blocked or evicted
-  window.__csrfToken = null;
-
   // Pages where a 401 is EXPECTED and should NOT redirect
   const AUTH_PAGES = ["login.html", "index.html", "signup.html", "forgot.html", "set-password.html"];
   function isAuthPage() {
@@ -134,8 +109,7 @@ const CONFIG = {
     const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
 
     const makeRequest = async (attempt = 0) => {
-      // Read CSRF from cookie — no extra round-trip needed
-      const csrfToken = getCSRFFromCookie();
+      const csrfToken = window.CSRFManager ? window.CSRFManager.get() : null;
 
       const headers = {
         "Content-Type": "application/json",
@@ -202,12 +176,8 @@ const CONFIG = {
 
       // Server echoes the current CSRF token in every response header.
       const freshCSRF = res.headers.get("X-CSRF-Token");
-      if (freshCSRF && freshCSRF.length >= 32) {
-        window.__csrfToken = freshCSRF;
-        // Also try to update the cookie if possible
-        try {
-          document.cookie = `csrf_token=${freshCSRF}; path=/; max-age=86400; samesite=lax`;
-        } catch (e) { /* ignore in restricted environments */ }
+      if (freshCSRF) {
+        window.CSRFManager && window.CSRFManager.capture(res.headers);
       }
 
       // CSRF mismatch — server returns {csrfError: true}
@@ -222,16 +192,26 @@ const CONFIG = {
       }
 
       // 401 handling — only redirect if NOT on an auth page and NOT a background check
-      if (res.status === 401) {
-        if (!isAuthPage() && !options._silent) {
-          // Small delay to prevent redirect loops on slow cold starts
-          setTimeout(() => {
-            window.location.href = "login.html?expired=true";
-          }, 100);
-          return;
-        }
-        // On auth pages or silent calls: fall through to normal error
-      }
+  if (res.status === 401) {
+  if (!isAuthPage() && !options._silent) {
+    // Attempt silent refresh before redirecting
+    const refreshed = window.SessionManager
+      ? await window.SessionManager.attemptRefresh()
+      : false;
+
+    if (refreshed && attempt < 1) {
+      // Retry the original request once with fresh cookies
+      return makeRequest(attempt + 1);
+    }
+
+    // Refresh failed — redirect to login
+    setTimeout(() => {
+      window.location.href = "login.html?expired=true";
+    }, 200);
+    return;
+  }
+  // On auth pages or silent: fall through to normal error
+}
 
       // Rate limit
       if (res.status === 429) {
@@ -317,8 +297,8 @@ const CONFIG = {
             
             // Capture CSRF from response header
             const csrfHeader = res.headers.get('X-CSRF-Token');
-            if (csrfHeader && csrfHeader.length >= 32) {
-              window.__csrfToken = csrfHeader;
+            if (csrfHeader) {
+              window.CSRFManager && window.CSRFManager.capture(res.headers);
             }
             return true;
           }
@@ -687,6 +667,7 @@ const CONFIG = {
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    window.CSRFManager && window.CSRFManager.init();
     if (!document.getElementById("toast-container")) {
       const tc = document.createElement("div");
       tc.id = "toast-container";

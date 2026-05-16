@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 
 // In-memory cache to avoid DB hit on every request for the same user.
-// Key: userId, Value: { updatedAt: timestamp, cachedAt: Date.now() }
+// Key: userId, Value: { updatedAt: timestamp, jwtGeneration: number, cachedAt: Date.now() }
 // TTL: 60 seconds — short enough to catch password changes quickly.
 const userCache = new Map();
 const CACHE_TTL = 60 * 1000; // 60 seconds
@@ -45,16 +45,21 @@ async function requireAuth(req, res, next) {
   // Try cache first
   let userData = getCachedUser(userId);
 
+  // NEW — replace the entire DB query block and staleness check:
   if (!userData) {
     try {
       const { rows } = await db.query(
-        "SELECT id, updated_at FROM users WHERE id = $1",
+        "SELECT id, updated_at, jwt_generation FROM users WHERE id = $1",
         [userId]
       );
       if (!rows[0]) {
         return res.status(401).json({ ok: false, message: "Account not found" });
       }
-      userData = { updatedAt: rows[0].updated_at, cachedAt: Date.now() };
+      userData = {
+        updatedAt: rows[0].updated_at,
+        jwtGeneration: rows[0].jwt_generation,
+        cachedAt: Date.now()
+      };
       userCache.set(userId, userData);
       pruneCache();
     } catch (err) {
@@ -65,12 +70,20 @@ async function requireAuth(req, res, next) {
     }
   }
 
-  // Staleness check: was the account updated AFTER this token was issued?
+  // Generation check (primary revocation mechanism)
+  if (payload.gen !== undefined && payload.gen !== userData.jwtGeneration) {
+    userCache.delete(userId);
+    return res.status(401).json({
+      ok: false,
+      message: "Session has been revoked. Please log in again.",
+    });
+  }
+
+  // Staleness check (secondary — for password changes on old tokens without gen)
   if (userData.updatedAt) {
     const lastUpdateSec = new Date(userData.updatedAt).getTime() / 1000;
     // 5-second buffer for clock skew between login and cookie write
     if (lastUpdateSec > payload.iat + 5) {
-      // Invalidate cache entry since user changed their password
       userCache.delete(userId);
       return res.status(401).json({
         ok: false,

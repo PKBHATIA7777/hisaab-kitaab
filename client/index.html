@@ -97,19 +97,13 @@
     </div>
   </footer>
 
+  <script src="js/core/sanitize.js"></script>
 <script src="js/pwa-install.js"></script>
+  <script src="js/core/csrf.js"></script>
+  <script src="js/core/session.js"></script>
   <script src="js/main.js"></script>
-  <script>
-    (async function () {
-      try {
-        await apiFetch("/auth/me", { _silent: true });
-        window.location.href = "dashboard.html";
-      } catch (e) {
-        // Not logged in — stay on landing page, no redirect
-        hideAppLoader();
-      }
-    })();
-  </script>
+  <!-- In login.html, REPLACE the large inline <script> block with: -->
+<script src="js/pages/index-page.js"></script>
 
   <div id="pwa-install-prompt" class="pwa-popup hidden">
     <div class="pwa-popup-content">

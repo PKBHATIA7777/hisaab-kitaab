@@ -5,8 +5,9 @@ const { sendOtpEmail } = require("../utils/email");
 const bcrypt = require("bcrypt");
 const xss = require("xss");
 const db = require("../config/db");
-const { createToken, sendAuthCookie, clearAuthCookies, SHORT_MS, LONG_MS } = require("../utils/jwt");
+const { createToken, sendAuthCookie, clearAuthCookies, SHORT_MS, LONG_MS, incrementJwtGeneration, rotateRefreshToken, revokeAllRefreshTokens } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto"); // ✅ ADDED for constant-time OTP comparison
 const {
   registerSchema,
   loginSchema,
@@ -81,7 +82,8 @@ async function loginVerifyOtp(req, res) {
     const user = await findUserByIdentifier(email.trim().toLowerCase());
     if (!user) return res.status(400).json({ ok: false, message: "User not found" });
     const remember = !!rememberMe;
-    const token = createToken({ userId: user.id.toString() }, remember);
+    // UPDATED: Include jwt_generation in token payload
+    const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, remember);
     sendAuthCookie(res, token, remember);
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS) });
   } catch (err) {
@@ -90,22 +92,51 @@ async function loginVerifyOtp(req, res) {
   }
 }
 
+// ✅ SECURE OTP VERIFICATION - Constant-time comparison + timing attack mitigation
 async function verifyOtpLogic(email, otp, purpose) {
   const cleanEmail = email.trim().toLowerCase();
+
+  // Sanitize OTP input
+  const cleanOtp = String(otp).trim().replace(/\D/g, "");
+  if (cleanOtp.length !== 6) throw new Error("OTP must be 6 digits");
+
   const { rows } = await db.query(
-    `SELECT * FROM otps WHERE email = $1 AND purpose = $2 AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
+    `SELECT * FROM otps
+     WHERE email = $1 AND purpose = $2
+       AND used = FALSE AND expires_at > NOW()
+     ORDER BY created_at DESC LIMIT 1`,
     [cleanEmail, purpose]
   );
   const otpRow = rows[0];
-  if (!otpRow) throw new Error("Invalid or expired OTP");
-  if (otpRow.attempts >= 3) {
-    await db.query("DELETE FROM otps WHERE id = $1", [otpRow.id]);
+
+  // Always perform constant-time comparison — even if row doesn't exist
+  // This prevents timing-based "does this email have a pending OTP" enumeration
+  const expectedCode = otpRow?.code || "000000";
+  const inputBuf = Buffer.alloc(6, cleanOtp);
+  const expectedBuf = Buffer.alloc(6, expectedCode);
+
+  // Constant-time comparison
+  const match = crypto.timingSafeEqual(inputBuf, expectedBuf);
+
+  if (!otpRow) {
+    // Artificial delay to prevent timing enumeration of OTP existence
+    await new Promise(r => setTimeout(r, 150 + Math.random() * 100));
+    throw new Error("Invalid or expired OTP");
+  }
+
+  if (otpRow.attempts >= 5) { // Increased from 3 to 5 — more user-friendly
+    await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
     throw new Error("Too many failed attempts. Please request a new code.");
   }
-  if (otpRow.code !== otp) {
+
+  if (!match) {
     await db.query("UPDATE otps SET attempts = attempts + 1 WHERE id = $1", [otpRow.id]);
-    throw new Error("Invalid OTP code");
+    // Jitter delay makes timing attacks impractical
+    await new Promise(r => setTimeout(r, 150 + Math.random() * 150));
+    const remaining = 5 - (otpRow.attempts + 1);
+    throw new Error(`Invalid OTP code. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`);
   }
+
   return otpRow;
 }
 
@@ -175,7 +206,9 @@ async function registerComplete(req, res) {
     const result = registerSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
 
-    const { realName, password } = result.data;
+    // ✅ XSS FIX: Sanitize realName with xss() before using
+    const { password } = result.data;
+    const realName = xss(result.data.realName.trim());
     
     // STEP 7: Read signup token from cookie OR Authorization header (iOS ITP fallback)
     const signupToken = req.cookies.signup_token || 
@@ -225,7 +258,7 @@ async function registerComplete(req, res) {
       const { rows: userRows } = await client.query(
         `INSERT INTO users (real_name, username, email, password_hash, provider, google_id, needs_password, last_login_at)
          VALUES ($1, $2, $3, $4, 'local', NULL, FALSE, $5) RETURNING *`,
-        [realName, username, email, passwordHash, now]
+        [realName, username, email, passwordHash, now]  // realName is now sanitized
       );
       const user = userRows[0];
 
@@ -252,7 +285,8 @@ async function registerComplete(req, res) {
         path: "/",
       });
 
-      const token = createToken({ userId: user.id.toString() });
+      // UPDATED: Include jwt_generation in token payload
+      const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 });
       sendAuthCookie(res, token);
 
       return res.json({
@@ -283,7 +317,8 @@ async function login(req, res) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ ok: false, message: "Invalid credentials" });
     const remember = !!rememberMe;
-    const token = createToken({ userId: user.id.toString() }, remember);
+    // UPDATED: Include jwt_generation in token payload
+    const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, remember);
     sendAuthCookie(res, token, remember);
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS) });
   } catch (err) {
@@ -298,6 +333,12 @@ async function googleLogin(req, res) {
     if (!idToken) return res.status(400).json({ ok: false, message: "idToken is required" });
     const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
+    if (!payload.email_verified) {
+  return res.status(400).json({
+    ok: false,
+    message: "This Google account's email is not verified. Please verify your email with Google first."
+  });
+}
     const googleId = payload.sub;
     const email = (payload.email || "").toLowerCase();
     const realName = payload.name || "Google User";
@@ -324,7 +365,8 @@ async function googleLogin(req, res) {
     } else {
       await db.query("UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2", [new Date(), user.id]);
     }
-    const token = createToken({ userId: user.id.toString() }, true);
+    // UPDATED: Include jwt_generation in token payload
+    const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, true);
     sendAuthCookie(res, token, true);
     return res.json({ ok: true, message: "Google login successful", isNewUser, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email } });
   } catch (err) {
@@ -355,13 +397,28 @@ async function setPassword(req, res) {
   }
 }
 
+// ✅ SECURE FORGOT PASSWORD - Timing-based enumeration protection
 async function forgotRequestOtp(req, res) {
   try {
     const result = emailSchema.safeParse(req.body.email);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     const email = result.data;
+    
+    // Measure time for "email exists" path and match it for "no email" path
+    const startTime = Date.now();
+
     const { rows: userRows } = await db.query("SELECT * FROM users WHERE email = $1 LIMIT 1", [email]);
-    if (!userRows[0]) return res.json({ ok: true, message: "If this email exists, an OTP has been sent" });
+    
+    if (!userRows[0]) {
+      // Match the time it would take to send an email
+      const elapsed = Date.now() - startTime;
+      const minDelay = 800; // Assume email send takes ~800ms
+      if (elapsed < minDelay) {
+        await new Promise(r => setTimeout(r, minDelay - elapsed + Math.random() * 200));
+      }
+      return res.json({ ok: true, message: "If this email exists, an OTP has been sent" });
+    }
+
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await db.query(
@@ -370,6 +427,7 @@ async function forgotRequestOtp(req, res) {
       [email, code, expiresAt]
     );
     await sendOtpEmail(email, "Your Hisaab-Kitaab password reset code", `Your password reset code is ${code}. It will expire in 10 minutes.`);
+    
     return res.json({ ok: true, message: "If this email exists, an OTP has been sent" });
   } catch (err) {
     console.error("forgotRequestOtp error:", err);
@@ -416,7 +474,8 @@ async function me(req, res) {
       const originalDuration = payload.exp - payload.iat;
       const TWENTY_DAYS_SECONDS = 20 * 24 * 60 * 60;
       const isRemembered = originalDuration > TWENTY_DAYS_SECONDS;
-      const newToken = createToken({ userId: user.id.toString() }, isRemembered);
+      // UPDATED: Include jwt_generation in token payload
+      const newToken = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, isRemembered);
       sendAuthCookie(res, newToken, isRemembered);
     }
     return res.json({ ok: true, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email, lastLoginAt: user.last_login_at, needsPassword: user.needs_password } });
@@ -426,13 +485,34 @@ async function me(req, res) {
   }
 }
 
-function logout(req, res) {
+// UPDATED: Made async and added jwt_generation increment + cache invalidation + refresh token revocation
+async function logout(req, res) {
   try {
+    // Revoke all sessions for this user
+    const userId = req.user?.userId;
+    if (userId) {
+      await Promise.all([
+        incrementJwtGeneration(userId),
+        revokeAllRefreshTokens(db, userId),
+      ]);
+      // Also invalidate the auth middleware cache
+      invalidateUserCache(userId);
+    }
     clearAuthCookies(res);
+    // Clear refresh token cookie
+    res.cookie("refresh_token", "", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      expires: new Date(0),
+      path: "/api/auth/refresh",
+    });
     return res.json({ ok: true, message: "Logged out" });
   } catch (err) {
     console.error("logout error:", err);
-    return res.status(500).json({ ok: false, message: "Server error in logout" });
+    // Even if DB fails, clear cookies
+    clearAuthCookies(res);
+    return res.json({ ok: true, message: "Logged out" });
   }
 }
 
@@ -453,13 +533,74 @@ async function updateProfile(req, res) {
   }
 }
 
+// ── NEW: Refresh Session Handler ──────────────────────────────────
+async function refreshSession(req, res) {
+  try {
+    const rawRefresh = req.cookies.refresh_token;
+    if (!rawRefresh) {
+      return res.status(401).json({ ok: false, message: "No refresh token" });
+    }
+
+    // Decode the expired/missing auth token to get userId
+    // (We need userId to look up the refresh token)
+    let userId = null;
+    const expiredAuthToken = req.cookies.auth_token;
+    if (expiredAuthToken) {
+      try {
+        // Allow expired tokens here — that's the whole point
+        const payload = jwt.verify(expiredAuthToken, process.env.JWT_SECRET, {
+          ignoreExpiration: true,
+        });
+        userId = payload.userId;
+      } catch (_) {}
+    }
+
+    if (!userId) {
+      return res.status(401).json({ ok: false, message: "Cannot identify session" });
+    }
+
+    // Rotate the refresh token (revoke old, issue new)
+    const newRawRefresh = await rotateRefreshToken(db, rawRefresh, userId);
+    if (!newRawRefresh) {
+      clearAuthCookies(res);
+      return res.status(401).json({ ok: false, message: "Refresh token expired or revoked" });
+    }
+
+    // Fetch fresh user data
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(401).json({ ok: false, message: "User not found" });
+    }
+
+    const newToken = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, true);
+    sendAuthCookie(res, newToken, true);
+
+    res.cookie("refresh_token", newRawRefresh, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 90 * 24 * 60 * 60 * 1000,
+      path: "/api/auth/refresh",
+    });
+
+    return res.json({
+      ok: true,
+      message: "Session refreshed",
+      user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }
+    });
+  } catch (err) {
+    console.error("refreshSession error:", err);
+    return res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
 module.exports = {
   checkIdentifier,
   loginRequestOtp,
   loginVerifyOtp,
   registerRequestOtp,
   registerVerifyOtp,
-  registerComplete,
+  registerComplete,  // ✅ Updated with xss() sanitization
   login,
   googleLogin,
   setPassword,
@@ -468,4 +609,5 @@ module.exports = {
   me,
   logout,
   updateProfile,
+  refreshSession, // ← NEW EXPORT
 };
