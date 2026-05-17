@@ -61,13 +61,37 @@ async function addExpense(req, res) {
     } else {
       const count = involvedMemberIds.length;
       if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
-      const sortedIds = [...involvedMemberIds].map(Number).sort((a, b) => a - b);
-      const baseShareCents = Math.floor(totalCents / count);
-      let remainderCents = totalCents % count;
-      sortedIds.forEach(mId => {
-        const myShareCents = baseShareCents + (remainderCents-- > 0 ? 1 : 0);
-        finalSplits.push({ memberId: mId, amount: myShareCents / 100 });
-      });
+     function distributeEqually(totalCents, memberIds) {
+  const count = memberIds.length;
+  const baseShare = Math.floor(totalCents / count);
+  const remainder = totalCents % count;
+
+  // Create array of shares
+  const shares = memberIds.map(() => baseShare);
+
+  // Randomly distribute remainder cents to avoid systematic bias
+  if (remainder > 0) {
+    // Shuffle indices using Fisher-Yates
+    const indices = memberIds.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    // Give extra cent to first `remainder` shuffled positions
+    for (let i = 0; i < remainder; i++) {
+      shares[indices[i]]++;
+    }
+  }
+
+  return memberIds.map((mId, i) => ({
+    memberId: Number(mId),
+    amount: shares[i] / 100,
+  }));
+}
+
+// USAGE (replace the forEach block):
+const splits = distributeEqually(totalCents, involvedMemberIds);
+splits.forEach(s => finalSplits.push(s));
     }
 
     const client = await db.pool.connect();
@@ -315,13 +339,37 @@ async function updateExpense(req, res) {
     } else {
       const count = involvedMemberIds.length;
       if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
-      const sortedIds = [...involvedMemberIds].map(Number).sort((a, b) => a - b);
-      const baseShareCents = Math.floor(totalCents / count);
-      let remainderCents = totalCents % count;
-      sortedIds.forEach(mId => {
-        const myShareCents = baseShareCents + (remainderCents-- > 0 ? 1 : 0);
-        finalSplits.push({ memberId: mId, amount: myShareCents / 100 });
-      });
+    function distributeEqually(totalCents, memberIds) {
+  const count = memberIds.length;
+  const baseShare = Math.floor(totalCents / count);
+  const remainder = totalCents % count;
+
+  // Create array of shares
+  const shares = memberIds.map(() => baseShare);
+
+  // Randomly distribute remainder cents to avoid systematic bias
+  if (remainder > 0) {
+    // Shuffle indices using Fisher-Yates
+    const indices = memberIds.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    // Give extra cent to first `remainder` shuffled positions
+    for (let i = 0; i < remainder; i++) {
+      shares[indices[i]]++;
+    }
+  }
+
+  return memberIds.map((mId, i) => ({
+    memberId: Number(mId),
+    amount: shares[i] / 100,
+  }));
+}
+
+// USAGE (replace the forEach block):
+const splits = distributeEqually(totalCents, involvedMemberIds);
+splits.forEach(s => finalSplits.push(s));
     }
 
     const client = await db.pool.connect();

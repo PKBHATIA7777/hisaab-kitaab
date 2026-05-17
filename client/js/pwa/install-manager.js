@@ -110,8 +110,7 @@
     if (detect.isStandalone) return { type: "installed" };
 
     // Check if native prompt is available (current page OR flagged from previous page)
-    const promptAvailable = !!deferredPrompt ||
-      (try { sessionStorage.getItem("pwa_prompt_available") === "1" } catch { false });
+   const promptAvailable = !!deferredPrompt || Store.get("pwa_prompt_available") === "1";
 
     if (detect.isIOS) {
       return getIOSConfig();

@@ -79,13 +79,13 @@
 
   function loadState() {
     try {
-      const dismissed = localStorage.getItem('pwa_dismissed_at');
-      const installed = localStorage.getItem('pwa_installed');
+      const dismissed = SafeStorage.get('pwa_dismissed_at');
+      const installed = SafeStorage.get('pwa_installed');
       
       // iOS never fires 'appinstalled' event, so detect standalone mode
       // and persist it so subsequent page loads know the app is installed
       if (detect.isStandalone && !installed) {
-        localStorage.setItem('pwa_installed', 'true');
+        SafeStorage.set('pwa_installed', 'true');
       }
       
       installState.hasInstalled = installed === 'true' || detect.isStandalone;
@@ -99,14 +99,14 @@
 
   function markDismissed() {
     try {
-      localStorage.setItem('pwa_dismissed_at', Date.now().toString());
+      SafeStorage.set('pwa_dismissed_at', Date.now().toString());
     } catch(e) {}
     installState.hasBeenDismissed = true;
   }
 
   function markInstalled() {
     try {
-      localStorage.setItem('pwa_installed', 'true');
+      SafeStorage.set('pwa_installed', 'true');
     } catch(e) {}
     installState.hasInstalled = true;
   }

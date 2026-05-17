@@ -1,108 +1,152 @@
-// Cache version — increment this on every deployment
-// Format: v{MAJOR}.{DEPLOY_TIMESTAMP} for easy debugging
-const CACHE_VERSION = "v3";
-const CACHE_NAME = `hisaab-kitaab-${CACHE_VERSION}`;
+/* client/sw.js — Production-Grade Service Worker */
+const CACHE_VERSION = "v4"; // Increment on every deploy
+const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
+const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
 
-const STATIC_ASSETS = [
-  "/",
-  "/index.html",
-  "/dashboard.html",
-  "/login.html",
-  "/signup.html",
-  "/chapter.html",
-  "/about.html",
-  "/privacy.html",
+// Assets that form the "app shell" — loaded on install
+const SHELL_ASSETS = [
+  "/offline.html",
   "/css/base.css",
+  "/css/chapter-page.css",
   "/css/features.css",
+  "/js/core/sanitize.js",
+  "/js/core/csrf.js",
+  "/js/core/session.js",
+  "/js/core/storage.js",
+  "/js/pwa/install-manager.js",
   "/js/main.js",
-  "/js/dashboard.js",
-  "/js/chapter.js",
-  "/js/feature-settlements.js",
-  "/js/feature-bulk-event.js",
-  "/js/feature-categories.js",
-  "/js/feature-creator-label.js",
-  "/js/feature-personal-chapter.js",
   "/manifest.json",
 ];
 
+// ── INSTALL: Cache app shell, do NOT skipWaiting ────────────
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(SHELL_CACHE).then(async (cache) => {
+      // addAll is all-or-nothing — if any file fails, install fails
+      // We use individual adds with error handling for resilience
+      const results = await Promise.allSettled(
+        SHELL_ASSETS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn(`SW: Failed to cache ${url}:`, err.message);
+          })
+        )
+      );
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > SHELL_ASSETS.length * 0.2) {
+        // More than 20% failed — abort install to avoid broken SW
+        throw new Error(`Too many cache failures: ${failed.length}/${SHELL_ASSETS.length}`);
+      }
+    })
+    // NOTE: No self.skipWaiting() here — controlled activation
   );
 });
 
+// ── ACTIVATE: Clean old caches, take control only when safe ──
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
+    caches.keys().then(async (keys) => {
+      await Promise.all(
         keys
-          .filter((k) => k.startsWith("hisaab-kitaab-") && k !== CACHE_NAME)
+          .filter((k) => (k.startsWith("hk-shell-") || k.startsWith("hk-data-")) && k !== SHELL_CACHE && k !== DATA_CACHE)
           .map((k) => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+      );
+      // Only claim clients after caches are ready
+      // skipWaiting() is called via message from the update toast
+      // self.clients.claim() is safe here since old caches are gone
+      return self.clients.claim();
+    })
   );
 });
 
+// ── FETCH: Strategy per resource type ────────────────────────
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // Never cache API calls
+  // 1. API calls — Network only, no cache
   if (url.pathname.startsWith("/api/")) {
-    // NEVER cache API calls. Always network-only, no fallback cache.
-    // Auth endpoints especially must never be served from cache.
     e.respondWith(
-      fetch(e.request, { credentials: 'include' }).catch((err) => {
-        // Only return offline message for non-auth endpoints
-        // Auth endpoints should fail transparently so the UI handles it
-        const isAuthEndpoint = url.pathname.includes('/auth/');
-        if (isAuthEndpoint) {
-          return new Response(
-            JSON.stringify({ ok: false, message: "Network error. Please check your connection." }),
-            { status: 0, headers: { "Content-Type": "application/json" } }
-          );
-        }
+      fetch(e.request, { credentials: "include" }).catch(() => {
         return new Response(
-          JSON.stringify({ ok: false, message: "You are offline." }),
-          { status: 503, headers: { "Content-Type": "application/json" } }
+          JSON.stringify({ ok: false, message: "You are offline. Please reconnect." }),
+          {
+            status: 503,
+            headers: {
+              "Content-Type": "application/json",
+              "X-Served-By": "service-worker-offline",
+            },
+          }
         );
       })
     );
     return;
   }
 
-  // Network-first for HTML pages (always get latest app shell)
+  // 2. HTML pages — Network first, fall back to offline page
   if (e.request.mode === "navigate") {
     e.respondWith(
       fetch(e.request)
         .then((response) => {
-          const toCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, toCache));
+          // Update cache in background for next visit
+          const clone = response.clone();
+          caches.open(SHELL_CACHE).then((c) => c.put(e.request, clone));
           return response;
         })
-        .catch(() => caches.match(e.request))
+        .catch(async () => {
+          // Check if we have this page cached
+          const cached = await caches.match(e.request);
+          if (cached) return cached;
+          // Serve offline page
+          return caches.match("/offline.html");
+        })
     );
     return;
   }
 
-  // Cache-first for static assets (CSS, JS, images)
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== "basic") {
-          return response;
-        }
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, toCache));
-        return response;
-      });
-    })
-  );
+  // 3. JS/CSS/Fonts — Stale-while-revalidate
+  // Serve from cache immediately, update in background
+  if (url.pathname.match(/\.(js|css|woff2?)$/)) {
+    e.respondWith(
+      caches.open(SHELL_CACHE).then((cache) => {
+        return cache.match(e.request).then((cached) => {
+          const fetchPromise = fetch(e.request)
+            .then((response) => {
+              if (response.ok) cache.put(e.request, response.clone());
+              return response;
+            })
+            .catch(() => cached); // Network failed, serve stale
+
+          return cached || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
+  // 4. Images — Cache first, network fallback
+  if (url.pathname.match(/\.(png|jpg|jpeg|svg|ico|webp)$/)) {
+    e.respondWith(
+      caches.open(SHELL_CACHE).then((cache) => {
+        return cache.match(e.request).then((cached) => {
+          return cached || fetch(e.request).then((response) => {
+            if (response.ok) cache.put(e.request, response.clone());
+            return response;
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // 5. Everything else — Network first
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
 
-// Handle skip waiting message from the app
+// ── MESSAGES ─────────────────────────────────────────────────
 self.addEventListener("message", (e) => {
-  if (e.data?.type === "SKIP_WAITING") self.skipWaiting();
+  if (e.data?.type === "SKIP_WAITING") {
+    self.skipWaiting(); // Only called when user clicks "Reload" in update toast
+  }
+  if (e.data?.type === "PING") {
+    e.ports[0]?.postMessage({ type: "PONG", version: CACHE_VERSION });
+  }
 });

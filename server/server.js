@@ -7,9 +7,12 @@ const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { ipKeyGenerator } = rateLimit;
-const logger = require("./middleware/logger");
+// ── STEP 17: Logging Infrastructure Upgrade ─────────────────
+// REMOVED: const logger = require("./middleware/logger");
+const httpLogger = require("./middleware/httpLogger");
 const csrfProtection = require("./middleware/csrfMiddleware");
 const db = require("./config/db");
+const log = require("./utils/logger"); // For structured logging in cleanup jobs & controllers
 
 // ── EXISTING ROUTES ───────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
@@ -29,7 +32,8 @@ app.get('/ping', (req, res) => {
 const isProduction = process.env.NODE_ENV === "production";
 
 app.set("trust proxy", 1);
-app.use(logger);
+// ── STEP 17: Replace legacy logger with structured httpLogger ─────────────────
+app.use(httpLogger);
 
 // ── CORS (FIX v2: Enhanced for credentialed cross-origin requests) ─────────────────────────────
 const allowedOrigins = [
@@ -47,7 +51,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) return callback(null, true);
     // Allow any vercel.app subdomain for preview deployments
     if (origin && origin.endsWith('.vercel.app')) return callback(null, true);
-    console.warn(`⚠️ CORS Blocked Origin: ${origin}`);
+    log.warn({ origin }, "CORS Blocked Origin");
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
@@ -139,7 +143,7 @@ app.use(helmet({
 app.post("/api/csp-report", express.json({ type: "application/csp-report" }), (req, res) => {
   // Log CSP violations for monitoring
   if (req.body && req.body["csp-report"]) {
-    console.warn("CSP Violation:", JSON.stringify(req.body["csp-report"]));
+    log.warn({ cspReport: req.body["csp-report"] }, "CSP Violation");
     // In production, send to your monitoring service (Datadog, Sentry, etc.)
     // Example: sentry.captureMessage(JSON.stringify(req.body["csp-report"]), { level: 'warning' });
   }
@@ -149,7 +153,7 @@ app.post("/api/csp-report", express.json({ type: "application/csp-report" }), (r
 // ── RATE LIMITING (SECURITY FIX AUTH-002: Remove unverified jwt.decode()) ────────────────────
 const rateLimitHandler = (req, res, next, options) => {
   const retryAfter = Math.ceil(options.resetTime / 1000) - Math.floor(Date.now() / 1000);
-  console.warn(`⚠️ Rate Limit Hit: IP=${req.ip} | Path=${req.originalUrl}`);
+  log.warn({ ip: req.ip, path: req.originalUrl, retryAfter }, "Rate Limit Hit");
   res.setHeader("Retry-After", retryAfter > 0 ? retryAfter : 60);
   res.status(options.statusCode).json({
     ok: false,
@@ -178,6 +182,45 @@ app.use((req, res, next) => {
   if (req.path === '/ping') return next();
   globalLimiter(req, res, next);
 });
+
+// ── PHASE 5: PRODUCTION INFRASTRUCTURE ───────────────────────
+// STEP 16 — Rate Limit Fixes (CROSS-003): Per-email OTP limiter
+// ADD a Map-based per-email OTP limiter (no extra library needed):
+const otpEmailLimiter = (() => {
+  const attempts = new Map(); // email → { count, resetAt }
+  const MAX = 5;
+  const WINDOW = 15 * 60 * 1000; // 15 min
+
+  return (req, res, next) => {
+    // Only apply to OTP request endpoints
+    const email = (req.body?.email || "").toLowerCase().trim();
+    if (!email) return next();
+
+    const now = Date.now();
+    const record = attempts.get(email);
+
+    if (record && now < record.resetAt) {
+      if (record.count >= MAX) {
+        log.warn({ email, count: record.count }, "OTP rate limit exceeded per email");
+        return res.status(429).json({
+          ok: false,
+          message: "Too many code requests for this email. Please wait 15 minutes.",
+        });
+      }
+      record.count++;
+    } else {
+      attempts.set(email, { count: 1, resetAt: now + WINDOW });
+    }
+
+    next();
+  };
+})();
+
+// Apply to OTP request routes (BEFORE authLimiter):
+app.use("/api/auth/register/request-otp", otpEmailLimiter);
+app.use("/api/auth/login/otp-request", otpEmailLimiter);
+app.use("/api/auth/forgot/request-otp", otpEmailLimiter);
+// ── END PHASE 5 STEP 16 ──────────────────────────────────────
 
 // AUTH LIMITER: Use IP only — login/register endpoints have no verified user yet
 const authLimiter = rateLimit({
@@ -225,6 +268,16 @@ app.use("/api/chapters", (req, res, next) => {
 });
 app.use("/api/expenses", (req, res, next) => {
   if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) return writeLimiter(req, res, next);
+  next();
+});
+
+// ✅ ADD middleware to handle idempotency keys for expense creation:
+// This prevents duplicate expenses if the retry fires after a partially successful request
+app.use("/api/expenses", (req, res, next) => {
+  const key = req.headers["x-idempotency-key"];
+  if (key && ["POST"].includes(req.method)) {
+    req.idempotencyKey = key;
+  }
   next();
 });
 
@@ -288,8 +341,32 @@ app.use("/api/friends", friendRoutes);
 // ✅ NEW route registrations
 app.use("/api/categories", categoryRoutes);
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "System operational" });
+// 🔍 STEP 23 — Enhanced Health Check & Readiness Probe
+app.get("/api/health", async (req, res) => {
+  const checks = { status: "ok", timestamp: new Date().toISOString() };
+
+  // DB connectivity check
+  try {
+    await db.query("SELECT 1");
+    checks.database = "ok";
+  } catch (err) {
+    checks.database = "error";
+    checks.status = "degraded";
+    log.error({ err }, "Health check: Database connection failed");
+  }
+
+  // Optional: Add more checks here (Redis, external APIs, etc.)
+  // Example:
+  // try {
+  //   await redis.ping();
+  //   checks.redis = "ok";
+  // } catch (err) {
+  //   checks.redis = "error";
+  //   checks.status = "degraded";
+  // }
+
+  const statusCode = checks.status === "ok" ? 200 : 503;
+  res.status(statusCode).json(checks);
 });
 
 app.use("/api", (req, res) => {
@@ -305,27 +382,49 @@ app.get(/^(?!\/api).+/, (req, res) => {
 setInterval(async () => {
   try {
     await db.query("DELETE FROM otps WHERE expires_at < NOW()");
-    console.log("🧹 Cleaned up expired OTPs");
+    log.info({}, "Cleaned up expired OTPs");
   } catch (err) {
-    console.error("❌ OTP Cleanup Error:", err);
+    log.error({ err }, "OTP Cleanup Error");
   }
 }, 60 * 60 * 1000);
 
+// ── STEP 18: Refresh Token Cleanup Job ───────────────────────
+// Runs every 6 hours to remove expired or revoked refresh tokens
+setInterval(async () => {
+  try {
+    const { rows } = await db.query(
+      "DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked = TRUE RETURNING id"
+    );
+    if (rows.length > 0) {
+      log.info({ count: rows.length }, "Cleaned up expired/revoked refresh tokens");
+    }
+  } catch (err) {
+    log.error({ err }, "Refresh token cleanup error");
+  }
+}, 6 * 60 * 60 * 1000); // Every 6 hours
+// ── END STEP 18 ─────────────────────────────────────────────
+
 // ── GRACEFUL SHUTDOWN (identical to original) ─────────────────
 process.on("SIGTERM", async () => {
-  console.log("🛑 SIGTERM received, shutting down gracefully");
+  log.info({}, "SIGTERM received, shutting down gracefully");
   try {
-    if (db.pool) { await db.pool.end(); console.log("🔌 Database connection pool closed"); }
+    if (db.pool) { await db.pool.end(); log.info({}, "Database connection pool closed"); }
     process.exit(0);
-  } catch (err) { console.error("❌ Error during shutdown:", err); process.exit(1); }
+  } catch (err) { 
+    log.error({ err }, "Error during shutdown"); 
+    process.exit(1); 
+  }
 });
 
 process.on("SIGINT", async () => {
-  console.log("🛑 SIGINT received, shutting down gracefully");
+  log.info({}, "SIGINT received, shutting down gracefully");
   try {
-    if (db.pool) { await db.pool.end(); console.log("🔌 Database connection pool closed"); }
+    if (db.pool) { await db.pool.end(); log.info({}, "Database connection pool closed"); }
     process.exit(0);
-  } catch (err) { console.error("❌ Error during shutdown:", err); process.exit(1); }
+  } catch (err) { 
+    log.error({ err }, "Error during shutdown"); 
+    process.exit(1); 
+  }
 });
 
 const PORT = process.env.PORT || 5001;
@@ -333,4 +432,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔒 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`⚡ Rate Limits: Global=${isProduction ? 100 : 1000}/15min | Write=${isProduction ? 30 : 100}/min`);
+  log.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
 });
