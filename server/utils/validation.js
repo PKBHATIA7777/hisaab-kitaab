@@ -20,24 +20,8 @@ const emailSchema = z.string().email("Invalid email format").transform(normalize
 // 🔐 UPDATED: Hardened password schema (AUTH-015)
 const passwordSchema = z
   .string()
-  .min(10, "Password must be at least 10 characters")
-  .max(128, "Password is too long")
-  .refine(
-    (pwd) => {
-      // At least one of: uppercase, lowercase, digit, special char
-      const hasUpper = /[A-Z]/.test(pwd);
-      const hasLower = /[a-z]/.test(pwd);
-      const hasDigit = /\d/.test(pwd);
-      const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
-      // Require at least 3 of 4 categories
-      const score = [hasUpper, hasLower, hasDigit, hasSpecial].filter(Boolean).length;
-      return score >= 3;
-    },
-    {
-      message:
-        "Password must include at least 3 of: uppercase letter, lowercase letter, number, special character",
-    }
-  );
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password is too long");
 
 // 3. Request Validators
 const registerSchema = z.object({

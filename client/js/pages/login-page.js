@@ -239,27 +239,34 @@ async function requestLoginOtp(targetBtn = null) {
       setTimeout(() => newInput.focus(), 120);
 
       // STEP 15: Wrap auto-submit with race condition guard
-      newInput.addEventListener('input', function() {
-        // Sanitize to digits only
-        const clean = this.value.replace(/\D/g, '').slice(0, 6);
-        if (this.value !== clean) this.value = clean;
-        
-        // STEP 15: Only auto-submit if not already in flight
-        if (clean.length === 6 && !_otpAutoSubmitInFlight) {
-          _otpAutoSubmitInFlight = true; // Set BEFORE async operation
-          this.blur();
-          // Use both methods for maximum iOS compatibility
-          const form = document.getElementById('form-otp');
-          if (form) {
-            // iOS 15.4+: requestSubmit works
-            if (typeof form.requestSubmit === 'function') {
-              try { form.requestSubmit(); return; } catch(_) {}
-            }
-            // iOS < 15.4: manually call handler
-            handleOtpSubmit({ preventDefault: () => {} });
-          }
+ newInput.addEventListener('input', function() {
+  // Sanitize to digits only
+  const clean = this.value.replace(/\D/g, '').slice(0, 6);
+  if (this.value !== clean) this.value = clean;
+  
+  if (clean.length === 6 && !_otpAutoSubmitInFlight) {
+    _otpAutoSubmitInFlight = true;
+    this.blur();
+    const form = document.getElementById('form-otp');
+    if (form) {
+      if (typeof form.requestSubmit === 'function') {
+        try { 
+          form.requestSubmit(); 
+          return; 
+        } catch(_) {
+          // requestSubmit failed — fall through to direct call
         }
+      }
+      // Direct async call with guaranteed reset on completion
+      handleOtpSubmit({ preventDefault: () => {} }).catch(() => {
+        _otpAutoSubmitInFlight = false;
       });
+    } else {
+      // Form not found — reset immediately
+      _otpAutoSubmitInFlight = false;
+    }
+  }
+});
     }
 
   } catch (err) {

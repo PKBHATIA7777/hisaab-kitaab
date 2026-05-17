@@ -16,11 +16,10 @@ const {
   googleLogin,
   setPassword,
   updateProfile,
-  
-  // ✅ NEW IMPORTS (Ensure these are here)
   checkIdentifier,
   loginRequestOtp,
-  loginVerifyOtp
+  loginVerifyOtp,
+  refreshSession      // ← ADD THIS
 } = require("../controllers/authController");
 
 // --- ROUTES ---
@@ -53,5 +52,9 @@ router.get("/me", me);
 router.patch("/profile", requireAuth, updateProfile);
 
 router.post("/logout", logout);
+
+// Session refresh — extends auth without requiring re-login
+// Must be accessible without a valid auth_token (called when token may be expired)
+router.post("/refresh", refreshSession);
 
 module.exports = router;

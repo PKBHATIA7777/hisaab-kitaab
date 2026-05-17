@@ -104,9 +104,11 @@
       <div id="events-strip-container" class="events-strip" role="tablist" aria-label="Filter by event"></div>
 
       <!-- Expenses -->
-      <section class="expenses-section" aria-label="Expense list">
-        <div id="expense-list-container" class="expense-list"></div>
-        <div class="empty-state-placeholder" id="chapter-empty-state" style="display:none;" role="status">
+    <section class="expenses-section" aria-label="Expense list">
+  <div id="expense-list-container" class="expense-list"></div>
+  <!-- Load More container — managed by chapter.js renderLoadMoreButton() -->
+  <div id="load-more-container" style="text-align:center; padding: 0 16px;"></div>
+  <div class="empty-state-placeholder" id="chapter-empty-state" style="display:none;" role="status">
           <div class="empty-state-icon" aria-hidden="true">💸</div>
           <p class="empty-state-title">No expenses yet</p>
           <p class="empty-state-subtitle">Tap the + button to add your first expense</p>
@@ -243,6 +245,8 @@
   </div>
 
   <!-- Scripts -->
+   <!-- ADD THIS as the first script in every HTML file, before any other scripts -->
+<script src="js/core/storage.js"></script>
    <script src="js/core/sanitize.js"></script>
   <script src="js/core/csrf.js"></script>
   <script src="js/core/session.js"></script>

@@ -560,44 +560,33 @@ const CONFIG = {
   }
 
   // 🔐 UPDATED: Hardened password validation (AUTH-015)
-  function initPasswordValidation() {
-    document.querySelectorAll('input[type="password"]').forEach(input => {
-      const wrapper = input.closest('.password-wrapper');
-      if (!wrapper) return;
-      const hint = wrapper.nextElementSibling;
-      if (hint && hint.classList.contains('password-hint')) {
-        input.addEventListener("input", () => {
-          const pwd = input.value;
-          const checks = {
-            length: pwd.length >= 10,
-            upper: /[A-Z]/.test(pwd),
-            lower: /[a-z]/.test(pwd),
-            digit: /\d/.test(pwd),
-            special: /[^A-Za-z0-9]/.test(pwd),
-          };
-          const score = [checks.upper, checks.lower, checks.digit, checks.special]
-            .filter(Boolean).length;
-          const isValid = checks.length && score >= 3;
+function initPasswordValidation() {
+  document.querySelectorAll('input[type="password"]').forEach(input => {
+    const wrapper = input.closest('.password-wrapper');
+    if (!wrapper) return;
+    const hint = wrapper.nextElementSibling;
+    if (hint && hint.classList.contains('password-hint')) {
+      input.addEventListener("input", () => {
+        const pwd = input.value;
+        const isValid = pwd.length >= 8;
 
-          if (!pwd) {
-            hint.textContent = "At least 10 characters";
-            hint.className = "password-hint";
-            return;
-          }
-          if (isValid) {
-            hint.textContent = "✓ Strong password";
-            hint.className = "password-hint valid";
-          } else if (pwd.length < 10) {
-            hint.textContent = `${10 - pwd.length} more character${10 - pwd.length !== 1 ? "s" : ""} needed`;
-            hint.className = "password-hint invalid";
-          } else {
-            hint.textContent = "Add uppercase, number, or special character";
-            hint.className = "password-hint invalid";
-          }
-        });
-      }
-    });
-  }
+        if (!pwd) {
+          hint.textContent = "At least 8 characters";
+          hint.className = "password-hint";
+          return;
+        }
+        if (isValid) {
+          hint.textContent = "✓ Good password";
+          hint.className = "password-hint valid";
+        } else {
+          const remaining = 8 - pwd.length;
+          hint.textContent = `${remaining} more character${remaining !== 1 ? "s" : ""} needed`;
+          hint.className = "password-hint invalid";
+        }
+      });
+    }
+  });
+}
 
   window.getAvatarColor = function(name) {
     if (!name) return "#ccc";

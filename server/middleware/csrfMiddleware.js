@@ -20,12 +20,17 @@ const CSRF_COOKIE_OPTIONS = {
  */
 function deriveCSRFToken(req) {
   // Strategy 1: Derive from JWT (stable per auth session)
+  // We VERIFY here — not just decode — to prevent forgery via crafted JWTs.
+  // An expired token is still acceptable for CSRF derivation (user may have an
+  // expired auth token but we still want a stable CSRF token for the login page).
   const authToken = req.cookies.auth_token;
   if (authToken) {
     try {
-      // We ONLY decode here (not verify) — we just need the payload's iat/userId
-      // to derive a deterministic CSRF token. CSRF is not auth — it binds to session.
-      const payload = jwt.decode(authToken);
+      // ignoreExpiration: true is intentional — CSRF derivation only needs the
+      // userId and iat for HMAC input. Signature verification is what matters.
+      const payload = jwt.verify(authToken, process.env.JWT_SECRET, {
+        ignoreExpiration: true
+      });
       if (payload && payload.userId && payload.iat) {
         // HMAC-SHA256 of (userId + iat) using CSRF_SECRET
         // Same inputs always produce same output — zero race condition

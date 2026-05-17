@@ -146,23 +146,29 @@ function attachOtpAutoSubmit() {
   setTimeout(() => fresh.focus(), 120);
 
   // STEP 15: Wrap auto-submit with race condition guard
-  fresh.addEventListener('input', function() {
-    const clean = this.value.replace(/\D/g, '').slice(0, 6);
-    if (this.value !== clean) this.value = clean;
-    
-    // STEP 15: Only auto-submit if not already in flight
-    if (clean.length === 6 && !_otpAutoSubmitInFlight) {
-      _otpAutoSubmitInFlight = true; // Set BEFORE async operation
-      this.blur();
-      const form = document.getElementById('form-otp');
-      if (form) {
-        if (typeof form.requestSubmit === 'function') {
-          try { form.requestSubmit(); return; } catch(_) {}
-        }
-        handleOtpSubmit({ preventDefault: () => {} });
+ fresh.addEventListener('input', function() {
+  const clean = this.value.replace(/\D/g, '').slice(0, 6);
+  if (this.value !== clean) this.value = clean;
+  
+  if (clean.length === 6 && !_otpAutoSubmitInFlight) {
+    _otpAutoSubmitInFlight = true;
+    this.blur();
+    const form = document.getElementById('form-otp');
+    if (form) {
+      if (typeof form.requestSubmit === 'function') {
+        try { 
+          form.requestSubmit(); 
+          return;
+        } catch(_) {}
       }
+      handleOtpSubmit({ preventDefault: () => {} }).catch(() => {
+        _otpAutoSubmitInFlight = false;
+      });
+    } else {
+      _otpAutoSubmitInFlight = false;
     }
-  });
+  }
+});
 }
 
 /* --- STEP 2: OTP VERIFY --- */

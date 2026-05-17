@@ -344,27 +344,47 @@ async function googleLogin(req, res) {
     const realName = payload.name || "Google User";
     if (!email) return res.status(400).json({ ok: false, message: "Email not available from Google" });
     const { rows: existingRows } = await db.query("SELECT * FROM users WHERE google_id = $1 OR email = $2 LIMIT 1", [googleId, email]);
-    let user = existingRows[0] || null;
-    let isNewUser = false;
-    if (!user) {
-      isNewUser = true;
-      const now = new Date();
-      const { rows: newUserRows } = await db.query(
-        `INSERT INTO users (real_name, username, email, password_hash, provider, google_id, needs_password, last_login_at)
-         VALUES ($1, NULL, $2, NULL, 'google', $3, FALSE, $4) RETURNING *`,
-        [realName, email, googleId, now]
-      );
-      user = newUserRows[0];
-      
-      // ✅ FIX 4: Auto-create personal chapter for Google user (fire-and-forget)
-      setImmediate(() => {
-        createPersonalChapterForUser(user.id, null).catch(err =>
-          console.error(`Background: personal chapter for Google user ${user.id}:`, err.message)
-        );
-      });
-    } else {
-      await db.query("UPDATE users SET last_login_at = $1, updated_at = NOW() WHERE id = $2", [new Date(), user.id]);
-    }
+let user = existingRows[0] || null;
+let isNewUser = false;
+if (!user) {
+  isNewUser = true;
+  const now = new Date();
+  const { rows: newUserRows } = await db.query(
+    `INSERT INTO users (real_name, username, email, password_hash, provider, google_id, needs_password, last_login_at)
+     VALUES ($1, NULL, $2, NULL, 'google', $3, FALSE, $4) RETURNING *`,
+    [realName, email, googleId, now]
+  );
+  user = newUserRows[0];
+  
+  setImmediate(() => {
+    createPersonalChapterForUser(user.id, null).catch(err =>
+      console.error(`Background: personal chapter for Google user ${user.id}:`, err.message)
+    );
+  });
+} else {
+  // Link Google account to existing user if not already linked.
+  // This handles: user registered with password, now uses Google with same email.
+  // Per product decision: Google verification is sufficient proof of identity.
+  const updates = ['last_login_at = $1', 'updated_at = NOW()'];
+  const params = [new Date(), user.id];
+  
+  if (!user.google_id) {
+    // First time linking Google to this account
+    updates.push(`google_id = $${params.length + 1}`);
+    params.splice(params.length - 1, 0, googleId); // insert before user.id
+    // Rebuild params correctly
+  }
+  
+  // Cleaner approach:
+  await db.query(
+    `UPDATE users 
+     SET last_login_at = $1,
+         updated_at = NOW(),
+         google_id = COALESCE(google_id, $2)
+     WHERE id = $3`,
+    [new Date(), googleId, user.id]
+  );
+}
     // UPDATED: Include jwt_generation in token payload
     const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, true);
     sendAuthCookie(res, token, true);
