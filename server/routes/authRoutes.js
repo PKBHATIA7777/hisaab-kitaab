@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const cache = require("../middleware/cacheMiddleware");
 const { requireAuth } = require("../middleware/authMiddleware");
+const { getDeviceSessions, logoutDevice } = require("../controllers/authController");
 
 const {
   registerRequestOtp,
@@ -56,5 +57,9 @@ router.post("/logout", logout);
 // Session refresh — extends auth without requiring re-login
 // Must be accessible without a valid auth_token (called when token may be expired)
 router.post("/refresh", refreshSession);
+
+// Device session management
+router.get("/devices", requireAuth, getDeviceSessions);
+router.delete("/devices/:sessionId", requireAuth, logoutDevice);
 
 module.exports = router;

@@ -24,6 +24,65 @@ function generateOtpCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Detect device info from User-Agent for device session tracking
+function parseDeviceInfo(userAgent, ip) {
+  const ua = userAgent || '';
+  let deviceType = 'desktop';
+  let browser = 'Unknown';
+  let os = 'Unknown';
+  
+  // Device type
+  if (/Mobile|Android.*Mobile|iPhone/.test(ua)) deviceType = 'mobile';
+  else if (/iPad|Android(?!.*Mobile)|Tablet/.test(ua)) deviceType = 'tablet';
+  
+  // Browser
+  if (/SamsungBrowser/.test(ua)) browser = 'Samsung Internet';
+  else if (/EdgA?\//.test(ua)) browser = 'Edge';
+  else if (/CriOS/.test(ua)) browser = 'Chrome (iOS)';
+  else if (/FxiOS/.test(ua)) browser = 'Firefox (iOS)';
+  else if (/Chrome/.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
+  else if (/Firefox/.test(ua)) browser = 'Firefox';
+  else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  
+  // OS
+  if (/iPhone/.test(ua)) os = 'iOS';
+  else if (/iPad/.test(ua)) os = 'iPadOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac/.test(ua)) os = 'macOS';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  
+  const deviceName = `${browser} on ${os}`;
+  
+  return { deviceType, browser, os, deviceName, ip: ip || 'Unknown' };
+}
+
+async function registerDeviceSession(userId, jwtIat, req) {
+  try {
+    const { deviceType, browser, os, deviceName, ip } = parseDeviceInfo(
+      req.headers['user-agent'],
+      req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress
+    );
+    
+    const sessionId = require('crypto').randomBytes(32).toString('hex');
+    
+    await db.query(
+      `INSERT INTO device_sessions 
+         (user_id, session_id, device_name, device_type, browser, os, ip_address, jwt_iat)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (session_id) DO UPDATE 
+         SET last_active_at = NOW()`,
+      [userId, sessionId, deviceName, deviceType, browser, os, ip, jwtIat]
+    );
+    
+    return sessionId;
+  } catch (err) {
+    // Non-fatal — don't block login if session tracking fails
+    console.error('registerDeviceSession error (non-fatal):', err.message);
+    return null;
+  }
+}
+
 async function findUserById(id) {
   const { rows } = await db.query("SELECT * FROM users WHERE id = $1 LIMIT 1", [id]);
   return rows[0] || null;
@@ -83,8 +142,14 @@ async function loginVerifyOtp(req, res) {
     if (!user) return res.status(400).json({ ok: false, message: "User not found" });
     const remember = !!rememberMe;
     // UPDATED: Include jwt_generation in token payload
-    const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, remember);
+    const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
+    const token = createToken(tokenPayload, remember);
     sendAuthCookie(res, token, remember);
+
+    // Register device session for multi-device management (non-blocking)
+    const decoded = require('jsonwebtoken').decode(token);
+    registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
+
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS) });
   } catch (err) {
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
@@ -286,7 +351,8 @@ async function registerComplete(req, res) {
       });
 
       // UPDATED: Include jwt_generation in token payload
-      const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 });
+      const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
+      const token = createToken(tokenPayload);
       sendAuthCookie(res, token);
 
       return res.json({
@@ -318,8 +384,14 @@ async function login(req, res) {
     if (!valid) return res.status(400).json({ ok: false, message: "Invalid credentials" });
     const remember = !!rememberMe;
     // UPDATED: Include jwt_generation in token payload
-    const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, remember);
+    const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
+    const token = createToken(tokenPayload, remember);
     sendAuthCookie(res, token, remember);
+
+    // Register device session for multi-device management (non-blocking)
+    const decoded = require('jsonwebtoken').decode(token);
+    registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
+
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS) });
   } catch (err) {
     console.error("login error:", err);
@@ -386,8 +458,14 @@ if (!user) {
   );
 }
     // UPDATED: Include jwt_generation in token payload
-    const token = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, true);
+    const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
+    const token = createToken(tokenPayload, true);
     sendAuthCookie(res, token, true);
+
+    // Register device session for multi-device management (non-blocking)
+    const decoded = require('jsonwebtoken').decode(token);
+    registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
+
     return res.json({ ok: true, message: "Google login successful", isNewUser, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email } });
   } catch (err) {
     console.error("googleLogin error:", err);
@@ -552,6 +630,77 @@ async function updateProfile(req, res) {
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
+async function getDeviceSessions(req, res) {
+  try {
+    const userId = req.user.userId;
+    const currentIat = req.user.iat; // iat from current JWT
+    
+    // Get sessions active in the last 90 days
+    const { rows } = await db.query(
+      `SELECT id, session_id, device_name, device_type, browser, os, 
+              ip_address, last_active_at, created_at, jwt_iat
+       FROM device_sessions
+       WHERE user_id = $1 
+         AND last_active_at > NOW() - INTERVAL '90 days'
+       ORDER BY last_active_at DESC
+       LIMIT 10`,
+      [userId]
+    );
+    
+    // Mark which session is current
+    const sessions = rows.map(s => ({
+      ...s,
+      isCurrent: s.jwt_iat === currentIat
+    }));
+    
+    res.json({ ok: true, sessions });
+  } catch (err) {
+    console.error("getDeviceSessions error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+async function logoutDevice(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { sessionId } = req.params;
+    const logoutAll = req.query.all === 'true';
+    
+    if (logoutAll) {
+      // Increment jwt_generation — invalidates ALL tokens for this user
+      await incrementJwtGeneration(userId);
+      // Delete all device sessions
+      await db.query(
+        "DELETE FROM device_sessions WHERE user_id = $1",
+        [userId]
+      );
+      // Also clear cookies for current device
+      clearAuthCookies(res);
+      return res.json({ ok: true, message: "Logged out from all devices" });
+    }
+    
+    // Logout specific device
+    const { rowCount } = await db.query(
+      "DELETE FROM device_sessions WHERE session_id = $1 AND user_id = $2 RETURNING jwt_iat",
+      [sessionId, userId]
+    );
+    
+    if (rowCount === 0) {
+      return res.status(404).json({ ok: false, message: "Session not found" });
+    }
+    
+    // Note: We can't truly invalidate a specific JWT without a blacklist.
+    // jwt_generation increment would invalidate ALL sessions.
+    // For single-device logout, the session will naturally expire (90 days max).
+    // This is an acceptable trade-off for a non-military application.
+    
+    res.json({ ok: true, message: "Device session removed" });
+  } catch (err) {
+    console.error("logoutDevice error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
 
 // ── NEW: Refresh Session Handler ──────────────────────────────────
 async function refreshSession(req, res) {
@@ -628,6 +777,8 @@ module.exports = {
   resetPassword,
   me,
   logout,
+   getDeviceSessions,
+  logoutDevice,
   updateProfile,
   refreshSession, // ← NEW EXPORT
 };

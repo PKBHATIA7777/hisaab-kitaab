@@ -388,6 +388,19 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000);
 
+// ── DEVICE SESSION CLEANUP (NEW: Remove stale sessions older than 90 days) ──────────────────────
+// Clean up stale device sessions (older than 90 days)
+setInterval(async () => {
+  try {
+    await db.query(
+      "DELETE FROM device_sessions WHERE last_active_at < NOW() - INTERVAL '90 days'"
+    );
+    log.info({}, "Cleaned up stale device sessions");
+  } catch (err) {
+    log.error({ err }, "Device session cleanup error");
+  }
+}, 24 * 60 * 60 * 1000); // Daily
+
 // ── STEP 18: Refresh Token Cleanup Job ───────────────────────
 // Runs every 6 hours to remove expired or revoked refresh tokens
 setInterval(async () => {

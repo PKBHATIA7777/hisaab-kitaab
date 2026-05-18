@@ -212,25 +212,32 @@ const CONFIG = {
       }
 
       // 401 handling — only redirect if NOT on an auth page and NOT a background check
-  if (res.status === 401) {
+// 401 handling — only redirect if NOT on an auth page and NOT a background check
+if (res.status === 401) {
   if (!isAuthPage() && !options._silent) {
-    // Attempt silent refresh before redirecting
-    const refreshed = window.SessionManager
-      ? await window.SessionManager.attemptRefresh()
-      : false;
+    // Only attempt refresh on the FIRST try (attempt === 0)
+    // and only if this is not already a refresh call itself
+    // This prevents infinite loops: apiFetch → refresh → 401 → apiFetch → ...
+    if (attempt === 0 && !options._isRefreshAttempt) {
+      const refreshed = window.SessionManager
+        ? await window.SessionManager.attemptRefresh()
+        : false;
 
-    if (refreshed && attempt < 1) {
-      // Retry the original request once with fresh cookies
-      return makeRequest(attempt + 1);
+      if (refreshed) {
+        // Retry the original request once with fresh cookies
+        // Mark as post-refresh to prevent another refresh attempt
+        return makeRequest(attempt + 1);
+      }
     }
 
-    // Refresh failed — redirect to login
+    // Refresh failed or already tried — redirect to login
+    // Small delay to allow any pending UI updates
     setTimeout(() => {
       window.location.href = "login.html?expired=true";
     }, 200);
     return;
   }
-  // On auth pages or silent: fall through to normal error
+  // On auth pages or silent: fall through to throw error normally
 }
 
       // Rate limit

@@ -77,6 +77,13 @@ function timeAgo(timestamp) {
 document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons();
 
+  // ✅ NEW: Handle logout triggered by another tab (Cross-tab sync)
+  if (typeof SessionManager !== 'undefined' && SessionManager.on) {
+    SessionManager.on('logout', () => {
+      window.location.replace("login.html?expired=true");
+    });
+  }
+
   // ✅ NEW: Fetch Friends in background for autocomplete
   try {
     const fData = await apiFetch("/friends");
@@ -877,20 +884,109 @@ function updateProfileInstallHint() {
 // Re-bind Logout (since ID changed to logout-btn-profile)
 const profileLogoutBtn = document.getElementById("logout-btn-profile");
 if (profileLogoutBtn) {
-  // ✅ STEP 3.5: Fixed logout race condition
   profileLogoutBtn.addEventListener("click", async () => {
-    try {
-      setBtnLoading(profileLogoutBtn, true);
-      // Close profile modal immediately to prevent any further API calls
-      closeProfileModal();
-      await apiFetch("/auth/logout", { method: "POST" });
-      // Replace the entire page state so no further navigation can trigger 401
-      window.location.replace("login.html");
-    } catch(e) {
-      window.location.replace("login.html");
-    }
+    await showLogoutDeviceScreen();
   });
 }
+
+async function showLogoutDeviceScreen() {
+  // Fetch active devices
+  let sessions = [];
+  try {
+    const data = await apiFetch("/auth/devices");
+    sessions = data.sessions || [];
+  } catch(_) {}
+  
+  // If only 1 session (current device), just log out directly
+  if (sessions.length <= 1) {
+    try {
+      setBtnLoading(profileLogoutBtn, true);
+      closeProfileModal();
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch(_) {}
+    // Notify other tabs
+    SessionManager.broadcastLogout({ reason: 'manual' });
+    window.location.replace("login.html");
+    return;
+  }
+  
+  // Multiple sessions — show device selection modal
+  const existingModal = document.getElementById('device-logout-modal');
+  if (existingModal) existingModal.remove();
+  
+  const deviceIcon = { mobile: '📱', tablet: '📱', desktop: '💻' };
+  
+  const modal = document.createElement('div');
+  modal.id = 'device-logout-modal';
+  modal.className = 'modal-overlay active';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h2>Log Out</h2>
+        <button class="close-modal" onclick="document.getElementById('device-logout-modal').remove()">×</button>
+      </div>
+      <p style="color:#666; font-size:0.9rem; margin-bottom:20px;">
+        You're logged in on ${sessions.length} device${sessions.length > 1 ? 's' : ''}. 
+        What would you like to do?
+      </p>
+      <div style="margin-bottom:20px;">
+        ${sessions.map(s => `
+          <div style="display:flex; align-items:center; gap:12px; padding:12px; 
+                      background:${s.isCurrent ? '#f0f0ff' : '#f9f9f9'}; 
+                      border-radius:10px; margin-bottom:8px;
+                      border:${s.isCurrent ? '1.5px solid #d000ff' : '1px solid #eee'};">
+            <span style="font-size:1.5rem;">${deviceIcon[s.device_type] || '💻'}</span>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:0.9rem; color:#333;">
+                ${escapeHTML(s.device_name)}
+                ${s.isCurrent ? '<span style="font-size:0.7rem; color:#d000ff; margin-left:6px; background:rgba(208,0,255,0.1); padding:2px 6px; border-radius:4px;">This device</span>' : ''}
+              </div>
+              <div style="font-size:0.75rem; color:#888;">
+                Last active: ${new Date(s.last_active_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="btn-primary" onclick="handleDeviceLogout('current')" 
+          style="background:#000;">
+          Log out this device only
+        </button>
+        <button class="btn-secondary" onclick="handleDeviceLogout('all')"
+          style="color:#ff1744; border-color:#ffcdd2;">
+          Log out all devices
+        </button>
+        <button class="btn-secondary" onclick="document.getElementById('device-logout-modal').remove()"
+          style="border:none; color:#666;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+window.handleDeviceLogout = async function(scope) {
+  const modal = document.getElementById('device-logout-modal');
+  const btn = modal?.querySelector(`button[onclick="handleDeviceLogout('${scope}')"]`);
+  if (btn) setBtnLoading(btn, true);
+  
+  try {
+    if (scope === 'all') {
+      await apiFetch("/auth/logout?all=true", { method: "POST" });
+      SessionManager.broadcastLogout({ reason: 'all_devices' });
+    } else {
+      await apiFetch("/auth/logout", { method: "POST" });
+      SessionManager.broadcastLogout({ reason: 'current_device' });
+    }
+} catch(_) {}
+
+// Clear remembered identifier from this device
+try { localStorage.removeItem('last_user'); } catch(_) {}
+
+window.location.replace("login.html");
+};
 
 // ==========================================
 // ✅ STEP 4.4 — PROFILE NAME EDIT FUNCTIONS
