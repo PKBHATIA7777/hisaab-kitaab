@@ -134,13 +134,15 @@ async function loginRequestOtp(req, res) {
 
 async function loginVerifyOtp(req, res) {
   try {
-    const { email, otp, rememberMe } = req.body;
+    const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
     const otpRow = await verifyOtpLogic(email, otp, "login");
     await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
     const user = await findUserByIdentifier(email.trim().toLowerCase());
     if (!user) return res.status(400).json({ ok: false, message: "User not found" });
-    const remember = !!rememberMe;
+    // Always remember — this is a consumer app where UX > strict session management.
+    // Users can explicitly log out via the device management screen.
+    const remember = true;
     // UPDATED: Include jwt_generation in token payload
     const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
     const token = createToken(tokenPayload, remember);
@@ -375,14 +377,16 @@ async function registerComplete(req, res) {
 
 async function login(req, res) {
   try {
-    const { identifier, password, rememberMe } = req.body;
+    const { identifier, password } = req.body;
     if (!identifier || !password) return res.status(400).json({ ok: false, message: "Missing credentials" });
     const user = await findUserByIdentifier(identifier);
     if (!user) return res.status(400).json({ ok: false, message: "Invalid credentials" });
     if (!user.password_hash) return res.status(400).json({ ok: false, message: "This account uses Google/OTP login." });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ ok: false, message: "Invalid credentials" });
-    const remember = !!rememberMe;
+    // Always remember — this is a consumer app where UX > strict session management.
+    // Users can explicitly log out via the device management screen.
+    const remember = true;
     // UPDATED: Include jwt_generation in token payload
     const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
     const token = createToken(tokenPayload, remember);
