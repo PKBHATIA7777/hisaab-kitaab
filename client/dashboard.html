@@ -20,6 +20,19 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="theme-color" content="#ffffff">
+  
+  <!-- iOS PWA Configuration (Phase 5 Step 2) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hisaab">
+  <!-- Prevents white flash on launch — matches app background -->
+  <style>
+    /* Critical above-fold CSS to prevent FOUC on PWA launch */
+    html, body { 
+      background-color: #000000; 
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
@@ -307,7 +320,7 @@
     </div>
     
     <div class="footer-bottom">
-      &copy; 2025 Hisaab-Kitaab. All rights reserved.
+      &copy; 2026 Hisaab-Kitaab. All rights reserved.
     </div>
   </footer>
 

@@ -394,23 +394,38 @@ if (res.status === 401) {
   }
 
   function initSessionMonitor() {
-    setInterval(() => {
-      // Try cookie first, then sessionStorage fallback
-      const expiryStr = getCookie("session_expiry") || sessionStorage.getItem("session_expiry_fallback");
-      if (!expiryStr) return;
-      
-      const expiresAt = parseInt(expiryStr, 10);
-      if (!expiresAt || isNaN(expiresAt) || expiresAt <= 0) return;
-      
-      const timeLeft = expiresAt - Date.now();
-      if (timeLeft > 0 && timeLeft < CONFIG.TIMEOUTS.SESSION_WARN) {
-        const lastWarned = sessionStorage.getItem("sessionWarned");
-        if (!lastWarned) {
-          showToast("⚠️ Session expires soon. Please save your work.", "info");
-          sessionStorage.setItem("sessionWarned", "true");
-        }
+    // Wait for SessionManager to be available (loaded after main.js in some pages)
+    const startMonitor = () => {
+      if (!window.SessionManager) {
+        setTimeout(startMonitor, 500);
+        return;
       }
-    }, CONFIG.TIMEOUTS.SESSION_CHECK);
+      
+      setInterval(async () => {
+        if (window.SessionManager.isExpiringSoon(CONFIG.TIMEOUTS.SESSION_WARN)) {
+          const lastWarned = (() => { 
+            try { return sessionStorage.getItem("sessionWarned"); } 
+            catch(_) { return null; } 
+          })();
+          if (!lastWarned) {
+            // Attempt silent refresh first
+            const refreshed = await window.SessionManager.attemptRefresh();
+            if (!refreshed) {
+              showToast("⚠️ Session expires soon. Please save your work.", "info");
+              try { sessionStorage.setItem("sessionWarned", "true"); } catch(_) {}
+            } else {
+              // Refresh succeeded — clear the warned flag
+              try { sessionStorage.removeItem("sessionWarned"); } catch(_) {}
+            }
+          }
+        } else {
+          // Session still valid — clear any stale warned flag
+          try { sessionStorage.removeItem("sessionWarned"); } catch(_) {}
+        }
+      }, CONFIG.TIMEOUTS.SESSION_CHECK);
+    };
+    
+    startMonitor();
   }
 
   /* ======================================

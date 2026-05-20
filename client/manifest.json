@@ -1,8 +1,9 @@
 {
+  "id": "hisaab-kitaab-pwa-v1",
   "name": "Hisaab-Kitaab — Split Expenses",
   "short_name": "Hisaab",
   "description": "Track group expenses and settle debts with friends and family.",
-  "start_url": "/index.html?source=pwa",
+  "start_url": "/dashboard.html?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -23,15 +24,7 @@
     { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/dashboard-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Dashboard — Your expense chapters"
-    }
-  ],
+  "screenshots": [],
   "shortcuts": [
     {
       "name": "Add Expense",
