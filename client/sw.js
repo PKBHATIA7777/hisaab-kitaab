@@ -1,41 +1,59 @@
 /* client/sw.js — Production-Grade Service Worker */
-const CACHE_VERSION = "v4"; // Increment on every deploy
+const CACHE_VERSION = "v5"; // ← INCREMENT THIS ON EVERY DEPLOY
+
+// Deployment checklist reminder (logged to DevTools console)
+// This helps catch forgotten cache version bumps during development
+if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+  console.log(`%c[SW] Running cache version: ${CACHE_VERSION}`, 'color: #d000ff; font-weight: bold');
+  console.log('%c[SW] REMEMBER: Increment CACHE_VERSION before every production deploy!', 'color: orange');
+}
+
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
 
-// Assets that form the "app shell" — loaded on install
+// Core assets that MUST be cached for offline fallback to work.
+// Keep this list small and reliable — only files that definitely exist.
+// Aggressive caching of app files happens via the stale-while-revalidate
+// strategy in the fetch handler below.
 const SHELL_ASSETS = [
   "/offline.html",
+  "/manifest.json",
+];
+
+// Additional assets to warm-cache opportunistically (failures don't block SW install)
+const WARM_CACHE_ASSETS = [
   "/css/base.css",
   "/css/chapter-page.css",
   "/css/features.css",
   "/js/core/sanitize.js",
+  "/js/core/storage.js",
   "/js/core/csrf.js",
   "/js/core/session.js",
-  "/js/core/storage.js",
-  "/js/pwa/install-manager.js",
   "/js/main.js",
-  "/manifest.json",
+  "/js/pwa-install.js",
+  "/js/pwa/offline-queue.js",  // ← Added: offline request queue for background sync
 ];
 
 // ── INSTALL: Cache app shell, do NOT skipWaiting ────────────
 self.addEventListener("install", (e) => {
   e.waitUntil(
     caches.open(SHELL_CACHE).then(async (cache) => {
-      // addAll is all-or-nothing — if any file fails, install fails
-      // We use individual adds with error handling for resilience
-      const results = await Promise.allSettled(
-        SHELL_ASSETS.map((url) =>
-          cache.add(url).catch((err) => {
-            console.warn(`SW: Failed to cache ${url}:`, err.message);
+      // Critical assets — must succeed or SW install fails
+      // (these are minimal so failure is unlikely)
+      await cache.addAll(SHELL_ASSETS);
+      
+      // Warm cache — best effort, failures don't block installation
+      const warmResults = await Promise.allSettled(
+        WARM_CACHE_ASSETS.map(url =>
+          cache.add(url).catch(err => {
+            // Log but don't throw — these are optional
+            console.warn(`SW warm-cache miss for ${url}: ${err.message}`);
           })
         )
       );
-      const failed = results.filter((r) => r.status === "rejected");
-      if (failed.length > SHELL_ASSETS.length * 0.2) {
-        // More than 20% failed — abort install to avoid broken SW
-        throw new Error(`Too many cache failures: ${failed.length}/${SHELL_ASSETS.length}`);
-      }
+      
+      const warmed = warmResults.filter(r => r.status === 'fulfilled').length;
+      console.log(`SW installed: ${warmed}/${WARM_CACHE_ASSETS.length} warm-cache assets ready`);
     })
     // NOTE: No self.skipWaiting() here — controlled activation
   );
