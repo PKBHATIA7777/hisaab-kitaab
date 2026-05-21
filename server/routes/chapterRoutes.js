@@ -79,4 +79,11 @@ router.post("/:id/members", chapterController.addMember);
 router.delete("/:id/members/:memberId", chapterController.deleteMember);
 router.get("/:id/members/deletability", chapterController.getMemberDeletability);
 
+
+
+// Change detection endpoint — polling foundation before WebSocket implementation
+// Returns data_updated_at timestamp for the chapter
+// Future: This endpoint will be deprecated in favor of WebSocket subscription
+router.get("/:id/heartbeat", chapterController.getChapterHeartbeat);
+
 module.exports = router;

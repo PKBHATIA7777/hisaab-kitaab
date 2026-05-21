@@ -385,6 +385,47 @@ async function deleteChapter(req, res) {
   }
 }
 
+// Lightweight endpoint for collaborative polling.
+// Returns only the last-modified timestamp — clients compare with their local state.
+// If timestamps differ, client fetches full update.
+// Future: Replace with WebSocket push notification.
+async function getChapterHeartbeat(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    
+    // Verify user has access to this chapter
+    // Note: Future collaborative features will need to check member access, not just creator
+    const { rows } = await db.query(
+      `SELECT c.data_updated_at, c.name
+       FROM chapters c
+       LEFT JOIN chapter_members cm ON c.id = cm.chapter_id AND cm.user_id = $2
+       WHERE c.id = $1 AND (c.created_by = $2 OR cm.id IS NOT NULL)
+       LIMIT 1`,
+      [id, userId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, message: "Chapter not found or no access" });
+    }
+    
+    res.json({ 
+      ok: true, 
+      chapterId: id,
+      dataUpdatedAt: rows[0].data_updated_at,
+      // Cache this response very briefly — polling clients check every few seconds
+      // The low max-age means fresh data arrives quickly
+    });
+    
+    // Set cache header programmatically (short cache for polling)
+    res.setHeader('Cache-Control', 'max-age=2, must-revalidate');
+    
+  } catch (err) {
+    console.error("getChapterHeartbeat error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
 // CHANGE 4: Export the new function
 module.exports = {
   createChapter,
@@ -395,5 +436,6 @@ module.exports = {
   addMember,
   deleteMember,
   getMemberDeletability,
+   getChapterHeartbeat,
   toggleArchiveChapter
 };
