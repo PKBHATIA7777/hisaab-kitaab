@@ -1,5 +1,5 @@
 /* client/sw.js — Production-Grade Service Worker */
-const CACHE_VERSION = "v5"; // ← INCREMENT THIS ON EVERY DEPLOY
+const CACHE_VERSION = "v6"; // ← INCREMENT THIS ON EVERY DEPLOY
 
 // Deployment checklist reminder (logged to DevTools console)
 // This helps catch forgotten cache version bumps during development
@@ -81,9 +81,10 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
   // 1. API calls — Network only, no cache
+// 1. API calls — Network only, no cache
   if (url.pathname.startsWith("/api/")) {
     e.respondWith(
-      fetch(e.request, { credentials: "include" }).catch(() => {
+      fetch(e.request).catch(() => {
         return new Response(
           JSON.stringify({ ok: false, message: "You are offline. Please reconnect." }),
           {
