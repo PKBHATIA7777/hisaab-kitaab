@@ -185,38 +185,51 @@ app.use((req, res, next) => {
 
 // ── PHASE 5: PRODUCTION INFRASTRUCTURE ───────────────────────
 // STEP 16 — Rate Limit Fixes (CROSS-003): Per-email OTP limiter
-// ADD a Map-based per-email OTP limiter (no extra library needed):
-const otpEmailLimiter = (() => {
-  const attempts = new Map(); // email → { count, resetAt }
-  const MAX = 5;
-  const WINDOW = 15 * 60 * 1000; // 15 min
-
-  return (req, res, next) => {
-    // Only apply to OTP request endpoints
-    const email = (req.body?.email || "").toLowerCase().trim();
-    if (!email) return next();
-
-    const now = Date.now();
-    const record = attempts.get(email);
-
-    if (record && now < record.resetAt) {
-      if (record.count >= MAX) {
-        log.warn({ email, count: record.count }, "OTP rate limit exceeded per email");
-        return res.status(429).json({
-          ok: false,
-          message: "Too many code requests for this email. Please wait 15 minutes.",
-        });
-      }
-      record.count++;
-    } else {
-      attempts.set(email, { count: 1, resetAt: now + WINDOW });
+// ADD a Database-backed per-email OTP limiter (survives server restarts):
+// Database-backed OTP rate limiter — survives server restarts.
+// Uses the existing 'otps' table to count recent OTP requests per email.
+// No new tables or packages needed.
+async function otpEmailLimiter(req, res, next) {
+  const email = (req.body?.email || "").toLowerCase().trim();
+  if (!email) return next();
+  
+  try {
+    // Count OTP requests for this email in the last 15 minutes
+    // We count rows in the otps table — each request creates/updates one row.
+    // The 'created_at' column tracks when the last OTP was issued.
+    const { rows } = await db.query(
+      `SELECT COUNT(*) as request_count,
+              MAX(created_at) as last_request
+       FROM otps
+       WHERE email = $1 
+         AND created_at > NOW() - INTERVAL '15 minutes'`,
+      [email]
+    );
+    
+    const count = parseInt(rows[0]?.request_count || '0');
+    
+    // Allow max 5 OTP requests per email per 15 minutes
+    if (count >= 5) {
+      const lastRequest = rows[0]?.last_request;
+      log.warn({ email, count }, "OTP rate limit exceeded per email (DB-backed)");
+      return res.status(429).json({
+        ok: false,
+        message: "Too many verification code requests. Please wait 15 minutes before trying again.",
+        retryAfter: 900 // 15 minutes in seconds
+      });
     }
-
+    
     next();
-  };
-})();
+  } catch (err) {
+    // If DB check fails, allow the request through (fail open for OTP)
+    // This prevents DB outages from completely blocking login
+    log.error({ err, email }, "OTP rate limiter DB check failed — allowing request");
+    next();
+  }
+}
 
 // Apply to OTP request routes (BEFORE authLimiter):
+// Note: These are now async middleware — Express 4/5 handles this correctly
 app.use("/api/auth/register/request-otp", otpEmailLimiter);
 app.use("/api/auth/login/otp-request", otpEmailLimiter);
 app.use("/api/auth/forgot/request-otp", otpEmailLimiter);
@@ -341,29 +354,61 @@ app.use("/api/friends", friendRoutes);
 // ✅ NEW route registrations
 app.use("/api/categories", categoryRoutes);
 
-// 🔍 STEP 23 — Enhanced Health Check & Readiness Probe
-app.get("/api/health", async (req, res) => {
-  const checks = { status: "ok", timestamp: new Date().toISOString() };
+// ── BASIC OBSERVABILITY METRICS (PHASE-8-STEP-3) ─────────────
+// Track request counts and errors for basic observability
+const _metrics = {
+  requests: 0,
+  errors: 0,
+  startTime: Date.now(),
+  lastOtpSentAt: null,
+};
 
-  // DB connectivity check
+// Increment request counter on every request
+app.use((req, res, next) => {
+  _metrics.requests++;
+  const originalEnd = res.end;
+  res.end = function(...args) {
+    if (res.statusCode >= 500) _metrics.errors++;
+    return originalEnd.apply(this, args);
+  };
+  next();
+});
+
+// 🔍 STEP 23 — Enhanced Health Check & Readiness Probe with Metrics
+app.get("/api/health", async (req, res) => {
+  const checks = { 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor((Date.now() - _metrics.startTime) / 1000) + 's',
+    requests: _metrics.requests,
+    errors: _metrics.errors,
+    errorRate: _metrics.requests > 0 
+      ? (((_metrics.errors / _metrics.requests) * 100).toFixed(2) + '%')
+      : '0%',
+    memory: (() => {
+      const mem = process.memoryUsage();
+      return {
+        rss: Math.round(mem.rss / 1024 / 1024) + 'MB',
+        heap: Math.round(mem.heapUsed / 1024 / 1024) + 'MB',
+      };
+    })(),
+  };
+
   try {
+    const start = Date.now();
     await db.query("SELECT 1");
-    checks.database = "ok";
+    checks.database = `ok (${Date.now() - start}ms)`;
   } catch (err) {
     checks.database = "error";
     checks.status = "degraded";
     log.error({ err }, "Health check: Database connection failed");
   }
 
-  // Optional: Add more checks here (Redis, external APIs, etc.)
-  // Example:
-  // try {
-  //   await redis.ping();
-  //   checks.redis = "ok";
-  // } catch (err) {
-  //   checks.redis = "error";
-  //   checks.status = "degraded";
-  // }
+  // Check Neon connection pool
+  try {
+    const { rows } = await db.query("SELECT COUNT(*) as active FROM pg_stat_activity WHERE state = 'active'");
+    checks.dbConnections = rows[0]?.active || 'unknown';
+  } catch(_) {}
 
   const statusCode = checks.status === "ok" ? 200 : 503;
   res.status(statusCode).json(checks);

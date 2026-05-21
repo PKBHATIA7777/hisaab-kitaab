@@ -716,6 +716,43 @@ function initPasswordValidation() {
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    // ── Global error handlers ─────────────────────────────────
+    // Catch unhandled promise rejections (network failures, API errors, etc.)
+    window.addEventListener('unhandledrejection', event => {
+      const err = event.reason;
+      
+      // Don't show toast for aborted requests (user navigated away)
+      if (err?.name === 'AbortError') return;
+      
+      // Don't show for 401 (handled by apiFetch redirect)
+      if (err?.status === 401) return;
+      
+      console.error('[Unhandled Rejection]:', err);
+      
+      // Show user-friendly toast for unexpected errors
+      if (window.showToast) {
+        const message = err?.message || 'Something went wrong. Please try again.';
+        // Only show network-related errors to user — internal errors are too technical
+        if (err?.isOffline || err?.isTimeout || err?.isServerError || err?.isRateLimit) {
+          showToast(message, 'error');
+        } else {
+          showToast('Something went wrong. Please refresh if the issue persists.', 'error');
+        }
+      }
+      
+      // Prevent default browser error logging in production
+      event.preventDefault();
+    });
+    
+    // Catch synchronous errors (coding bugs, missing elements, etc.)
+    window.addEventListener('error', event => {
+      console.error('[Global Error]:', event.error);
+      // Don't show to user — these are typically coding bugs, not user-actionable
+      // In future: send to error reporting service (Sentry, etc.)
+    });
+    
+    // ... rest of existing DOMContentLoaded code ...
+
     window.CSRFManager && window.CSRFManager.init();
     if (!document.getElementById("toast-container")) {
       const tc = document.createElement("div");
