@@ -127,8 +127,9 @@ async function loginRequestOtp(req, res) {
     await sendOtpEmail(email, "Your Hisaab-Kitaab login code", `Your login code is ${code}. It will expire in 10 minutes.`);
     return res.json({ ok: true, message: "Login OTP sent to your email" });
   } catch (err) {
-    console.error("loginRequestOtp error:", err);
-    return res.status(500).json({ ok: false, message: "Server error" });
+    console.error("loginRequestOtp error — message:", err.message);
+    console.error("loginRequestOtp error — stack:", err.stack);
+    return res.status(500).json({ ok: false, message: "Server error", detail: err.message });
   }
 }
 
@@ -224,8 +225,9 @@ async function registerRequestOtp(req, res) {
     await sendOtpEmail(email, "Your Hisaab-Kitaab verification code", `Your verification code is ${code}. It will expire in 10 minutes.`);
     return res.json({ ok: true, message: "OTP sent to your email address" });
   } catch (err) {
-    console.error("registerRequestOtp error:", err);
-    return res.status(500).json({ ok: false, message: "Server error" });
+    console.error("registerRequestOtp error — message:", err.message);
+    console.error("registerRequestOtp error — stack:", err.stack);
+    return res.status(500).json({ ok: false, message: "Server error", detail: err.message });
   }
 }
 
