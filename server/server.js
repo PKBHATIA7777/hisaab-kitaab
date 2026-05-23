@@ -354,6 +354,10 @@ app.use("/api/friends", friendRoutes);
 // ✅ NEW route registrations
 app.use("/api/categories", categoryRoutes);
 
+// ── WARM UP EMAIL CONNECTION ON STARTUP ──────────────────────
+// Import the warmUp function and call it after server starts
+const { warmUpEmailConnection } = require("./utils/email");
+
 // ── BASIC OBSERVABILITY METRICS (PHASE-8-STEP-3) ─────────────
 // Track request counts and errors for basic observability
 const _metrics = {
@@ -491,4 +495,7 @@ app.listen(PORT, () => {
   console.log(`🔒 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`⚡ Rate Limits: Global=${isProduction ? 100 : 1000}/15min | Write=${isProduction ? 30 : 100}/min`);
   log.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
+  
+  // Warm up email connection in background (non-blocking)
+  warmUpEmailConnection().catch(() => {}); // ← ADD THIS LINE ONLY
 });

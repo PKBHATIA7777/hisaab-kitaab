@@ -120,12 +120,14 @@ const CONFIG = {
       }
 
       const controller = new AbortController();
-      // Render cold starts can take 30-60s on free tier.
-      // OTP endpoints need extra time for cold Render starts (can take 60s)
-      // We give 90s for OTP specifically, 70s for other auth, 30s for data
+      // Timeout strategy:
+      // - OTP send: 25s (email should send in <10s with persistent transport)
+      // - Other auth: 30s (login, register complete)
+      // - Data endpoints: 20s
+      // Note: We no longer need 90s timeouts since email uses persistent SMTP pool
       const isAuthEndpoint = path.includes('/auth/');
       const isOtpEndpoint = path.includes('/otp') || path.includes('request-otp');
-      const timeoutMs = isOtpEndpoint ? 90000 : (isAuthEndpoint ? 70000 : 30000);
+      const timeoutMs = isOtpEndpoint ? 25000 : (isAuthEndpoint ? 30000 : 20000);
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       let res;
@@ -281,6 +283,7 @@ if (res.status === 401) {
         const error = new Error(data.message || `Request failed (${res.status})`);
         error.status = res.status;
         error.data = data;
+        error.retryable = data.retryable || false;
         throw error;
       }
       return data;

@@ -85,7 +85,14 @@ async function handleEmailSubmit(e) {
     attachOtpAutoSubmit();
 
   } catch (err) {
-    showToast(err.message || "Failed to send code", "error");
+    const msg = err.message || "Failed to send code";
+    if (err.status === 503 || err.retryable) {
+      showToast(msg + " Please try again.", "error");
+    } else if (err.isTimeout) {
+      showToast("Request timed out — please try again.", "error");
+    } else {
+      showToast(msg, "error");
+    }
     document.querySelector('.auth-card').classList.add('shake-card');
     setTimeout(() => document.querySelector('.auth-card').classList.remove('shake-card'), 500);
   } finally {

@@ -270,7 +270,15 @@ async function requestLoginOtp(targetBtn = null) {
     }
 
   } catch (err) {
-    showToast(err.message || "Failed to send code", "error");
+    const msg = err.message || "Failed to send code";
+    // 503 = email service temporarily down, suggest retry
+    if (err.status === 503 || err.retryable) {
+      showToast(msg + " Tap again to retry.", "error");
+    } else if (err.isTimeout) {
+      showToast("Request timed out — server may be starting up. Please try again.", "error");
+    } else {
+      showToast(msg, "error");
+    }
   } finally {
     // STEP 5 Part C: Reset the in-flight flag
     otpRequestInFlight = false;
@@ -292,7 +300,7 @@ function switchToPasswordMode() {
 async function handlePasswordSubmit(e) {
   e.preventDefault();
   const password = document.getElementById('input-password').value;
-  const rememberMe = document.querySelector('input[name="rememberMe"]').checked;
+  const rememberMe = document.querySelector('input[name="rememberMe"]')?.checked ?? true;
   const btn = document.getElementById('btn-login-pass');
 
   setBtnLoading(btn, true);
