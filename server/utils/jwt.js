@@ -2,14 +2,17 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
-const SHORT_AGE = "15d";
-const LONG_AGE  = "90d";
-const SHORT_MS  = 15 * 24 * 60 * 60 * 1000;
-const LONG_MS   = 90 * 24 * 60 * 60 * 1000;
+// 60-day sliding window for all login methods.
+// Every login resets the 60-day clock — user is only logged out
+// if they don't open the app for 60 consecutive days.
+const SHORT_AGE = "60d";
+const LONG_AGE  = "60d";
+const SHORT_MS  = 60 * 24 * 60 * 60 * 1000;
+const LONG_MS   = 60 * 24 * 60 * 60 * 1000;
 
-// Refresh token configuration
+// Refresh token configuration — matches access token window
 const REFRESH_TOKEN_BYTES = 48;
-const REFRESH_TOKEN_TTL_DAYS = 90;
+const REFRESH_TOKEN_TTL_DAYS = 60;
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -99,7 +102,9 @@ async function revokeAllRefreshTokens(db, userId) {
 }
 
 function sendAuthCookie(res, token, remember = false) {
-  const maxAgeMs = remember ? LONG_MS : SHORT_MS;
+  // Always use 60-day window — remember flag kept for API compatibility
+  // but both paths use the same duration (sliding 60-day window)
+  const maxAgeMs = LONG_MS; // Always 60 days
   res.cookie("auth_token", token, getCookieOptions(maxAgeMs, true));
   // session_expiry is intentionally httpOnly:false so JS can read it for the
   // "session expiring soon" warning. But we keep all other options identical

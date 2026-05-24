@@ -49,10 +49,10 @@ router.post("/forgot/request-otp", forgotRequestOtp);
 router.post("/forgot/reset", resetPassword);
 
 // user
-router.get("/me", me);
+router.get("/me", requireAuth, me);
 router.patch("/profile", requireAuth, updateProfile);
 
-router.post("/logout", logout);
+router.post("/logout", requireAuth, logout);
 
 // Session refresh — extends auth without requiring re-login
 // Must be accessible without a valid auth_token (called when token may be expired)

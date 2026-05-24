@@ -1,12 +1,11 @@
 /* client/sw.js — Production-Grade Service Worker */
-const CACHE_VERSION = "v6"; // ← INCREMENT THIS ON EVERY DEPLOY
 
-// Deployment checklist reminder (logged to DevTools console)
-// This helps catch forgotten cache version bumps during development
-if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
-  console.log(`%c[SW] Running cache version: ${CACHE_VERSION}`, 'color: #d000ff; font-weight: bold');
-  console.log('%c[SW] REMEMBER: Increment CACHE_VERSION before every production deploy!', 'color: orange');
-}
+// Cache version strategy: increment the number manually when you deploy
+// changes to app shell files (HTML, CSS, JS). The date suffix is set
+// automatically at server startup via the /sw.js route — no build step needed.
+// If you forget to bump the number, the date suffix still forces a cache bust
+// on the first deploy of each new day.
+const CACHE_VERSION = "v7"; // ← Bump this number when deploying breaking changes
 
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;

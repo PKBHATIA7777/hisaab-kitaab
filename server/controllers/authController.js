@@ -141,19 +141,30 @@ async function loginVerifyOtp(req, res) {
     await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
     const user = await findUserByIdentifier(email.trim().toLowerCase());
     if (!user) return res.status(400).json({ ok: false, message: "User not found" });
-    // Always remember — this is a consumer app where UX > strict session management.
-    // Users can explicitly log out via the device management screen.
+    // Always remember — 60-day sliding window for all login methods
     const remember = true;
     // UPDATED: Include jwt_generation in token payload
     const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
     const token = createToken(tokenPayload, remember);
     sendAuthCookie(res, token, remember);
 
+    // Issue refresh token for silent session renewal (60-day sliding window)
+    const { issueRefreshToken } = require("../utils/jwt");
+    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
+    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    res.cookie("refresh_token", rawRefresh, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+      path: "/api/auth/refresh",
+    });
+
     // Register device session for multi-device management (non-blocking)
     const decoded = require('jsonwebtoken').decode(token);
     registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
 
-    return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS) });
+    return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + LONG_MS });
   } catch (err) {
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
     return res.status(status).json({ ok: false, message: err.message });
@@ -180,8 +191,11 @@ async function verifyOtpLogic(email, otp, purpose) {
   // Always perform constant-time comparison — even if row doesn't exist
   // This prevents timing-based "does this email have a pending OTP" enumeration
   const expectedCode = otpRow?.code || "000000";
-  const inputBuf = Buffer.alloc(6, cleanOtp);
-  const expectedBuf = Buffer.alloc(6, expectedCode);
+
+  // FIX: Use Buffer.from() not Buffer.alloc() — alloc fills with repeated byte,
+  // not the string. Both buffers must be same length for timingSafeEqual.
+  const inputBuf = Buffer.from(cleanOtp.padEnd(6, '0').slice(0, 6));
+  const expectedBuf = Buffer.from(expectedCode.padEnd(6, '0').slice(0, 6));
 
   // Constant-time comparison
   const match = crypto.timingSafeEqual(inputBuf, expectedBuf);
@@ -359,6 +373,18 @@ async function registerComplete(req, res) {
       const token = createToken(tokenPayload);
       sendAuthCookie(res, token);
 
+      // Issue refresh token for silent session renewal (60-day sliding window)
+      const { issueRefreshToken } = require("../utils/jwt");
+      const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
+      const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+      res.cookie("refresh_token", rawRefresh, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+        path: "/api/auth/refresh",
+      });
+
       return res.json({
         ok: true,
         message: "Account created successfully",
@@ -386,19 +412,30 @@ async function login(req, res) {
     if (!user.password_hash) return res.status(400).json({ ok: false, message: "This account uses Google/OTP login." });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ ok: false, message: "Invalid credentials" });
-    // Always remember — this is a consumer app where UX > strict session management.
-    // Users can explicitly log out via the device management screen.
+    // Always remember — 60-day sliding window for all login methods
     const remember = true;
     // UPDATED: Include jwt_generation in token payload
     const tokenPayload = { userId: user.id.toString(), gen: user.jwt_generation ?? 0 };
     const token = createToken(tokenPayload, remember);
     sendAuthCookie(res, token, remember);
 
+    // Issue refresh token for silent session renewal (60-day sliding window)
+    const { issueRefreshToken } = require("../utils/jwt");
+    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
+    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    res.cookie("refresh_token", rawRefresh, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+      path: "/api/auth/refresh",
+    });
+
     // Register device session for multi-device management (non-blocking)
     const decoded = require('jsonwebtoken').decode(token);
     registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
 
-    return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + (remember ? LONG_MS : SHORT_MS) });
+    return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + LONG_MS });
   } catch (err) {
     console.error("login error:", err);
     return res.status(500).json({ ok: false, message: "Server error" });
@@ -468,6 +505,18 @@ if (!user) {
     const token = createToken(tokenPayload, true);
     sendAuthCookie(res, token, true);
 
+    // Issue refresh token for silent session renewal (60-day sliding window)
+    const { issueRefreshToken } = require("../utils/jwt");
+    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
+    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    res.cookie("refresh_token", rawRefresh, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+      path: "/api/auth/refresh",
+    });
+
     // Register device session for multi-device management (non-blocking)
     const decoded = require('jsonwebtoken').decode(token);
     registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
@@ -493,7 +542,33 @@ async function setPassword(req, res) {
     if (!user.needs_password && user.password_hash) return res.status(400).json({ ok: false, message: "Password is already set" });
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await db.query(`UPDATE users SET password_hash = $1, needs_password = FALSE, updated_at = NOW() WHERE id = $2`, [passwordHash, user.id]);
+
+    // Invalidate all other sessions — password change should kick out all other devices.
+    // The current device gets a fresh token below so it stays logged in.
+    await Promise.all([
+      incrementJwtGeneration(user.id),
+      revokeAllRefreshTokens(db, user.id),
+    ]);
     invalidateUserCache(user.id);
+
+    // Re-fetch user to get the new jwt_generation, then issue a fresh token
+    // so the current device doesn't get kicked out by its own password change.
+    const updatedUser = await findUserById(user.id);
+    const newToken = createToken({ userId: updatedUser.id.toString(), gen: updatedUser.jwt_generation ?? 0 }, true);
+    sendAuthCookie(res, newToken, true);
+
+    // Issue a fresh refresh token for the current device
+    const { issueRefreshToken } = require("../utils/jwt");
+    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
+    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    res.cookie("refresh_token", rawRefresh, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 60 * 24 * 60 * 60 * 1000,
+      path: "/api/auth/refresh",
+    });
+
     return res.json({ ok: true, message: "Password set successfully" });
   } catch (err) {
     console.error("setPassword error:", err);
@@ -551,7 +626,15 @@ async function resetPassword(req, res) {
     if (!user) return res.status(400).json({ ok: false, message: "User not found for this email" });
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await db.query(`UPDATE users SET password_hash = $1, needs_password = FALSE, updated_at = NOW() WHERE id = $2`, [passwordHash, user.id]);
+
+    // Invalidate ALL existing sessions — if someone reset their password,
+    // all other devices (including any attacker) must re-authenticate.
+    await Promise.all([
+      incrementJwtGeneration(user.id),
+      revokeAllRefreshTokens(db, user.id),
+    ]);
     invalidateUserCache(user.id);
+
     await db.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpRow.id]);
     return res.json({ ok: true, message: "Password reset successfully" });
   } catch (err) {
@@ -562,48 +645,50 @@ async function resetPassword(req, res) {
 
 async function me(req, res) {
   try {
-    const token = req.cookies.auth_token;
-    if (!token) return res.status(401).json({ ok: false, message: "Not authenticated" });
-    let payload;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET); } catch { return res.status(401).json({ ok: false, message: "Invalid token" }); }
-    const user = await findUserById(payload.userId);
+    // requireAuth middleware has already verified the token and set req.user.
+    // We still need the full user record for profile data and token sliding.
+    const user = await findUserById(req.user.userId);
     if (!user) return res.status(401).json({ ok: false, message: "User not found" });
+
     const nowUnix = Math.floor(Date.now() / 1000);
-    const tokenAgeSeconds = nowUnix - payload.iat;
-    
-    // ✅ FIX 3: Increase refresh threshold from 5 days to 10 days to prevent cookie-write storm
-    const refreshThreshold = 10 * 24 * 60 * 60; // Refresh only after 10 days
-    
+    const tokenAgeSeconds = nowUnix - req.user.iat;
+
+    // Sliding window: refresh the token if it's older than 10 days.
+    // This resets the 60-day expiry clock on active users.
+    const refreshThreshold = 10 * 24 * 60 * 60; // 10 days
+
     if (tokenAgeSeconds > refreshThreshold) {
-      const originalDuration = payload.exp - payload.iat;
-      const TWENTY_DAYS_SECONDS = 20 * 24 * 60 * 60;
-      const isRemembered = originalDuration > TWENTY_DAYS_SECONDS;
-      // UPDATED: Include jwt_generation in token payload
-      const newToken = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, isRemembered);
-      sendAuthCookie(res, newToken, isRemembered);
+      const newToken = createToken({ userId: user.id.toString(), gen: user.jwt_generation ?? 0 }, true);
+      sendAuthCookie(res, newToken, true);
     }
-    return res.json({ ok: true, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email, lastLoginAt: user.last_login_at, needsPassword: user.needs_password } });
+
+    return res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        realName: user.real_name,
+        username: user.username,
+        email: user.email,
+        lastLoginAt: user.last_login_at,
+        needsPassword: user.needs_password,
+      },
+    });
   } catch (err) {
     console.error("me error:", err);
     return res.status(500).json({ ok: false, message: "Server error in me" });
   }
 }
 
-// UPDATED: Made async and added jwt_generation increment + cache invalidation + refresh token revocation
+// requireAuth middleware guarantees req.user is set before this runs
 async function logout(req, res) {
   try {
-    // Revoke all sessions for this user
-    const userId = req.user?.userId;
-    if (userId) {
-      await Promise.all([
-        incrementJwtGeneration(userId),
-        revokeAllRefreshTokens(db, userId),
-      ]);
-      // Also invalidate the auth middleware cache
-      invalidateUserCache(userId);
-    }
+    const userId = req.user.userId;
+    await Promise.all([
+      incrementJwtGeneration(userId),
+      revokeAllRefreshTokens(db, userId),
+    ]);
+    invalidateUserCache(userId);
     clearAuthCookies(res);
-    // Clear refresh token cookie
     res.cookie("refresh_token", "", {
       httpOnly: true,
       secure: isProduction,
@@ -614,7 +699,7 @@ async function logout(req, res) {
     return res.json({ ok: true, message: "Logged out" });
   } catch (err) {
     console.error("logout error:", err);
-    // Even if DB fails, clear cookies
+    // Even if DB fails, clear cookies so the user is logged out client-side
     clearAuthCookies(res);
     return res.json({ ok: true, message: "Logged out" });
   }
@@ -754,7 +839,7 @@ async function refreshSession(req, res) {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 90 * 24 * 60 * 60 * 1000,
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days — matches sliding window
       path: "/api/auth/refresh",
     });
 

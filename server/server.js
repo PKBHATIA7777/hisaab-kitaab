@@ -422,6 +422,33 @@ app.use("/api", (req, res) => {
   res.status(404).json({ ok: false, message: "API endpoint not found" });
 });
 
+// ── SERVICE WORKER — Auto cache-bust without a build step ────
+// Reads sw.js, appends today's date to CACHE_VERSION so returning users
+// always get fresh assets after a deploy. No CI/CD or build tooling needed.
+// The date changes at midnight UTC — worst case a user gets stale assets
+// for <24h, which is acceptable for this app.
+const fs = require("fs");
+const swPath = path.join(__dirname, "../client/sw.js");
+app.get("/sw.js", (req, res) => {
+  try {
+    let swContent = fs.readFileSync(swPath, "utf8");
+    // Inject today's date into the CACHE_VERSION constant
+    // e.g. "v7" becomes "v7-20260524"
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    swContent = swContent.replace(
+      /const CACHE_VERSION = "(v\d+)";/,
+      `const CACHE_VERSION = "$1-${today}";`
+    );
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Service-Worker-Allowed", "/");
+    res.send(swContent);
+  } catch (err) {
+    log.error({ err }, "Failed to serve sw.js");
+    res.status(500).send("// Service worker unavailable");
+  }
+});
+
 app.use(express.static(path.join(__dirname, "../client")));
 app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, "../client/index.html"));
