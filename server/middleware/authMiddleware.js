@@ -63,10 +63,14 @@ async function requireAuth(req, res, next) {
       userCache.set(userId, userData);
       pruneCache();
     } catch (err) {
-      // DB hiccup — don't lock users out, log and continue
+      // AUTH-08 FIX: Fail closed on DB error.
+      // Failing open would allow revoked sessions (post-logout, post-password-change)
+      // to remain valid during a DB outage. A brief 503 is the safer trade-off.
       console.error("requireAuth DB error:", err.message);
-      req.user = payload;
-      return next();
+      return res.status(503).json({
+        ok: false,
+        message: "Service temporarily unavailable. Please try again in a moment.",
+      });
     }
   }
 

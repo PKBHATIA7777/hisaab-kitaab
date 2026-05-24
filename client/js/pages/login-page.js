@@ -41,8 +41,15 @@ const els = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // AUTH-06 FIX: Only pre-fill email if user previously checked "Remember me"
+  const rememberMe = localStorage.getItem('remember_me') === 'true';
   const lastUser = localStorage.getItem('last_user');
-  if (lastUser) els.inputIdentifier.value = lastUser;
+  if (rememberMe && lastUser) {
+    els.inputIdentifier.value = lastUser;
+  }
+  // Sync the checkbox state with what was previously saved
+  const checkbox = document.getElementById('remember-me-checkbox');
+  if (checkbox) checkbox.checked = rememberMe !== false; // default true on first visit
   if (window.initPasswordToggles) initPasswordToggles();
 });
 
@@ -81,7 +88,16 @@ async function handleIdentifierSubmit(e) {
 
     if (res.exists) {
       userContext = { ...res, identifier };
-      localStorage.setItem('last_user', identifier);
+      // AUTH-06 FIX: Only save email to localStorage if "Remember me" is checked
+      const rememberCheckbox = document.getElementById('remember-me-checkbox');
+      const shouldRemember = rememberCheckbox ? rememberCheckbox.checked : true;
+      if (shouldRemember) {
+        localStorage.setItem('last_user', identifier);
+        localStorage.setItem('remember_me', 'true');
+      } else {
+        localStorage.removeItem('last_user');
+        localStorage.setItem('remember_me', 'false');
+      }
       transitionToStep2();
     } else {
       showToast("Account not found. Please create an account.", "error");
@@ -351,7 +367,9 @@ async function handleOtpSubmit(e) {
 }
 
 function loginSuccess(data) {
-  if (data.sessionExpiresAt) localStorage.setItem("sessionExpiresAt", data.sessionExpiresAt);
+  // AUTH-10 FIX: Do not store sessionExpiresAt in localStorage — it's client-controlled
+  // and can be manipulated to suppress expiry warnings. The session_expiry cookie
+  // (set server-side, httpOnly:false so JS can read it) is the authoritative source.
   if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
   window.location.href = "dashboard.html";
 }

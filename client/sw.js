@@ -29,7 +29,7 @@ const WARM_CACHE_ASSETS = [
   "/js/core/csrf.js",
   "/js/core/session.js",
   "/js/main.js",
-  "/js/pwa-install.js",
+  "/js/pwa/install-manager.js",  // ← Fixed: was incorrectly /js/pwa-install.js
   "/js/pwa/offline-queue.js",  // ← Added: offline request queue for background sync
 ];
 

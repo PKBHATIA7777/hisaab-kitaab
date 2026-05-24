@@ -283,6 +283,7 @@
     <!-- ADD THIS as the first script in every HTML file, before any other scripts -->
 <script src="js/core/storage.js"></script>
 <script src="js/core/sanitize.js"></script>
+<script src="js/pwa/install-manager.js"></script>
     <script src="js/core/csrf.js"></script>
     <script src="js/core/session.js"></script>
     <script src="js/main.js"></script>
@@ -324,6 +325,7 @@
     </div>
   </footer>
 
+  <!-- PWA install prompt HTML (must be in DOM for install-manager.js to find it) -->
   <div id="pwa-install-prompt" class="pwa-popup hidden">
     <div class="pwa-popup-content">
       <div class="pwa-icon">📱</div>
@@ -337,7 +339,5 @@
       </div>
     </div>
   </div>
-
-  <script src="js/pwa/install-manager.js"></script>
 </body>
 </html>

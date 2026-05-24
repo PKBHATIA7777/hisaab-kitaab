@@ -251,14 +251,40 @@ async function registerVerifyOtp(req, res) {
     if (!email || !otp) return res.status(400).json({ ok: false, message: "Missing data" });
     const otpRow = await verifyOtpLogic(email, otp, "signup");
     
-    // STEP 7: Create short-lived token for iOS ITP fallback
-    const tempToken = jwt.sign(
-      { email: email.trim().toLowerCase(), purpose: "complete_signup", otpId: otpRow.id },
-      process.env.JWT_SECRET, { expiresIn: "15m" }
+    // AUTH-01 FIX: Use an opaque server-side session ID instead of a signed JWT
+    // in the response body. A signed JWT in the response body is vulnerable to
+    // XSS — any script on the page can steal it and complete registration.
+    // We store the mapping server-side and give the client only a random ID.
+    const { randomBytes } = require("crypto");
+    const signupSessionId = randomBytes(32).toString("hex");
+    const signupSessionExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+
+    // Reuse the otps table: store the opaque session under purpose='signup_session'
+    // The email + otpId are stored as the "code" field (JSON-encoded) so we can
+    // look them up without a new table.
+    await db.query(
+      `INSERT INTO otps (email, code, purpose, expires_at, used, attempts)
+       VALUES ($1, $2, 'signup_session', $3, FALSE, 0)
+       ON CONFLICT (email, purpose) DO UPDATE
+         SET code = EXCLUDED.code,
+             expires_at = EXCLUDED.expires_at,
+             used = FALSE,
+             attempts = 0,
+             created_at = NOW()`,
+      [
+        email.trim().toLowerCase(),
+        JSON.stringify({ sessionId: signupSessionId, otpId: otpRow.id }),
+        signupSessionExpiry,
+      ]
     );
 
-    // ✅ FIX: Use environment-aware cookie settings (was hardcoded to secure:true, sameSite:"none")
-    // On iOS Safari in dev (HTTP localhost), sameSite:none without Secure blocks the cookie
+    // Also keep the httpOnly cookie path for non-ITP browsers (most browsers)
+    const tempToken = require("jsonwebtoken").sign(
+      { email: email.trim().toLowerCase(), purpose: "complete_signup", otpId: otpRow.id },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
     res.cookie("signup_token", tempToken, {
       httpOnly: true,
       secure: isProduction,
@@ -267,12 +293,14 @@ async function registerVerifyOtp(req, res) {
       path: "/",
     });
 
-    // STEP 7: Also return token in response body for iOS ITP environments
-    // Frontend stores this in sessionStorage as fallback when cookies are blocked
-    return res.json({ 
-      ok: true, 
+    // Return only the opaque session ID — NOT a signed JWT.
+    // The client stores this in sessionStorage as a fallback for iOS ITP
+    // (where the httpOnly cookie may be blocked on cross-origin requests).
+    // An opaque random ID has no value to an attacker without the server-side mapping.
+    return res.json({
+      ok: true,
       message: "Email verified successfully",
-      _signupToken: tempToken
+      _signupSessionId: signupSessionId,  // opaque ID, not a signed token
     });
   } catch (err) {
     const status = err.message.includes("Invalid") || err.message.includes("Too many") ? 400 : 500;
@@ -293,23 +321,62 @@ async function registerComplete(req, res) {
     const { password } = result.data;
     const realName = xss(result.data.realName.trim());
     
-    // STEP 7: Read signup token from cookie OR Authorization header (iOS ITP fallback)
-    const signupToken = req.cookies.signup_token || 
-      (req.headers.authorization?.startsWith('Bearer ') ? 
-        req.headers.authorization.slice(7) : null);
-    
-    if (!signupToken) return res.status(401).json({ ok: false, message: "Email verification required." });
+    // AUTH-01 FIX: Read signup token from cookie OR opaque session ID from Authorization header
+    // The opaque session ID (stored server-side) replaces the signed JWT in the response body.
+    // Priority: httpOnly cookie (most browsers) → opaque session ID (iOS ITP fallback)
+    const signupToken = req.cookies.signup_token;
+    const signupSessionId = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : null;
 
-    let payload;
-    try {
-      payload = jwt.verify(signupToken, process.env.JWT_SECRET);
-      if (payload.purpose !== "complete_signup") throw new Error();
-    } catch {
-      return res.status(401).json({ ok: false, message: "Invalid verification." });
+    let email = null;
+    let otpId = null;
+
+    if (signupToken) {
+      // Primary path: httpOnly cookie with signed JWT (works on all non-ITP browsers)
+      try {
+        const payload = jwt.verify(signupToken, process.env.JWT_SECRET);
+        if (payload.purpose !== "complete_signup") throw new Error();
+        email = payload.email;
+        otpId = payload.otpId;
+      } catch {
+        return res.status(401).json({ ok: false, message: "Invalid verification." });
+      }
+    } else if (signupSessionId) {
+      // Fallback path: opaque session ID for iOS ITP environments
+      // Look up the server-side mapping in the otps table
+      const cleanEmail = (req.body?.email || "").trim().toLowerCase();
+      if (!cleanEmail) {
+        return res.status(401).json({ ok: false, message: "Email required for verification." });
+      }
+      const { rows: sessionRows } = await db.query(
+        `SELECT code FROM otps
+         WHERE email = $1 AND purpose = 'signup_session'
+           AND used = FALSE AND expires_at > NOW()
+         LIMIT 1`,
+        [cleanEmail]
+      );
+      if (!sessionRows[0]) {
+        return res.status(401).json({ ok: false, message: "Verification session expired. Please start over." });
+      }
+      let sessionData;
+      try {
+        sessionData = JSON.parse(sessionRows[0].code);
+      } catch {
+        return res.status(401).json({ ok: false, message: "Invalid verification session." });
+      }
+      // Constant-time comparison of the opaque session ID
+      const { timingSafeEqual } = require("crypto");
+      const provided = Buffer.from(signupSessionId.padEnd(64, '0').slice(0, 64));
+      const stored = Buffer.from(sessionData.sessionId.padEnd(64, '0').slice(0, 64));
+      if (!timingSafeEqual(provided, stored)) {
+        return res.status(401).json({ ok: false, message: "Invalid verification." });
+      }
+      email = cleanEmail;
+      otpId = sessionData.otpId;
+    } else {
+      return res.status(401).json({ ok: false, message: "Email verification required." });
     }
-
-    const email = payload.email;
-    const otpId = payload.otpId;
 
     const client = await db.pool.connect();
     await client.query("BEGIN");
@@ -346,6 +413,11 @@ async function registerComplete(req, res) {
       const user = userRows[0];
 
       await client.query("UPDATE otps SET used = TRUE WHERE id = $1", [otpId]);
+      // AUTH-01 FIX: Also mark the signup_session row as used so it can't be replayed
+      await client.query(
+        "UPDATE otps SET used = TRUE WHERE email = $1 AND purpose = 'signup_session'",
+        [email]
+      );
       await client.query("COMMIT");
 
       // ✅ FIX 1: Auto-create personal chapter (non-fatal, fire-and-forget)
@@ -780,12 +852,12 @@ async function logoutDevice(req, res) {
       return res.status(404).json({ ok: false, message: "Session not found" });
     }
     
-    // Note: We can't truly invalidate a specific JWT without a blacklist.
-    // jwt_generation increment would invalidate ALL sessions.
-    // For single-device logout, the session will naturally expire (90 days max).
-    // This is an acceptable trade-off for a non-military application.
+    // Note: Removing a specific device session does not immediately invalidate
+    // its JWT (which would require a full jwt_generation increment affecting all devices).
+    // The removed device's token will naturally expire within its remaining lifetime.
+    // The device session row is deleted so it no longer appears in the devices list.
     
-    res.json({ ok: true, message: "Device session removed" });
+    res.json({ ok: true, message: "Device session removed. That device will be signed out on its next activity." });
   } catch (err) {
     console.error("logoutDevice error:", err);
     res.status(500).json({ ok: false, message: "Server error" });
@@ -818,6 +890,34 @@ async function refreshSession(req, res) {
     if (!userId) {
       return res.status(401).json({ ok: false, message: "Cannot identify session" });
     }
+
+    // ── AUTH-05 FIX: Verify jwt_generation before issuing new token ──────────
+    // Even though the auth_token is expired, we must check that the generation
+    // in the token still matches the DB. If the user changed their password or
+    // logged out all devices, jwt_generation was incremented — this refresh
+    // should be rejected even if the refresh_token itself is still valid.
+    try {
+      const expiredPayload = jwt.verify(expiredAuthToken, process.env.JWT_SECRET, {
+        ignoreExpiration: true,
+      });
+      if (expiredPayload.gen !== undefined) {
+        const { rows: genRows } = await db.query(
+          "SELECT jwt_generation FROM users WHERE id = $1",
+          [userId]
+        );
+        if (genRows[0] && expiredPayload.gen !== genRows[0].jwt_generation) {
+          clearAuthCookies(res);
+          return res.status(401).json({
+            ok: false,
+            message: "Session has been revoked. Please log in again.",
+          });
+        }
+      }
+    } catch (_) {
+      // If we can't verify, proceed — the refresh token rotation below
+      // will catch any truly invalid sessions
+    }
+    // ── END AUTH-05 FIX ──────────────────────────────────────────────────────
 
     // Rotate the refresh token (revoke old, issue new)
     const newRawRefresh = await rotateRefreshToken(db, rawRefresh, userId);

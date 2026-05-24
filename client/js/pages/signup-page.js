@@ -196,9 +196,11 @@ async function handleOtpSubmit(e) {
       body: { email: signupEmail, otp }
     });
 
-    // Store fallback token for iOS ITP environments
-    if (data._signupToken) {
-      try { sessionStorage.setItem('_st', data._signupToken); } catch(_) {}
+    // AUTH-01 FIX: Store only the opaque session ID (not a signed JWT) in sessionStorage.
+    // An opaque random ID has no value to an attacker — the actual session data
+    // lives server-side. This eliminates the XSS risk of storing a signed JWT.
+    if (data._signupSessionId) {
+      try { sessionStorage.setItem('_st', data._signupSessionId); } catch(_) {}
     }
 
     // Store verification proof in sessionStorage as fallback for iOS ITP
@@ -243,17 +245,20 @@ async function handleDetailsSubmit(e) {
   setBtnLoading(btn, true);
 
   try {
-    // STEP 7: Get fallback token for iOS ITP environments
-    let signupToken = null;
-    try { signupToken = sessionStorage.getItem('_st'); } catch(_) {}
+    // AUTH-01 FIX: Get the opaque session ID (not a signed JWT) for iOS ITP fallback
+    let signupSessionId = null;
+    try { signupSessionId = sessionStorage.getItem('_st'); } catch(_) {}
 
     await apiFetch("/auth/register/complete", {
       method: "POST",
-      // Pass token as Authorization header if cookie might not work on iOS
-      headers: signupToken ? { 'Authorization': `Bearer ${signupToken}` } : {},
+      // Pass opaque session ID as Authorization header if cookie might not work on iOS.
+      // Also send the email so the server can look up the session mapping.
+      headers: signupSessionId ? { 'Authorization': `Bearer ${signupSessionId}` } : {},
       body: {
         realName: formData.get("realName"),
-        password: formData.get("password")
+        password: formData.get("password"),
+        // Include email for the server-side session lookup (iOS ITP fallback path only)
+        email: signupEmail,
       }
     });
 

@@ -77,10 +77,23 @@ function timeAgo(timestamp) {
 document.addEventListener("DOMContentLoaded", async () => {
   renderSkeletons();
 
-  // ✅ NEW: Handle logout triggered by another tab (Cross-tab sync)
+  // AUTH-09 FIX: Soft banner then redirect on cross-tab logout
   if (typeof SessionManager !== 'undefined' && SessionManager.on) {
     SessionManager.on('logout', () => {
-      window.location.replace("login.html?expired=true");
+      // Show a non-intrusive banner before redirecting
+      const banner = document.createElement('div');
+      banner.style.cssText = `
+        position:fixed; top:0; left:0; width:100%; z-index:99999;
+        background:#333; color:#fff; text-align:center;
+        padding:12px 16px; font-family:var(--font-main); font-size:0.9rem;
+        font-weight:500; letter-spacing:0.2px;
+        animation: slideDown 0.3s ease;
+      `;
+      banner.textContent = "You've been logged out from another tab. Redirecting...";
+      document.body.prepend(banner);
+      setTimeout(() => {
+        window.location.replace("login.html?expired=true");
+      }, 2500);
     });
   }
 

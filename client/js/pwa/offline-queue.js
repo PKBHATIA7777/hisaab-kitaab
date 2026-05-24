@@ -67,10 +67,19 @@ const OfflineQueue = (() => {
     const pending = await getPending();
     if (pending.length === 0) return;
 
+    const MAX_RETRIES = 5;
     let successCount = 0;
     let failCount = 0;
+    const droppedItems = [];
 
     for (const item of pending) {
+      // INSTALL-07 FIX: Drop items that have exceeded the retry cap
+      if ((item.retries || 0) >= MAX_RETRIES) {
+        await remove(item.id);
+        droppedItems.push(item);
+        continue;
+      }
+
       try {
         const res = await fetch(
           (window.APP_CONFIG?.API_BASE || "/api") + item.path,
@@ -97,10 +106,14 @@ const OfflineQueue = (() => {
           // Client error — remove without retrying (bad request won't succeed)
           await remove(item.id);
           failCount++;
+        } else {
+          // 5xx — increment retry count and leave in queue for next flush
+          await _incrementRetries(item.id, item.retries || 0);
+          failCount++;
         }
-        // 5xx — leave in queue for next flush
       } catch (_) {
-        // Network error — leave in queue
+        // Network error — increment retry count and leave in queue
+        await _incrementRetries(item.id, item.retries || 0);
         failCount++;
       }
     }
@@ -110,6 +123,33 @@ const OfflineQueue = (() => {
       // Refresh the current page's data
       if (typeof window.loadExpenses === "function") window.loadExpenses();
     }
+
+    // INSTALL-07 FIX: Notify user about dropped items
+    if (droppedItems.length > 0 && window.showToast) {
+      window.showToast(
+        `${droppedItems.length} offline expense${droppedItems.length !== 1 ? "s" : ""} couldn't be saved — please re-enter ${droppedItems.length !== 1 ? "them" : "it"}.`,
+        "error"
+      );
+    }
+  }
+
+  // Increment retry count for a queued item
+  async function _incrementRetries(id, currentRetries) {
+    const idb = await initDB();
+    return new Promise((resolve) => {
+      const tx = idb.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const item = getReq.result;
+        if (item) {
+          item.retries = (currentRetries || 0) + 1;
+          store.put(item);
+        }
+        resolve();
+      };
+      getReq.onerror = () => resolve(); // Non-fatal
+    });
   }
 
   // Flush when coming back online

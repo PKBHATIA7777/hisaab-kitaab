@@ -94,6 +94,14 @@
                 inputmode="email"
                 placeholder="name@example.com">
             </label>
+
+            <!-- AUTH-06 FIX: Remember me checkbox (checked by default) -->
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#666; margin-bottom:16px; cursor:pointer; font-weight:400;">
+              <input type="checkbox" id="remember-me-checkbox" name="rememberMe" checked
+                style="width:16px; height:16px; accent-color:#d000ff; cursor:pointer; flex-shrink:0;">
+              Remember my email on this device
+            </label>
+
             <button type="submit" class="btn-primary" id="btn-next">Continue</button>
           </form>
 
