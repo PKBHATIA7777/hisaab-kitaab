@@ -224,9 +224,8 @@ async function loadExpenses(append = false) {
     
     renderExpenses();
     
-    // 3. Pass boolean safely
-    // renderLoadMoreButton(data.pagination?.hasMore || false);
-    renderLoadMoreButton(true); // Temporarily forcing it to true
+    // 3. Show "Load more" only when the server says there are more pages
+    renderLoadMoreButton(data.pagination?.hasMore || false);
     
     loadHeroSettlements();
     
