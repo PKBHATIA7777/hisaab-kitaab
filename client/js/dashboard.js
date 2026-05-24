@@ -353,6 +353,12 @@ createForm.onsubmit = async (e) => {
       showToast("Chapter updated successfully", "success");
     } else {
       // --- CREATE NEW ---
+
+      // Check if creator is included (creator row checkbox)
+      const creatorCheckbox = memberListContainer.querySelector('#creator-checkbox');
+      const creatorIncluded = creatorCheckbox ? creatorCheckbox.checked : true;
+
+      // Collect additional members from smart inputs
       const members = [];
       const inputs = memberListContainer.querySelectorAll('.member-input-smart');
       
@@ -361,7 +367,7 @@ createForm.onsubmit = async (e) => {
         if (nameVal) {
           let friendId = input.dataset.friendId ? parseInt(input.dataset.friendId) : null;
           
-          // 🟢 NEW FIX: Auto-link to friend if name matches exactly (and ID was missing)
+          // 🟢 Auto-link to friend if name matches exactly (and ID was missing)
           if (!friendId && cachedFriends.length > 0) {
              const match = cachedFriends.find(f => 
                f.name.toLowerCase() === nameVal.toLowerCase() || 
@@ -373,7 +379,6 @@ createForm.onsubmit = async (e) => {
              }
           }
 
-          // Push object instead of string
           members.push({ 
             name: nameVal,
             friendId: friendId 
@@ -381,9 +386,16 @@ createForm.onsubmit = async (e) => {
         }
       });
 
+      // Enforce minimum one member: creator must be included OR at least one extra member added
+      if (!creatorIncluded && members.length === 0) {
+        showToast("A chapter needs at least one member. Either include yourself or add someone.", "error");
+        setBtnLoading(submitBtn, false);
+        return;
+      }
+
       await apiFetch("/chapters", {
         method: "POST",
-        body: { name, description, members } // Send objects
+        body: { name, description, members, creatorExcluded: !creatorIncluded }
       });
       showToast("Chapter created successfully!", "success");
     }
@@ -538,9 +550,9 @@ window.openModal = function() {
   createModal.querySelector(".modal-header h2").textContent = "New Chapter";
   createForm.querySelector("button[type='submit']").textContent = "Create Chapter";
 
-  // Reset member inputs - No pre-added input, user can add members optionally
+  // Reset member inputs and pre-add the current user (creator)
   memberListContainer.innerHTML = "";
-  // No pre-added input — user can add members optionally
+  _addCreatorRow();
 
   createModal.classList.add("active");
 
@@ -603,7 +615,40 @@ function closeModal() {
   }
 }
 
-// ✅ UPDATED: Add Smart Input
+// ── Creator row (pre-added, toggleable) ──────────────────────
+function _addCreatorRow() {
+  if (!currentUser) return; // Guard: user not loaded yet
+
+  const div = document.createElement("div");
+  div.className = "member-item creator-row";
+  div.style.cssText = "position:relative; display:flex; align-items:center; gap:10px;";
+  div.dataset.isCreator = "true";
+
+  // Tick / untick checkbox
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = true;
+  checkbox.id = "creator-checkbox";
+  checkbox.style.cssText = "width:18px; height:18px; accent-color:#d000ff; cursor:pointer; flex-shrink:0;";
+  checkbox.title = "Uncheck to exclude yourself from this chapter";
+
+  // Label showing the creator's name
+  const label = document.createElement("label");
+  label.htmlFor = "creator-checkbox";
+  label.textContent = currentUser.real_name || currentUser.username || "You";
+  label.style.cssText = "flex:1; font-weight:600; color:#d000ff; cursor:pointer; user-select:none;";
+
+  const badge = document.createElement("span");
+  badge.textContent = "You";
+  badge.style.cssText = "font-size:0.7rem; background:rgba(208,0,255,0.15); color:#d000ff; border:1px solid rgba(208,0,255,0.3); border-radius:20px; padding:2px 8px; flex-shrink:0;";
+
+  div.appendChild(checkbox);
+  div.appendChild(label);
+  div.appendChild(badge);
+  memberListContainer.appendChild(div);
+}
+
+// ✅ UPDATED: Add Smart Input (auto-focuses new row)
 window.addMemberInput = function() {
   const div = document.createElement("div");
   div.className = "member-item";
@@ -614,7 +659,6 @@ window.addMemberInput = function() {
   input.type = "text";
   input.className = "member-input-smart"; // Marker class
   input.placeholder = "Name (or select friend)";
-  input.required = true;
   input.autocomplete = "off"; // Disable browser autocomplete
 
   // 2. Delete Button
@@ -647,6 +691,9 @@ window.addMemberInput = function() {
     }
   });
   input._autocomplete = ac; // Store reference for cleanup
+
+  // 4. Auto-focus so user can start typing immediately
+  setTimeout(() => input.focus(), 0);
 };
 
 /* ======================================
