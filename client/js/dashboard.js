@@ -762,7 +762,7 @@ function performDeleteWithUndo(id) {
   setTimeout(() => {
     window.removeEventListener("beforeunload", beforeUnloadHandler);
     executeDelete();
-  }, 4000);
+  }, 5000);
 }
 
 // ✅ NEW: Focus Trap for Modals

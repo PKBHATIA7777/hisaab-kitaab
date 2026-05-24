@@ -68,7 +68,7 @@ const CONFIG = {
         : "/api";
     },
     TIMEOUTS: {
-      TOAST_DURATION: 4000,
+      TOAST_DURATION: 5000,
       DEBOUNCE_DELAY: 300,
       SESSION_CHECK: 60000,
       SESSION_WARN: 300000,
@@ -696,10 +696,10 @@ function initPasswordValidation() {
     requestAnimationFrame(() => toast.classList.add('show'));
 
     setTimeout(() => {
-      toast.classList.remove('show');
-      toast.addEventListener('transitionend', () => {
+      toast.classList.add('hiding');
+      toast.addEventListener('animationend', () => {
         if (toast.parentElement) toast.remove();
-      });
+      }, { once: true });
     }, CONFIG.TIMEOUTS.TOAST_DURATION);
   };
 
