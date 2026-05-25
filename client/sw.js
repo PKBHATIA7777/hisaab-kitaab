@@ -5,7 +5,7 @@
 // automatically at server startup via the /sw.js route — no build step needed.
 // If you forget to bump the number, the date suffix still forces a cache bust
 // on the first deploy of each new day.
-const CACHE_VERSION = "v7"; // ← Bump this number when deploying breaking changes
+const CACHE_VERSION = "v8"; // ← Bump this number when deploying breaking changes
 
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
