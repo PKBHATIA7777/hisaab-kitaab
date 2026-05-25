@@ -16,6 +16,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- ── AUTH REDIRECT GUARD ──────────────────────────────────────
+       Synchronous check before first paint. Logged-in users are
+       redirected to dashboard without ever seeing the forgot page.
+  ──────────────────────────────────────────────────────────────── -->
+  <script>
+    (function() {
+      try {
+        var cookie = document.cookie.split('; ').find(function(r) {
+          return r.startsWith('session_expiry=');
+        });
+        if (cookie) {
+          var expiry = parseInt(cookie.split('=')[1], 10);
+          if (!isNaN(expiry) && expiry > Date.now() + 10000) {
+            document.documentElement.style.visibility = 'hidden';
+            window.location.replace('dashboard.html');
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
@@ -86,6 +107,7 @@
 <script src="js/core/sanitize.js"></script>
   <script src="js/core/csrf.js"></script>
   <script src="js/core/session.js"></script>
+  <script src="js/core/api-cache.js"></script>
   <script src="js/main.js"></script>
   <!-- In login.html, REPLACE the large inline <script> block with: -->
 <script src="js/pages/forgot-page.js"></script>

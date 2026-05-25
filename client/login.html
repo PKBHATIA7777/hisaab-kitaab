@@ -49,6 +49,27 @@
       opacity: 0;
     }
   </style>
+
+  <!-- ── AUTH REDIRECT GUARD ──────────────────────────────────────
+       Synchronous check before first paint. Logged-in users are
+       redirected to dashboard without ever seeing the login page.
+  ──────────────────────────────────────────────────────────────── -->
+  <script>
+    (function() {
+      try {
+        var cookie = document.cookie.split('; ').find(function(r) {
+          return r.startsWith('session_expiry=');
+        });
+        if (cookie) {
+          var expiry = parseInt(cookie.split('=')[1], 10);
+          if (!isNaN(expiry) && expiry > Date.now() + 10000) {
+            document.documentElement.style.visibility = 'hidden';
+            window.location.replace('dashboard.html');
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -237,6 +258,7 @@
   <script src="js/pwa/install-manager.js"></script>
   <script src="js/core/csrf.js"></script>
   <script src="js/core/session.js"></script>
+  <script src="js/core/api-cache.js"></script>
   <script src="js/main.js"></script>
  <!-- In login.html, REPLACE the large inline <script> block with: -->
 <script src="js/pages/login-page.js"></script>

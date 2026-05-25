@@ -1298,7 +1298,7 @@ window.refreshSettlements = async function() {
           refreshBtn.innerHTML = `<span class="spinner-small"></span>`;
         }
         
-        await loadHeroSettlements();
+        await loadHeroSettlements(true);
         showToast("Settlements updated", "info");
     } catch (err) {
         console.error("Refresh settlements error:", err);
@@ -1321,12 +1321,12 @@ window.refreshSettlements = async function() {
 };
 
 // --- Data Loading for Hero Settlements (Unchanged core logic) ---
-async function loadHeroSettlements() {
+async function loadHeroSettlements(forceRefresh = false) {
     try {
         let url = `/expenses/chapter/${chapterId}/settlements`;
         if (currentEventId) url += `?eventId=${currentEventId}`;
 
-        const data = await apiFetch(url);
+        const data = await apiFetch(url, forceRefresh ? { _noCache: true } : {});
         renderHeroSettlements(data.settlements);
     } catch (err) {
         console.error("Hero Settlement Error:", err);

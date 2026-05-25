@@ -108,6 +108,31 @@ const CONFIG = {
     const method = (options.method || "GET").toUpperCase();
     const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
 
+    // ── CACHE: serve GET responses from in-memory cache ──────────
+    // Mutations bypass the cache entirely and invalidate related keys.
+    // options._noCache = true skips cache for one-off forced refreshes.
+    const cache = window.ApiCache;
+    if (!isMutation && !options._noCache && cache) {
+      const cached = cache.get(path);
+      if (cached) {
+        if (!cached.isStale) {
+          // Fresh — return immediately, no network call
+          return cached.data;
+        }
+        // Stale — return cached data immediately, then revalidate in background
+        // We fire the real fetch but don't await it here; the caller gets
+        // the stale data instantly and the cache is updated for the next call.
+        (async () => {
+          try {
+            const fresh = await window.apiFetch(path, { ...options, _noCache: true });
+            if (fresh) cache.set(path, fresh);
+          } catch (_) { /* background revalidation failure is silent */ }
+        })();
+        return cached.data;
+      }
+    }
+    // ── END CACHE ─────────────────────────────────────────────────
+
     const makeRequest = async (attempt = 0) => {
       const csrfToken = window.CSRFManager ? window.CSRFManager.get() : null;
 
@@ -289,7 +314,19 @@ if (res.status === 401) {
       return data;
     };
 
-    return makeRequest(0);
+    // ── CACHE: store result or invalidate on mutation ─────────
+    const result = await makeRequest(0);
+    if (cache && result) {
+      if (!isMutation && !options._noCache) {
+        // Store successful GET response
+        cache.set(path, result);
+      } else if (isMutation) {
+        // Invalidate related cache entries after any write
+        cache.invalidate(path);
+      }
+    }
+    return result;
+    // ── END CACHE ─────────────────────────────────────────────
   };
 
   /* ── Server Wake-Up System ──────────────────────────────────

@@ -414,6 +414,12 @@
   transition: transform 0.15s, box-shadow 0.15s;
   -webkit-tap-highlight-color: transparent;
   animation: slideInUp 0.25s ease-out;
+  /* ── PERF: Skip rendering off-screen cards entirely.
+     contain-intrinsic-size matches the actual card height (padding 14+14=28,
+     content ~44px, gap = ~72px total) so the browser reserves the right
+     amount of scroll space without painting the card. ── */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 72px;
 }
 
 .expense-card:active { transform: scale(0.98); }

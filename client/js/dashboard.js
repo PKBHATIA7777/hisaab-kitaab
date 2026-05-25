@@ -964,6 +964,8 @@ async function showLogoutDeviceScreen() {
       closeProfileModal();
       await apiFetch("/auth/logout", { method: "POST" });
     } catch(_) {}
+    // Clear in-memory API cache on logout
+    if (window.ApiCache) window.ApiCache.clear();
     // Notify other tabs
     SessionManager.broadcastLogout({ reason: 'manual' });
     window.location.replace("login.html");
@@ -1041,6 +1043,9 @@ window.handleDeviceLogout = async function(scope) {
       SessionManager.broadcastLogout({ reason: 'current_device' });
     }
 } catch(_) {}
+
+// Clear in-memory API cache on logout
+if (window.ApiCache) window.ApiCache.clear();
 
 // Clear remembered identifier from this device
 try { localStorage.removeItem('last_user'); } catch(_) {}
