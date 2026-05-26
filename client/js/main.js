@@ -936,21 +936,42 @@ function initPasswordValidation() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').then(reg => {
+
+        // ── Update detection path 1: new SW found during this page session ──
+        // Fires when a new SW is downloading (e.g. user opened the page and
+        // a deploy happened since their last visit).
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
+          if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version available
-              showToast("App updated! Reload for the latest version.", "info", {
-                label: "Reload",
-                callback: () => {
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
-                  window.location.reload();
-                }
-              });
+            // 'installed' + controller exists = new version ready, old one still running
+            // With skipWaiting() in the new SW, it will activate immediately and
+            // clients.claim() will take over this tab — we just need to reload.
+            if (newWorker.state === 'activated') {
+              // New SW has fully taken over — reload to get fresh HTML + assets
+              window.location.reload();
             }
           });
         });
+
+        // ── Update detection path 2: SW_UPDATED message from newly activated SW ──
+        // The new SW sends this after clients.claim(). This catches the case where
+        // the SW updated while the user was on a different tab and they come back.
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data?.type === 'SW_UPDATED') {
+            // Reload silently — the new SW is already serving fresh assets.
+            // We do a replace() so the back button doesn't loop.
+            window.location.replace(window.location.href);
+          }
+        });
+
+        // ── Update detection path 3: periodic check every 60s ──
+        // Catches the case where the user has had the tab open for a long time
+        // and a deploy happened. The SW won't auto-check unless we ask it to.
+        setInterval(() => {
+          reg.update().catch(() => {}); // silent — just triggers the SW update check
+        }, 60 * 1000);
+
       }).catch(err => console.log('ServiceWorker registration failed:', err));
     });
   }

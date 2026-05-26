@@ -5,21 +5,22 @@
 // automatically at server startup via the /sw.js route — no build step needed.
 // If you forget to bump the number, the date suffix still forces a cache bust
 // on the first deploy of each new day.
-const CACHE_VERSION = "v9"; // ← Bump this number when deploying breaking changes
+const CACHE_VERSION = "v10"; // ← Bump this number when deploying breaking changes
 
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
 
 // Core assets that MUST be cached for offline fallback to work.
 // Keep this list small and reliable — only files that definitely exist.
-// Aggressive caching of app files happens via the stale-while-revalidate
-// strategy in the fetch handler below.
+// HTML pages are intentionally NOT pre-cached — they are served network-first
+// so users always get the latest version immediately after a deploy.
 const SHELL_ASSETS = [
   "/offline.html",
-  "/manifest.json",
 ];
 
 // Additional assets to warm-cache opportunistically (failures don't block SW install)
+// NOTE: These are cached with no-cache headers from Vercel, so the SW will
+// always revalidate them on the next fetch — serving fresh files after every deploy.
 const WARM_CACHE_ASSETS = [
   "/css/base.css",
   "/css/chapter-page.css",
@@ -30,8 +31,8 @@ const WARM_CACHE_ASSETS = [
   "/js/core/session.js",
   "/js/core/api-cache.js",
   "/js/main.js",
-  "/js/pwa/install-manager.js",  // ← Fixed: was incorrectly /js/pwa-install.js
-  "/js/pwa/offline-queue.js",  // ← Added: offline request queue for background sync
+  "/js/pwa/install-manager.js",
+  "/js/pwa/offline-queue.js",
 ];
 
 // ── INSTALL: Cache app shell, do NOT skipWaiting ────────────
@@ -39,14 +40,12 @@ self.addEventListener("install", (e) => {
   e.waitUntil(
     caches.open(SHELL_CACHE).then(async (cache) => {
       // Critical assets — must succeed or SW install fails
-      // (these are minimal so failure is unlikely)
       await cache.addAll(SHELL_ASSETS);
       
       // Warm cache — best effort, failures don't block installation
       const warmResults = await Promise.allSettled(
         WARM_CACHE_ASSETS.map(url =>
           cache.add(url).catch(err => {
-            // Log but don't throw — these are optional
             console.warn(`SW warm-cache miss for ${url}: ${err.message}`);
           })
         )
@@ -55,7 +54,10 @@ self.addEventListener("install", (e) => {
       const warmed = warmResults.filter(r => r.status === 'fulfilled').length;
       console.log(`SW installed: ${warmed}/${WARM_CACHE_ASSETS.length} warm-cache assets ready`);
     })
-    // NOTE: No self.skipWaiting() here — controlled activation
+    // skipWaiting immediately so the new SW takes over without waiting for
+    // all tabs to close. Combined with clients.claim() below, this means
+    // users get the new version on the very next page load — no manual reload needed.
+    .then(() => self.skipWaiting())
   );
 });
 
@@ -68,10 +70,16 @@ self.addEventListener("activate", (e) => {
           .filter((k) => (k.startsWith("hk-shell-") || k.startsWith("hk-data-")) && k !== SHELL_CACHE && k !== DATA_CACHE)
           .map((k) => caches.delete(k))
       );
-      // Only claim clients after caches are ready
-      // skipWaiting() is called via message from the update toast
-      // self.clients.claim() is safe here since old caches are gone
+      // Claim all open clients immediately so the new SW serves them
+      // without requiring a page reload. This is safe because skipWaiting()
+      // already ran in install, so the old SW is fully replaced.
       return self.clients.claim();
+    }).then(async () => {
+      // Notify all open tabs that a new version is active
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach(client => {
+        client.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION });
+      });
     })
   );
 });
@@ -81,7 +89,6 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
   // 1. API calls — Network only, no cache
-// 1. API calls — Network only, no cache
   if (url.pathname.startsWith("/api/")) {
     e.respondWith(
       fetch(e.request).catch(() => {
@@ -100,48 +107,65 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 2. HTML pages — Network first, fall back to offline page
+  // 2. HTML pages — Network first, NO cache storage.
+  // Always fetch fresh HTML from the server. This ensures users get the
+  // latest page immediately after a deploy — no stale HTML ever served.
+  // Falls back to offline page only when truly offline.
   if (e.request.mode === "navigate") {
     e.respondWith(
       fetch(e.request)
-        .then((response) => {
-          // Update cache in background for next visit
-          const clone = response.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(e.request, clone));
-          return response;
-        })
         .catch(async () => {
-          // Check if we have this page cached
+          // Truly offline — serve the offline page
           const cached = await caches.match(e.request);
           if (cached) return cached;
-          // Serve offline page
           return caches.match("/offline.html");
         })
     );
     return;
   }
 
-  // 3. JS/CSS/Fonts — Stale-while-revalidate
-  // Serve from cache immediately, update in background
-  if (url.pathname.match(/\.(js|css|woff2?)$/)) {
+  // 3. JS/CSS — Network first, cache as fallback for offline only.
+  // Vercel sends no-cache headers so the browser always revalidates.
+  // The SW respects those headers and fetches fresh files after every deploy.
+  // The cache is only used as an offline fallback.
+  if (url.pathname.match(/\.(js|css)$/)) {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          // Only cache successful responses
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(SHELL_CACHE).then((cache) => cache.put(e.request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          // Offline fallback — serve from cache if available
+          const cached = await caches.match(e.request);
+          return cached || new Response("/* offline */", {
+            headers: { "Content-Type": "text/javascript" }
+          });
+        })
+    );
+    return;
+  }
+
+  // 4. Fonts — Cache first, network fallback (fonts never change)
+  if (url.pathname.match(/\.(woff2?)$/) || url.hostname.includes('fonts.gstatic.com')) {
     e.respondWith(
       caches.open(SHELL_CACHE).then((cache) => {
         return cache.match(e.request).then((cached) => {
-          const fetchPromise = fetch(e.request)
-            .then((response) => {
-              if (response.ok) cache.put(e.request, response.clone());
-              return response;
-            })
-            .catch(() => cached); // Network failed, serve stale
-
-          return cached || fetchPromise;
+          return cached || fetch(e.request).then((response) => {
+            if (response.ok) cache.put(e.request, response.clone());
+            return response;
+          });
         });
       })
     );
     return;
   }
 
-  // 4. Images — Cache first, network fallback
+  // 5. Images — Cache first, network fallback
   if (url.pathname.match(/\.(png|jpg|jpeg|svg|ico|webp)$/)) {
     e.respondWith(
       caches.open(SHELL_CACHE).then((cache) => {
@@ -156,14 +180,16 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 5. Everything else — Network first
+  // 6. Everything else — Network first
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
 
 // ── MESSAGES ─────────────────────────────────────────────────
 self.addEventListener("message", (e) => {
+  // SKIP_WAITING kept for backward compatibility but no longer needed
+  // since install now calls skipWaiting() automatically
   if (e.data?.type === "SKIP_WAITING") {
-    self.skipWaiting(); // Only called when user clicks "Reload" in update toast
+    self.skipWaiting();
   }
   if (e.data?.type === "PING") {
     e.ports[0]?.postMessage({ type: "PONG", version: CACHE_VERSION });
