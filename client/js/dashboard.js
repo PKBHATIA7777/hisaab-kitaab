@@ -28,14 +28,20 @@ const placeholderSuggestions = [
   "e.g. Office Lunch Crew"       // 4. Suggest Daily Life
 ];
 
-// ✅ Updated skeleton loader: centered spinner
+// ✅ Updated skeleton loader: chapter card skeletons matching real card dimensions
 function renderSkeletons() {
   const grid = document.getElementById("chapters-grid");
-  grid.innerHTML = `
-    <div class="loader-container">
-      <div class="spinner"></div>
+  // Render 4 skeleton cards that match .chapter-card height (220px) exactly.
+  // This prevents layout shift when real cards replace them and gives the user
+  // a clear sense of what's loading — far better than a centered spinner.
+  const skeletonCard = `
+    <div class="skeleton-chapter-card" aria-hidden="true">
+      <div class="sk-avatar"></div>
+      <div class="sk-title"></div>
+      <div class="sk-meta"></div>
     </div>
   `;
+  grid.innerHTML = skeletonCard + skeletonCard + skeletonCard + skeletonCard;
 }
 
 // ==========================================
@@ -527,6 +533,23 @@ function renderGrid(chapters) {
       window.location.href = `chapter.html?id=${chapter.id}`;
     });
 
+    // ── PREFETCH: warm the cache before the user finishes clicking ──
+    // On desktop: mouseenter fires ~150ms before click — enough to start fetching.
+    // On mobile: touchstart fires ~100ms before click — same benefit.
+    // Both calls go through apiFetch which stores results in ApiCache automatically.
+    // If the user doesn't click, the cached data expires normally — no harm done.
+    let prefetchFired = false;
+    const doPrefetch = () => {
+      if (prefetchFired) return;
+      prefetchFired = true;
+      // Fire both requests in parallel — don't await, purely background
+      apiFetch(`/chapters/${chapter.id}`).catch(() => {});
+      apiFetch(`/expenses/chapter/${chapter.id}?limit=50&offset=0`).catch(() => {});
+    };
+    card.addEventListener('mouseenter', doPrefetch, { passive: true });
+    card.addEventListener('touchstart', doPrefetch, { passive: true });
+    // ── END PREFETCH ─────────────────────────────────────────────
+
     chaptersGrid.appendChild(card);
   });
 }
@@ -555,6 +578,8 @@ window.openModal = function() {
   _addCreatorRow();
 
   createModal.classList.add("active");
+  // Lock body scroll so footer cannot scroll into view behind the modal
+  document.body.style.overflow = 'hidden';
 
   // 👇 START PLACEHOLDER ANIMATION
   const input = createForm.querySelector('input[name="name"]');
@@ -604,10 +629,14 @@ window.openEditModal = function(id, currentName, currentDesc) {
   createForm.querySelector("button[type='submit']").textContent = "Save Changes";
 
   createModal.classList.add("active");
+  // Lock body scroll so footer cannot scroll into view behind the modal
+  document.body.style.overflow = 'hidden';
 };
 
 function closeModal() {
   createModal.classList.remove("active");
+  // Restore body scroll
+  document.body.style.overflow = '';
   // 👇 Stop Animation on Close
   if (placeholderInterval) {
     clearInterval(placeholderInterval);
@@ -745,12 +774,14 @@ window.confirmDelete = function(id) {
 
   deleteTargetId = id;
   deleteModal.classList.add("active");
+  document.body.style.overflow = 'hidden';
 };
 
 // 2. Close Modal
 window.closeDeleteModal = function() {
   deleteModal.classList.remove("active");
   deleteTargetId = null;
+  document.body.style.overflow = '';
 };
 
 // 3. Handle "Yes, Delete" Click
@@ -887,11 +918,15 @@ window.openProfileModal = function() {
   updateProfileInstallHint();
 
   modal.classList.add("active");
+  // Lock body scroll so footer cannot scroll into view behind the modal
+  document.body.style.overflow = 'hidden';
 };
 
 window.closeProfileModal = function() {
   const modal = document.getElementById("profile-modal");
   if (modal) modal.classList.remove("active");
+  // Restore body scroll
+  document.body.style.overflow = '';
 };
 
 // ==========================================
@@ -985,7 +1020,7 @@ async function showLogoutDeviceScreen() {
     <div class="modal-box" style="max-width:420px;">
       <div class="modal-header">
         <h2>Log Out</h2>
-        <button class="close-modal" onclick="document.getElementById('device-logout-modal').remove()">×</button>
+        <button class="close-modal" onclick="closeDeviceLogoutModal()">×</button>
       </div>
       <p style="color:#666; font-size:0.9rem; margin-bottom:20px;">
         You're logged in on ${sessions.length} device${sessions.length > 1 ? 's' : ''}. 
@@ -1019,7 +1054,7 @@ async function showLogoutDeviceScreen() {
           style="color:#ff1744; border-color:#ffcdd2;">
           Log out all devices
         </button>
-        <button class="btn-secondary" onclick="document.getElementById('device-logout-modal').remove()"
+        <button class="btn-secondary" onclick="closeDeviceLogoutModal()"
           style="border:none; color:#666;">
           Cancel
         </button>
@@ -1027,6 +1062,8 @@ async function showLogoutDeviceScreen() {
     </div>
   `;
   document.body.appendChild(modal);
+  // Lock body scroll while device logout modal is open
+  document.body.style.overflow = 'hidden';
 }
 
 window.handleDeviceLogout = async function(scope) {
@@ -1051,6 +1088,13 @@ if (window.ApiCache) window.ApiCache.clear();
 try { localStorage.removeItem('last_user'); } catch(_) {}
 
 window.location.replace("login.html");
+};
+
+// Helper: close the dynamically-created device logout modal and restore scroll
+window.closeDeviceLogoutModal = function() {
+  const m = document.getElementById('device-logout-modal');
+  if (m) m.remove();
+  document.body.style.overflow = '';
 };
 
 // ==========================================
@@ -1226,6 +1270,7 @@ window.openFriendDetails = function(id) {
 
   // 2. Open Modal
   document.getElementById("friend-details-modal").classList.add("active");
+  document.body.style.overflow = 'hidden';
 
   // 3. Fetch Settlements
   refreshFriendSettlements();
@@ -1233,6 +1278,7 @@ window.openFriendDetails = function(id) {
 
 window.closeFriendDetails = function() {
   document.getElementById("friend-details-modal").classList.remove("active");
+  document.body.style.overflow = '';
   currentViewFriendId = null;
 };
 

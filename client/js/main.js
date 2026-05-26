@@ -825,6 +825,29 @@ function initPasswordValidation() {
       }
     });
 
+    // ── PAGE FADE-OUT ON NAVIGATION ──────────────────────────────
+    // When the user clicks any internal link or navigates away, fade the
+    // current page out before the browser unloads. Combined with the
+    // pageFadeIn animation on body, every page transition feels smooth.
+    // We only trigger on same-origin <a> links and window.location changes.
+    // Buttons that call window.location.href directly are handled by
+    // the beforeunload path — the CSS animation runs for ~150ms which is
+    // enough to be visible before the browser navigates.
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      // Only handle same-origin relative links (not mailto:, tel:, external)
+      if (!href || href.startsWith('http') || href.startsWith('//') ||
+          href.startsWith('mailto') || href.startsWith('tel') ||
+          href.startsWith('#') || link.target === '_blank') return;
+      // Don't interfere with modifier-key clicks (open in new tab, etc.)
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      // Trigger fade-out
+      document.body.classList.add('page-navigating');
+    }, { capture: true }); // capture: true so we run before other handlers
+    // ── END PAGE FADE-OUT ─────────────────────────────────────────
+
     window.addEventListener('resize', window.debounce(initMobileTweaks, CONFIG.TIMEOUTS.DEBOUNCE_DELAY));
 
     // Step 5.3 — Fix offline indicator: Persistent offline banner

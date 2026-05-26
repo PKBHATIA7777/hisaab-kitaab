@@ -91,22 +91,34 @@ document.addEventListener("click", () => {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
+    // ── BATCH 1: Auth + chapter details (must complete first) ────
     const [authData, chapterData] = await Promise.all([
       apiFetch("/auth/me"),
       apiFetch(`/chapters/${chapterId}`)
     ]);
-    
+
     currentUser = authData.user;
     currentChapter = chapterData.chapter;
     currentMembers = chapterData.members;
 
-    loadFriendsForAutocomplete();
+    // Render the chapter header synchronously — no network needed
     renderChapterInfo();
-    await renderMembers(); // ✅ UPDATED: await async renderMembers()
-    
-    // Load Events first, then trigger unified data load
-    await loadEvents(); 
-    loadExpenses(); // This now handles expenses AND settlements
+
+    // ── BATCH 2: All secondary data in parallel ──────────────────
+    // renderMembers, loadEvents, loadExpenses, and friends all start
+    // at the same time. None of them depend on each other.
+    // loadExpenses also calls loadHeroSettlements internally.
+    await Promise.all([
+      renderMembers(),        // fetches /chapters/:id/members/deletability
+      loadEvents(),           // fetches /chapters/:id/events
+      loadFriendsForAutocomplete(), // fetches /friends
+    ]);
+
+    // loadExpenses depends on events being rendered (for currentEventId)
+    // but NOT on the network result of loadEvents — currentEventId starts
+    // as null ("All") which is always valid. We call it after the parallel
+    // batch so event tabs are already painted when expenses arrive.
+    loadExpenses();
 
   } catch (err) {
     console.error(err);
@@ -363,7 +375,11 @@ function renderLoadMoreButton(hasMore) {
 function renderChapterInfo() {
   document.getElementById("chapter-skeleton").style.display = "none";
   document.getElementById("chapter-content").style.display = "block";
-  
+
+  // Populate sticky nav title (was always empty before)
+  const navTitle = document.getElementById("nav-chapter-name");
+  if (navTitle) navTitle.textContent = currentChapter.name;
+
   titleEl.textContent = currentChapter.name;
   descEl.textContent = currentChapter.description || "";
   descEl.style.display = currentChapter.description ? "block" : "none";
@@ -1193,7 +1209,7 @@ if(addMemberFormEl) {
       
       const data = await apiFetch(`/chapters/${chapterId}/members`, {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: payload,
       });
 
       if (data.ok) {
