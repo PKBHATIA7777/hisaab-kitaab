@@ -934,42 +934,56 @@ function initPasswordValidation() {
      6. SERVICE WORKER
      ====================================== */
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
+
+      // ── NUCLEAR OPTION: Kill any stuck waiting SW immediately ──────────────
+      // The old SW (v9) had NO skipWaiting(), so new SWs get stuck in
+      // "waiting" state forever even after the user closes and reopens the app.
+      // This block runs BEFORE registering, finds any waiting SW, sends it
+      // SKIP_WAITING, then reloads once — after that the new SW is in control
+      // and this block becomes a no-op on every subsequent load.
+      try {
+        const existingReg = await navigator.serviceWorker.getRegistration('/');
+        if (existingReg) {
+          const waitingWorker = existingReg.waiting;
+          if (waitingWorker) {
+            // There is a new SW stuck waiting — force it to take over now
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            // Wait briefly for the SW to activate, then reload once
+            await new Promise(r => setTimeout(r, 400));
+            window.location.reload();
+            return; // Stop here — the reload will re-run this whole script fresh
+          }
+        }
+      } catch (_) { /* never block page load */ }
+      // ── END NUCLEAR OPTION ─────────────────────────────────────────────────
+
       navigator.serviceWorker.register('/sw.js').then(reg => {
 
-        // ── Update detection path 1: new SW found during this page session ──
-        // Fires when a new SW is downloading (e.g. user opened the page and
-        // a deploy happened since their last visit).
+        // ── Update detection: new SW found during this page session ──────────
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
-            // 'installed' + controller exists = new version ready, old one still running
-            // With skipWaiting() in the new SW, it will activate immediately and
-            // clients.claim() will take over this tab — we just need to reload.
+            // New SW activated — reload to get fresh HTML + assets
             if (newWorker.state === 'activated') {
-              // New SW has fully taken over — reload to get fresh HTML + assets
               window.location.reload();
             }
           });
         });
 
-        // ── Update detection path 2: SW_UPDATED message from newly activated SW ──
-        // The new SW sends this after clients.claim(). This catches the case where
-        // the SW updated while the user was on a different tab and they come back.
+        // ── SW_UPDATED message from newly activated SW ───────────────────────
+        // Catches the case where SW updated while user was on another tab
         navigator.serviceWorker.addEventListener('message', (event) => {
           if (event.data?.type === 'SW_UPDATED') {
-            // Reload silently — the new SW is already serving fresh assets.
-            // We do a replace() so the back button doesn't loop.
             window.location.replace(window.location.href);
           }
         });
 
-        // ── Update detection path 3: periodic check every 60s ──
-        // Catches the case where the user has had the tab open for a long time
-        // and a deploy happened. The SW won't auto-check unless we ask it to.
+        // ── Periodic update check every 60s ─────────────────────────────────
+        // Catches long-lived tabs that miss the updatefound event
         setInterval(() => {
-          reg.update().catch(() => {}); // silent — just triggers the SW update check
+          reg.update().catch(() => {});
         }, 60 * 1000);
 
       }).catch(err => console.log('ServiceWorker registration failed:', err));
