@@ -434,7 +434,9 @@ app.get("/sw.js", (req, res) => {
     let swContent = fs.readFileSync(swPath, "utf8");
     // Inject today's date into the CACHE_VERSION constant
     // e.g. "v7" becomes "v7-20260524"
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const now = new Date();
+    const weekOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
+    const today = `${now.getFullYear()}w${weekOfYear}`;
     swContent = swContent.replace(
       /const CACHE_VERSION = "(v\d+)";/,
       `const CACHE_VERSION = "$1-${today}";`

@@ -54,10 +54,6 @@ self.addEventListener("install", (e) => {
       const warmed = warmResults.filter(r => r.status === 'fulfilled').length;
       console.log(`SW installed: ${warmed}/${WARM_CACHE_ASSETS.length} warm-cache assets ready`);
     })
-    // skipWaiting immediately so the new SW takes over without waiting for
-    // all tabs to close. Combined with clients.claim() below, this means
-    // users get the new version on the very next page load — no manual reload needed.
-    .then(() => self.skipWaiting())
   );
 });
 
@@ -71,15 +67,8 @@ self.addEventListener("activate", (e) => {
           .map((k) => caches.delete(k))
       );
       // Claim all open clients immediately so the new SW serves them
-      // without requiring a page reload. This is safe because skipWaiting()
-      // already ran in install, so the old SW is fully replaced.
+      // without requiring a page reload.
       return self.clients.claim();
-    }).then(async () => {
-      // Notify all open tabs that a new version is active
-      const clients = await self.clients.matchAll({ type: 'window' });
-      clients.forEach(client => {
-        client.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION });
-      });
     })
   );
 });

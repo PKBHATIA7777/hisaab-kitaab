@@ -936,49 +936,7 @@ function initPasswordValidation() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
 
-      // ── NUCLEAR OPTION: Kill any stuck waiting SW immediately ──────────────
-      // The old SW (v9) had NO skipWaiting(), so new SWs get stuck in
-      // "waiting" state forever even after the user closes and reopens the app.
-      // This block runs BEFORE registering, finds any waiting SW, sends it
-      // SKIP_WAITING, then reloads once — after that the new SW is in control
-      // and this block becomes a no-op on every subsequent load.
-      try {
-        const existingReg = await navigator.serviceWorker.getRegistration('/');
-        if (existingReg) {
-          const waitingWorker = existingReg.waiting;
-          if (waitingWorker) {
-            // There is a new SW stuck waiting — force it to take over now
-            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-            // Wait briefly for the SW to activate, then reload once
-            await new Promise(r => setTimeout(r, 400));
-            window.location.reload();
-            return; // Stop here — the reload will re-run this whole script fresh
-          }
-        }
-      } catch (_) { /* never block page load */ }
-      // ── END NUCLEAR OPTION ─────────────────────────────────────────────────
-
       navigator.serviceWorker.register('/sw.js').then(reg => {
-
-        // ── Update detection: new SW found during this page session ──────────
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            // New SW activated — reload to get fresh HTML + assets
-            if (newWorker.state === 'activated') {
-              window.location.reload();
-            }
-          });
-        });
-
-        // ── SW_UPDATED message from newly activated SW ───────────────────────
-        // Catches the case where SW updated while user was on another tab
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data?.type === 'SW_UPDATED') {
-            window.location.replace(window.location.href);
-          }
-        });
 
         // ── Periodic update check every 60s ─────────────────────────────────
         // Catches long-lived tabs that miss the updatefound event
