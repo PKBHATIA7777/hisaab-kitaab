@@ -54,6 +54,23 @@ function hideAppLoader() {
 }
 
 (function() {
+  // ── ONE-TIME CACHE BUST ──────────────────────────────────────
+  // Clears old SW caches on first run after this deploy.
+  // The flag key changes with each deploy that needs a hard bust.
+  const BUST_KEY = 'cache_bust_v11';
+  if (!sessionStorage.getItem(BUST_KEY)) {
+    sessionStorage.setItem(BUST_KEY, '1');
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(key => {
+          if (!key.includes('v11')) {
+            caches.delete(key);
+          }
+        });
+      });
+    }
+  }
+  // ── END CACHE BUST ────────────────────────────────────────────
 
   /* ======================================
      0. CONSTANTS & CONFIG
@@ -931,20 +948,43 @@ function initPasswordValidation() {
   });
 
   /* ======================================
-     6. SERVICE WORKER
+     6. SERVICE WORKER — FIX 5: Update checker + auto-activate
      ====================================== */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
 
-      navigator.serviceWorker.register('/sw.js').then(reg => {
-
-        // ── Periodic update check every 60s ─────────────────────────────────
-        // Catches long-lived tabs that miss the updatefound event
+        // Check for updates every 60 seconds
         setInterval(() => {
           reg.update().catch(() => {});
         }, 60 * 1000);
 
-      }).catch(err => console.log('ServiceWorker registration failed:', err));
+        // When a new SW is waiting, activate it immediately
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New SW is ready — tell it to skip waiting
+              newWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+
+        // When SW changes (after skipWaiting), reload the page to get fresh assets
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+
+      } catch(err) {
+        console.log('ServiceWorker registration failed:', err);
+      }
     });
   }
 

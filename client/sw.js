@@ -5,7 +5,7 @@
 // automatically at server startup via the /sw.js route — no build step needed.
 // If you forget to bump the number, the date suffix still forces a cache bust
 // on the first deploy of each new day.
-const CACHE_VERSION = "v10"; // ← Bump this number when deploying breaking changes
+const CACHE_VERSION = "v11"; // ← Bumped to force cache bust on all devices
 
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
@@ -35,14 +35,15 @@ const WARM_CACHE_ASSETS = [
   "/js/pwa/offline-queue.js",
 ];
 
-// ── INSTALL: Cache app shell, do NOT skipWaiting ────────────
+// ── INSTALL: Force immediate activation, cache app shell ────────────
 self.addEventListener("install", (e) => {
+  // Force this SW to become active immediately without waiting
+  self.skipWaiting();
+  
   e.waitUntil(
     caches.open(SHELL_CACHE).then(async (cache) => {
-      // Critical assets — must succeed or SW install fails
       await cache.addAll(SHELL_ASSETS);
       
-      // Warm cache — best effort, failures don't block installation
       const warmResults = await Promise.allSettled(
         WARM_CACHE_ASSETS.map(url =>
           cache.add(url).catch(err => {
@@ -57,7 +58,7 @@ self.addEventListener("install", (e) => {
   );
 });
 
-// ── ACTIVATE: Clean old caches, take control only when safe ──
+// ── ACTIVATE: Clean old caches, take control immediately ──
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then(async (keys) => {
@@ -113,23 +114,21 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 3. JS/CSS — Network first, cache as fallback for offline only.
-  // Vercel sends no-cache headers so the browser always revalidates.
-  // The SW respects those headers and fetches fresh files after every deploy.
-  // The cache is only used as an offline fallback.
+  // 3. JS/CSS — Network ALWAYS. Never serve stale code.
+  // Cache is written for offline fallback only, but network is always tried first
+  // and we do NOT serve from cache if network succeeds.
   if (url.pathname.match(/\.(js|css)$/)) {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: 'no-store' })
         .then((response) => {
-          // Only cache successful responses
           if (response.ok) {
+            // Update cache in background for offline fallback only
             const clone = response.clone();
             caches.open(SHELL_CACHE).then((cache) => cache.put(e.request, clone));
           }
           return response;
         })
         .catch(async () => {
-          // Offline fallback — serve from cache if available
           const cached = await caches.match(e.request);
           return cached || new Response("/* offline */", {
             headers: { "Content-Type": "text/javascript" }
