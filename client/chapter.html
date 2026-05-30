@@ -168,12 +168,12 @@
 
   <!-- Add Expense Modal -->
   <div class="modal-overlay" id="add-expense-modal">
-    <div class="modal-box" style="max-width:500px; padding:0;">
+    <div class="modal-box" style="max-width:500px; padding:0; max-height:92dvh; overflow:hidden; display:flex; flex-direction:column;">
       <div style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
         <h2 style="margin:0; font-size:1.2rem;" id="expense-modal-title">Add Expense</h2>
         <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddExpenseModal()">×</button>
       </div>
-      <form id="add-expense-form" style="padding:20px; overflow-y:auto; max-height:70vh;">
+      <form id="add-expense-form" style="padding:20px; overflow-y:auto; max-height:75dvh;">
         <div style="text-align:center; margin-bottom:25px;">
           <label style="font-size:0.9rem; color:#888; display:block; margin-bottom:5px;">AMOUNT</label>
           <div style="display:flex; justify-content:center; align-items:center; gap:5px;">

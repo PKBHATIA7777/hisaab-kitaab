@@ -107,10 +107,17 @@ async function injectCategoryRowInExpenseModal(currentCategoryId) {
   const allLabels = form.querySelectorAll('label');
   let insertBefore = null;
   for (const lbl of allLabels) {
-    if (lbl.textContent.trim().startsWith('Paid By')) {
+    const text = (lbl.firstChild?.textContent || lbl.textContent || '').trim();
+    if (text.startsWith('Paid By') || text === 'Paid By') {
       insertBefore = lbl;
       break;
     }
+  }
+
+  // Also try finding by the payer container as fallback
+  if (!insertBefore) {
+    insertBefore = document.getElementById('payer-selection-container');
+    if (insertBefore) insertBefore = insertBefore.closest('label') || insertBefore.parentElement;
   }
 
   const row = document.createElement('div');
