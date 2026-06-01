@@ -103,39 +103,38 @@ async function injectCategoryRowInExpenseModal(currentCategoryId) {
     await loadCategories();
   }
 
-  // Find insertion point — before the Paid By label
-  const allLabels = form.querySelectorAll('label');
-  let insertBefore = null;
-  for (const lbl of allLabels) {
-    const text = (lbl.firstChild?.textContent || lbl.textContent || '').trim();
-    if (text.startsWith('Paid By') || text === 'Paid By') {
-      insertBefore = lbl;
-      break;
-    }
-  }
+  // Find insertion point — before the Paid By field group
+  const payerContainer = document.getElementById('payer-selection-container');
+  let insertBefore = payerContainer ? payerContainer.closest('.expense-field-group') : null;
 
-  // Also try finding by the payer container as fallback
+  // Fallback: find by label text
   if (!insertBefore) {
-    insertBefore = document.getElementById('payer-selection-container');
-    if (insertBefore) insertBefore = insertBefore.closest('label') || insertBefore.parentElement;
+    const allLabels = form.querySelectorAll('label, .expense-field-label');
+    for (const lbl of allLabels) {
+      const text = (lbl.firstChild?.textContent || lbl.textContent || '').trim();
+      if (text.startsWith('Paid By') || text === 'Paid By') {
+        insertBefore = lbl.closest('.expense-field-group') || lbl;
+        break;
+      }
+    }
   }
 
   const row = document.createElement('div');
   row.id = 'expense-category-row';
-  row.style.marginTop = '15px';
+  row.className = 'expense-field-group';
   row.innerHTML = `
-    <div style="font-size:0.85rem; color:#333; font-weight:600; margin-bottom:8px; margin-left:5px;">
-      Category <span style="font-weight:400; color:#aaa;">(optional)</span>
-    </div>
+    <label class="expense-field-label">
+      Category <span class="expense-field-optional">(optional)</span>
+    </label>
     <div id="expense-category-pills" class="category-pill-container"></div>
   `;
 
   if (insertBefore) {
     form.insertBefore(row, insertBefore);
   } else {
-    // Fallback: insert before submit button area
-    const submitDiv = form.querySelector('div[style*="margin-top:25px"]');
-    if (submitDiv) form.insertBefore(row, submitDiv);
+    // Fallback: insert before the actions block
+    const actionsDiv = form.querySelector('.expense-sheet-actions');
+    if (actionsDiv) form.insertBefore(row, actionsDiv);
     else form.appendChild(row);
   }
 

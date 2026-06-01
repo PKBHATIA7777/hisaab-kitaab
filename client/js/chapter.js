@@ -492,7 +492,7 @@ window.openAddExpenseModal = function() {
   renderPayerAndSplitOptions(); 
   
   addExpenseModal.classList.add("active");
-  setTimeout(() => addExpenseForm.querySelector(".big-amount-input").focus(), 100);
+  setTimeout(() => addExpenseForm.querySelector(".expense-amount-input")?.focus(), 350);
 };
 
 window.openEditExpenseModal = async function(id) {

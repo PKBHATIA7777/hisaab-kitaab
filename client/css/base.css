@@ -454,8 +454,7 @@
     left: 0;
     width: 100%; 
     height: 100%;
-    /* Use 100dvh to cover the full dynamic viewport including areas below the fold */
-    min-height: 100dvh;
+    min-height: 100svh;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px); /* Stronger blur for focus */
     /* z-index must be high enough to cover the footer (z-index:10) and
@@ -493,7 +492,7 @@
     opacity: 0;
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
     
-    max-height: 92dvh;
+    max-height: 90svh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -604,8 +603,7 @@
     z-index: 100; /* Ensure it stays above scrolling content */
     
     /* Added Glass Background (Essential for sticky headers) */
-    background: rgba(0, 0, 0, 0.2); 
-    backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.85); 
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
   
@@ -1496,12 +1494,14 @@
   .big-amount-input {
     border: none;
     background: transparent;
-    font-size: 2.5rem;
+    font-size: 2.5rem !important;
     font-weight: 700;
     color: #333;
     width: 150px;
     text-align: center;
     outline: none;
+    /* Prevent iOS auto-zoom: keep at minimum 16px rendered size */
+    -webkit-text-size-adjust: none;
   }
   .big-amount-input::placeholder { color: #bbb; } /* ✅ FIXED A2 */
   
@@ -1859,10 +1859,12 @@ body::after {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 120px; /* Fade height */
+  height: 120px;
   background: linear-gradient(to top, #000000 10%, transparent 100%);
-  pointer-events: none; /* Let clicks pass through */
-  z-index: 50; /* Below the FAB (z-index 100) but above content */
+  pointer-events: none;
+  z-index: 50;
+  /* Ensure this never interferes with modals */
+  isolation: auto;
 }
 
 

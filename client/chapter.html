@@ -166,37 +166,87 @@
     </div>
   </div>
 
-  <!-- Add Expense Modal -->
-  <div class="modal-overlay" id="add-expense-modal">
-    <div class="modal-box" style="max-width:500px; padding:0; max-height:92dvh; overflow:hidden; display:flex; flex-direction:column;">
-      <div style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0; font-size:1.2rem;" id="expense-modal-title">Add Expense</h2>
-        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddExpenseModal()">×</button>
+  <!-- Add Expense Modal (Bottom Sheet) -->
+  <div class="expense-sheet-overlay" id="add-expense-modal" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+    <div class="expense-sheet" role="document">
+      <!-- Drag handle -->
+      <div class="expense-sheet-handle" aria-hidden="true"></div>
+
+      <!-- Header -->
+      <div class="expense-sheet-header">
+        <h2 class="expense-sheet-title" id="expense-modal-title">Add Expense</h2>
+        <button class="expense-sheet-close" aria-label="Close" type="button" onclick="closeAddExpenseModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-      <form id="add-expense-form" style="padding:20px; overflow-y:auto; max-height:75dvh;">
-        <div style="text-align:center; margin-bottom:25px;">
-          <label style="font-size:0.9rem; color:#888; display:block; margin-bottom:5px;">AMOUNT</label>
-          <div style="display:flex; justify-content:center; align-items:center; gap:5px;">
-            <span style="font-size:2rem; color:#333;">₹</span>
-            <input type="number" name="amount" placeholder="0" required class="big-amount-input" inputmode="decimal" />
+
+      <!-- Scrollable body -->
+      <form id="add-expense-form" class="expense-sheet-body">
+
+        <!-- Amount -->
+        <div class="expense-amount-block">
+          <div class="expense-amount-row">
+            <span class="expense-currency-symbol">₹</span>
+            <input
+              type="number"
+              name="amount"
+              placeholder="0"
+              required
+              class="expense-amount-input"
+              inputmode="decimal"
+              min="0.01"
+              step="any"
+              autocomplete="off"
+            />
           </div>
+          <div class="expense-amount-underline"></div>
         </div>
-        <label>Description <span style="font-weight:400; color:#888;">(Optional)</span>
-          <input type="text" name="description" placeholder="e.g. Dinner at Taj" maxlength="100" />
-        </label>
-        <label style="margin-top:15px;">Paid By</label>
-        <div class="payer-scroll-container" id="payer-selection-container"></div>
-        <label style="margin-top:20px; display:flex; justify-content:space-between;">
-          Split Among
-          <span style="color:#d000ff; cursor:pointer; font-size:0.85rem;" onclick="toggleSelectAll()">Select All</span>
-        </label>
-        <div class="split-list-container" id="split-selection-container"></div>
-        <div style="margin-top:25px; display:flex; gap:10px;">
-          <button type="submit" class="btn-primary" id="btn-save-expense">Save Expense</button>
-          <button type="button" id="btn-delete-expense" class="btn-secondary" style="background:#ffebee; color:#d32f2f; border:none; display:none;" onclick="handleDeleteExpense()">
-            Delete
-          </button>
+
+        <!-- Description -->
+        <div class="expense-field-group">
+          <label class="expense-field-label" for="expense-desc-input">
+            Description <span class="expense-field-optional">(Optional)</span>
+          </label>
+          <input
+            type="text"
+            id="expense-desc-input"
+            name="description"
+            placeholder="e.g. Dinner at Taj"
+            maxlength="100"
+            class="expense-text-input"
+            autocomplete="off"
+          />
         </div>
+
+        <!-- Category — injected here by feature-categories.js -->
+
+        <!-- Paid By -->
+        <div class="expense-field-group">
+          <label class="expense-field-label">Paid By</label>
+          <div class="expense-payer-scroll" id="payer-selection-container"></div>
+        </div>
+
+        <!-- Split Among -->
+        <div class="expense-field-group">
+          <div class="expense-split-header">
+            <span class="expense-field-label" style="margin:0;">Split Among</span>
+            <button type="button" class="expense-select-all-btn" onclick="toggleSelectAll()">Select All</button>
+          </div>
+          <div class="expense-split-list" id="split-selection-container"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="expense-sheet-actions">
+          <button type="submit" class="expense-save-btn" id="btn-save-expense">Save Expense</button>
+          <button
+            type="button"
+            id="btn-delete-expense"
+            class="expense-delete-btn"
+            style="display:none;"
+            onclick="handleDeleteExpense()"
+          >Delete</button>
+        </div>
+
       </form>
     </div>
   </div>
