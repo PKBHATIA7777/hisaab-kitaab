@@ -1,1385 +1,1070 @@
-/* client/js/chapter.js */
-/* ✅ XSS PROTECTION: All user-generated strings in innerHTML are wrapped with escapeHTML() */
-/* Ensure <script src="js/core/sanitize.js"></script> is loaded BEFORE this file in HTML */
+/* client/js/chapter.js — FULL REWRITE */
+/* =============================================
+   STATE
+   ============================================= */
+const _urlParams = new URLSearchParams(window.location.search);
+const _chapterId = _urlParams.get('id');
+window.chapterId = _chapterId; // for feature scripts
 
-const urlParams = new URLSearchParams(window.location.search);
-const chapterId = urlParams.get('id');
-window.chapterId = chapterId; // expose for feature scripts
+if (!_chapterId) window.location.href = 'dashboard.html';
 
-if (!chapterId) {
-  window.location.href = "dashboard.html";
-}
+let _state = {
+  currentUser:    null,
+  chapter:        null,
+  members:        [],
+  expenses:       [],
+  events:         [],
+  currentEventId: null,
+  offset:         0,
+  total:          0,
+  hasMore:        false,
+};
 
-// State
-let currentUser = null;
-let currentChapter = null;
-let currentMembers = [];
-let expenses = []; 
-let cachedFriends = []; 
-let myFriendsCache = []; 
+const PAGE_SIZE = 50;
+window.currentEventId = null; // for feature script compatibility
+window.currentChapter = null;
+window.currentMembers = [];
+window.expenses = [];
+window.events = [];
 
-// ✅ NEW: Event State
-let events = [];
-let currentEventId = null; // null means "All"
-
-// ✅ NEW: Pagination State for Load More
-let expensesOffset = 0;
-const EXPENSES_PAGE_SIZE = 50;
-let expensesTotal = 0;
-
-// Edit Mode State
-let isEditingExpense = false;
-let editingExpenseId = null;
-
-// Elements
-const titleEl = document.getElementById("chapter-title");
-const descEl = document.getElementById("chapter-desc");
-const iconEl = document.getElementById("chapter-icon-display");
-const memberListEl = document.getElementById("member-list-content");
-const adminActions = document.getElementById("admin-actions");
-const expenseListEl = document.getElementById("expense-list-container");
-const emptyStateEl = document.getElementById("chapter-empty-state");
-const fabBtn = document.querySelector(".fab-btn");
-const eventsContainer = document.getElementById("events-strip-container"); // ✅ New Container
-
-// Modals
-const addExpenseModal = document.getElementById("add-expense-modal");
-const addExpenseForm = document.getElementById("add-expense-form");
-const payerContainer = document.getElementById("payer-selection-container");
-const splitContainer = document.getElementById("split-selection-container");
-const createEventModal = document.getElementById("create-event-modal"); // ✅ New Modal
-
-// --- NEW MENU LOGIC ---
-const menuBtn = document.getElementById("chapter-menu-btn");
-const menuDropdown = document.getElementById("chapter-menu-dropdown");
-const membersTrigger = document.getElementById("nav-members-trigger");
-const memberDropdown = document.getElementById("member-dropdown");
-
-// 1. Toggle Main Menu
-if(menuBtn) {
-  menuBtn.addEventListener("click", (e) => {
-    e.stopPropagation(); // Prevents immediate closing by the document listener
-    menuDropdown.classList.toggle("active");
-    
-    // Safety: Close member dropdown if it's open
-    if(memberDropdown) memberDropdown.classList.remove("active");
-  });
-}
-
-// 2. Handle "Members" click inside the menu
-if(membersTrigger) {
-  membersTrigger.addEventListener("click", (e) => {
-    e.stopPropagation(); // Prevent document click from closing it immediately
-    // Close the main menu
-    menuDropdown.classList.remove("active");
-    
-    // Toggle the existing member list dropdown
-    if(memberDropdown) {
-        memberDropdown.style.display = "block";
-        requestAnimationFrame(() => {
-            memberDropdown.classList.toggle("active");
-        });
-    }
-  });
-}
-
-// 3. Close menus when clicking anywhere else on the page
-document.addEventListener("click", () => {
-  if(menuDropdown) menuDropdown.classList.remove("active");
-  if(memberDropdown) memberDropdown.classList.remove("active");
-});
-
-document.addEventListener("DOMContentLoaded", async () => {
+/* =============================================
+   INIT
+   ============================================= */
+document.addEventListener('DOMContentLoaded', async () => {
   try {
-    // ── BATCH 1: Auth + chapter details (must complete first) ────
     const [authData, chapterData] = await Promise.all([
-      apiFetch("/auth/me"),
-      apiFetch(`/chapters/${chapterId}`)
+      apiFetch('/auth/me'),
+      apiFetch(`/chapters/${_chapterId}`),
     ]);
 
-    currentUser = authData.user;
-    currentChapter = chapterData.chapter;
-    currentMembers = chapterData.members;
+    _state.currentUser = authData.user;
+    _state.chapter     = chapterData.chapter;
+    _state.members     = chapterData.members;
 
-    // Render the chapter header synchronously — no network needed
-    renderChapterInfo();
+    // Expose for feature scripts
+    window.currentUser    = authData.user;
+    window.currentChapter = chapterData.chapter;
+    window.currentMembers = chapterData.members;
 
-    // ── BATCH 2: All secondary data in parallel ──────────────────
-    // renderMembers, loadEvents, loadExpenses, and friends all start
-    // at the same time. None of them depend on each other.
-    // loadExpenses also calls loadHeroSettlements internally.
+    _renderChapterInfo();
+
+    // Parallel secondary data
     await Promise.all([
-      renderMembers(),        // fetches /chapters/:id/members/deletability
-      loadEvents(),           // fetches /chapters/:id/events
-      loadFriendsForAutocomplete(), // fetches /friends
+      _loadEvents(),
+      _loadFriendsForAutocomplete(),
     ]);
 
-    // loadExpenses depends on events being rendered (for currentEventId)
-    // but NOT on the network result of loadEvents — currentEventId starts
-    // as null ("All") which is always valid. We call it after the parallel
-    // batch so event tabs are already painted when expenses arrive.
-    loadExpenses();
+    await _loadExpenses();
+
+    EventBus.emit('chapter:loaded', {
+      chapter: _state.chapter,
+      members: _state.members,
+      currentUser: _state.currentUser,
+    });
 
   } catch (err) {
-    console.error(err);
-    alert("Failed to load chapter");
-    window.location.href = "dashboard.html";
+    console.error('Chapter load failed:', err);
+    showToast('Failed to load chapter', 'error');
+    setTimeout(() => window.location.href = 'dashboard.html', 2000);
   }
 });
 
-// 👇 NEW FUNCTION: Fetch friends and populate datalist
-async function loadFriendsForAutocomplete() {
+/* =============================================
+   RENDER CHAPTER INFO
+   ============================================= */
+function _renderChapterInfo() {
+  const ch = _state.chapter;
+
+  // Hide skeleton, show content
+  document.getElementById('chapter-hero-skeleton')?.remove();
+  const hero = document.getElementById('chapter-hero');
+  if (hero) hero.style.display = '';
+
+  // Nav title
+  const navTitle = document.getElementById('nav-chapter-name');
+  if (navTitle) navTitle.textContent = ch.name;
+
+  // Hero
+  const titleEl = document.getElementById('chapter-title');
+  const descEl  = document.getElementById('chapter-desc');
+  const iconEl  = document.getElementById('chapter-icon');
+
+  if (titleEl) titleEl.textContent = ch.name;
+  if (descEl)  {
+    descEl.textContent = ch.description || '';
+    descEl.style.display = ch.description ? '' : 'none';
+  }
+  if (iconEl) {
+    iconEl.textContent = _getInitials(ch.name);
+    iconEl.style.background = _getAvatarColor(ch.name);
+  }
+
+  // Show admin controls
+  if (_state.currentUser.id === ch.created_by) {
+    document.getElementById('member-panel-admin')?.style.setProperty('display', 'block');
+  }
+
+  document.title = `${ch.name} — Hisaab-Kitaab`;
+}
+
+/* =============================================
+   EVENTS
+   ============================================= */
+async function _loadEvents() {
   try {
-    const data = await apiFetch("/friends"); 
-    if (data.ok) {
-      myFriendsCache = data.friends;
-      
-      const dataList = document.getElementById("friends-datalist");
-      if (dataList) {
-        // ✅ XSS FIX: Escape user-generated friend data
-        dataList.innerHTML = myFriendsCache
-          .map(f => `<option value="${escapeHTML(f.name)}">${escapeHTML(f.username)}</option>`)
-          .join("");
-      }
-    }
+    const data = await apiFetch(`/chapters/${_chapterId}/events`);
+    _state.events = data.events || [];
+    window.events = _state.events;
+    _renderEventTabs();
   } catch (err) {
-    console.error("Failed to load friends for autocomplete", err);
+    console.warn('Events load failed:', err.message);
   }
 }
 
-// --- INITIALIZATION ---
-// NOTE: This duplicate DOMContentLoaded listener has been removed to avoid conflicts
-// The single listener above handles all initialization
+function _renderEventTabs() {
+  const strip = document.getElementById('events-strip');
+  if (!strip) return;
 
-// ✅ NEW: Load Events
-async function loadEvents() {
-  try {
-    const data = await apiFetch(`/chapters/${chapterId}/events`);
-    events = data.events || [];
-    renderEventTabs();
-  } catch (err) {
-    console.warn("Failed to load events", err);
-  }
-}
+  strip.innerHTML = '';
 
-// ✅ NEW: Render Tabs (Pills)
-function renderEventTabs() {
-  if (!eventsContainer) return;
-  
-  // 1. "All" Pill
-  let html = `
-    <button class="event-pill ${currentEventId === null ? 'active' : ''}" 
-      onclick="switchEvent(null)">
-      All
-    </button>
-  `;
+  // "All" pill
+  const allPill = _createPill('All', _state.currentEventId === null, () => _switchEvent(null));
+  strip.appendChild(allPill);
 
-  // 2. Event Pills
-  events.forEach(ev => {
-    // ✅ XSS FIX: Escape event name
-    html += `
-      <button class="event-pill ${currentEventId === ev.id ? 'active' : ''}" 
-        onclick="switchEvent(${ev.id})">
-        ${escapeHTML(ev.name)}
-      </button>
-    `;
-  });
-
-  // 3. "+ New" Pill
-  html += `
-    <button class="event-pill new" onclick="openCreateEventModal()">
-      + New
-    </button>
-  `;
-
-  eventsContainer.innerHTML = html;
-}
-
-// ✅ NEW: Switch Logic
-window.switchEvent = function(eventId) {
-  if (currentEventId === eventId) return; // No change
-  currentEventId = eventId;
-  
-  // Re-render tabs to highlight active
-  renderEventTabs();
-  
-  // Reload data filtered by this event
-  expenseListEl.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
-  loadExpenses();
-};
-
-// --- UPDATED: Load Expenses (Accepts Event Filter) ---
-// UPDATED: Robust loadExpenses function
-async function loadExpenses(append = false) {
-  if (!append) {
-    expensesOffset = 0;
-    expenses = [];
+  // Event pills
+  for (const ev of _state.events) {
+    const pill = _createPill(ev.name, _state.currentEventId === ev.id, () => _switchEvent(ev.id));
+    strip.appendChild(pill);
   }
 
-  try {
-    let url = `/expenses/chapter/${chapterId}?limit=${EXPENSES_PAGE_SIZE}&offset=${expensesOffset}`;
-    if (currentEventId) url += `&eventId=${currentEventId}`;
-    
-    const data = await apiFetch(url);
-    
-    // 1. SAFETY CHECK: Use '?.' so it doesn't crash if pagination is missing
-    expensesTotal = data.pagination?.total || 0;
-    
-    // 2. SAFETY CHECK: Ensure data.expenses is an array
-    const fetchedExpenses = Array.isArray(data.expenses) ? data.expenses : [];
-    
-    if (append) {
-      expenses = [...expenses, ...fetchedExpenses];
-    } else {
-      expenses = fetchedExpenses;
-    }
-    
-    renderExpenses();
-    
-    // 3. Show "Load more" only when the server says there are more pages
-    renderLoadMoreButton(data.pagination?.hasMore || false);
-    
-    loadHeroSettlements();
-    
-  } catch (err) {
-    // 4. LOG THE ACTUAL ERROR to the F12 developer console
-    console.error("Failed to load expenses detailed error:", err);
-    
-    const listEl = document.getElementById("expense-list-container");
-    if (listEl) {
-      listEl.innerHTML = `<div style="color:red; text-align:center; padding:20px;">
-        Error: ${escapeHTML(err.message || "Failed to load expenses")}. Check console.
-      </div>`;
-    }
-  }
+  // "+ New" pill
+  const newPill = document.createElement('button');
+  newPill.className = 'event-pill event-pill--new';
+  newPill.textContent = '+ New';
+  newPill.addEventListener('click', _openCreateEventModal);
+  strip.appendChild(newPill);
 }
 
-// --- UPDATED: Render Expenses (Step 6.4 - New Card Structure) ---
-function renderExpenses() {
-  expenseListEl.innerHTML = "";
-  
-  if (expenses.length === 0) {
-    // Custom Empty State for Events
-    if (currentEventId) {
-       emptyStateEl.querySelector('p').textContent = "No expenses in this event yet.";
-    } else {
-       emptyStateEl.querySelector('p').textContent = "No expenses yet. Tap + to add one.";
-    }
-    emptyStateEl.style.display = "block";
-    return;
-  }
-  
-  emptyStateEl.style.display = "none";
-
-  expenses.forEach(ex => {
-    const card = document.createElement("div");
-    card.className = "expense-card";
-    if (ex.isTemp) { card.style.opacity = "0.6"; card.style.pointerEvents = "none"; }
-
-    // Icon cell
-    const iconDiv = document.createElement("div");
-    iconDiv.className = "expense-icon";
-    iconDiv.textContent = ex.category_icon || "💰";
-
-    // Info cell
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "expense-info";
-
-    const h4 = document.createElement("h4");
-    // ✅ XSS FIX: Escape description
-    h4.textContent = escapeHTML(ex.description || "Untitled Expense");
-
-    const p = document.createElement("p");
-    const strong = document.createElement("strong");
-    // ✅ XSS FIX: Escape payer_name
-    strong.textContent = escapeHTML(ex.payer_name || "Unknown");
-    p.appendChild(strong);
-    p.appendChild(document.createTextNode(" • " + timeAgo(ex.expense_date)));
-
-    infoDiv.appendChild(h4);
-    infoDiv.appendChild(p);
-
-    // Right cell
-    const rightDiv = document.createElement("div");
-    rightDiv.className = "expense-right";
-
-    const amountDiv = document.createElement("div");
-    amountDiv.className = "expense-amount";
-    amountDiv.textContent = "₹" + parseFloat(ex.amount).toLocaleString("en-IN");
-
-    const hintDiv = document.createElement("div");
-    hintDiv.className = "expense-edit-hint";
-    hintDiv.textContent = "Tap to edit";
-
-    rightDiv.appendChild(amountDiv);
-    rightDiv.appendChild(hintDiv);
-
-    card.appendChild(iconDiv);
-    card.appendChild(infoDiv);
-    card.appendChild(rightDiv);
-
-    if (!ex.isTemp) {
-      card.addEventListener("click", () => openEditExpenseModal(ex.id));
-    }
-
-    expenseListEl.appendChild(card);
-  });
-}
-
-// UPDATED: Load More Button
-// UPDATED: Load More Button (Fixed DOM Insertion)
-function renderLoadMoreButton(hasMore) {
-  const container = document.getElementById('load-more-container');
-  if (!container) return; // Failsafe if HTML isn't updated
-  
-  // Clear any existing button first
-  container.innerHTML = '';
-  
-  if (!hasMore) return;
-  
+function _createPill(label, isActive, onClick) {
   const btn = document.createElement('button');
-  btn.id = 'load-more-btn';
-  btn.textContent = `Load more expenses`;
-  
-  // Strong inline styles to guarantee visibility over any other CSS
-  btn.style.cssText = `
-    display: inline-block !important; 
-    width: 90% !important; 
-    max-width: 400px !important; 
-    margin: 10px auto 80px auto !important; /* Huge bottom margin to clear the FAB */
-    padding: 14px 20px !important; 
-    background: #d000ff !important; 
-    color: white !important; 
-    border: none !important;
-    border-radius: 12px !important; 
-    font-weight: 700 !important;
-    font-size: 1rem !important;
-    cursor: pointer !important; 
-    position: relative !important;
-    z-index: 100 !important;
-    box-shadow: 0 4px 12px rgba(208, 0, 255, 0.3) !important;
-  `;
-  
-  btn.addEventListener('click', () => {
-    btn.innerHTML = '<span class="spinner-small" style="border-top-color: white;"></span> Loading...';
-    btn.disabled = true;
-    btn.style.opacity = '0.7';
-    expensesOffset += EXPENSES_PAGE_SIZE;
-    loadExpenses(true);
-  });
-  
-  container.appendChild(btn);
+  btn.className = 'event-pill' + (isActive ? ' is-active' : '');
+  btn.textContent = label;
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
-// --- RENDER FUNCTIONS ---
-function renderChapterInfo() {
-  document.getElementById("chapter-skeleton").style.display = "none";
-  document.getElementById("chapter-content").style.display = "block";
-
-  // Populate sticky nav title (was always empty before)
-  const navTitle = document.getElementById("nav-chapter-name");
-  if (navTitle) navTitle.textContent = currentChapter.name;
-
-  titleEl.textContent = currentChapter.name;
-  descEl.textContent = currentChapter.description || "";
-  descEl.style.display = currentChapter.description ? "block" : "none";
-
-  iconEl.textContent = getInitials(currentChapter.name);
-  const color = getAvatarColor(currentChapter.name);
-  iconEl.style.background = color;
-  iconEl.style.boxShadow = `0 0 30px ${color}60`;
-
-  if (currentUser.id === currentChapter.created_by) {
-    adminActions.style.display = "block";
-  }
+async function _switchEvent(eventId) {
+  if (_state.currentEventId === eventId) return;
+  _state.currentEventId = eventId;
+  window.currentEventId = eventId;
+  _renderEventTabs();
+  await _loadExpenses();
+  EventBus.emit('event:switched', { eventId });
 }
 
-// ✅ UPDATED: renderMembers() - Async with deletability check + XSS protection
-async function renderMembers() {
-  memberListEl.innerHTML = "";
+function _openCreateEventModal() {
+  const overlay = ModalManager.createOverlay(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 class="modal-title">New Event</h2>
+      <button class="modal-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding: 0 20px 24px;">
+      <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:16px;line-height:1.5;">
+        Events are sub-groups inside this chapter (e.g. "Goa Trip", "Diwali Party"). All chapter members are included automatically.
+      </p>
+      <form id="create-event-form">
+        <div class="form-group">
+          <label class="form-label" for="ev-name">Event Name *</label>
+          <input type="text" id="ev-name" class="form-input" maxlength="100" required placeholder="e.g. Weekend Getaway">
+        </div>
+        <button type="submit" class="btn btn--primary" id="ev-submit">Create Event</button>
+      </form>
+    </div>
+  `, { type: 'bottom' });
 
-  // Fetch which members are involved in expenses
-  let involvedIds = [];
-  try {
-    const data = await apiFetch(`/chapters/${chapterId}/members/deletability`);
-    involvedIds = data.involvedMemberIds || [];
-  } catch (e) {
-    // If fetch fails, assume all are involved (safe default — no delete shown)
-    involvedIds = currentMembers.map(m => m.id);
-  }
+  overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
 
-  const isAdmin = currentUser.id === currentChapter.created_by;
-
-  currentMembers.forEach(m => {
-    const isMemberAdmin = (m.user_id === currentChapter.created_by);
-    const isInvolved = involvedIds.includes(m.id);
-    const canDelete = isAdmin && !isMemberAdmin && !isInvolved;
-
-    const row = document.createElement("div");
-    row.className = "dropdown-member-item";
-
-    // ✅ XSS FIX: Escape all user-generated content in innerHTML
-    row.innerHTML = `
-      <div class="small-avatar" style="background:${getAvatarColor(m.member_name)}">${escapeHTML(getInitials(m.member_name))}</div>
-      <div class="member-name-text" style="flex:1;">
-        ${escapeHTML(m.member_name)}
-        ${isMemberAdmin ? '<span class="admin-badge">Admin</span>' : ''}
-      </div>
-      ${canDelete ? `<button class="btn-delete-member" onclick="deleteMember(${m.id})" title="Remove member" aria-label="Remove ${escapeHTML(m.member_name)}">×</button>` : ''}
-    `;
-    memberListEl.appendChild(row);
-  });
-}
-
-// --- HELPER: Render Payer and Split Options ---
-function renderPayerAndSplitOptions(selectedPayerId = null, selectedSplitIds = []) {
-  payerContainer.innerHTML = "";
-  currentMembers.forEach((m, idx) => {
-    const isSelected = selectedPayerId ? (m.id === selectedPayerId) : (idx === 0);
-    
-    const el = document.createElement("label");
-    el.className = `payer-option ${isSelected ? 'selected' : ''}`;
-    // ✅ XSS FIX: Escape member_name
-    el.innerHTML = `
-      <input type="radio" name="payerMemberId" value="${m.id}" ${isSelected ? 'checked' : ''}>
-      <div style="font-weight:600; font-size:0.9rem;">${escapeHTML(m.member_name)}</div>
-    `;
-    el.addEventListener("click", () => {
-      document.querySelectorAll(".payer-option").forEach(x => x.classList.remove("selected"));
-      el.classList.add("selected");
-    });
-    payerContainer.appendChild(el);
-  });
-
-  splitContainer.innerHTML = "";
-  const isAddMode = selectedSplitIds.length === 0 && !isEditingExpense; 
-  
-  currentMembers.forEach(m => {
-    const isChecked = isAddMode || selectedSplitIds.includes(m.id);
-    
-    const el = document.createElement("label");
-    el.className = `split-option ${isChecked ? 'selected' : ''}`;
-    // ✅ XSS FIX: Escape member_name
-    el.innerHTML = `
-      <input type="checkbox" name="involvedMemberIds[]" value="${m.id}" ${isChecked ? 'checked' : ''}>
-      <div class="custom-check"></div>
-      <span>${escapeHTML(m.member_name)}</span>
-    `;
-    el.addEventListener("change", () => {
-      if (el.querySelector("input").checked) el.classList.add("selected");
-      else el.classList.remove("selected");
-    });
-    splitContainer.appendChild(el);
-  });
-}
-
-// --- EXPENSE MODAL LOGIC ---
-window.openAddExpenseModal = function() {
-  isEditingExpense = false;
-  editingExpenseId = null;
-  document.getElementById("expense-modal-title").textContent = "Add Expense";
-  
-  // 🔒 SAFETY RESET: Explicitly enable button and reset text for new expense
-  const saveBtn = document.getElementById("btn-save-expense");
-  if (saveBtn) {
-    saveBtn.disabled = false;
-    saveBtn.innerHTML = "Save Expense";
-  }
-  
-  document.getElementById("btn-delete-expense").style.display = "none";
-  
-  addExpenseForm.reset();
-  renderPayerAndSplitOptions(); 
-  
-  addExpenseModal.classList.add("active");
-  setTimeout(() => addExpenseForm.querySelector(".expense-amount-input")?.focus(), 350);
-};
-
-window.openEditExpenseModal = async function(id) {
-  isEditingExpense = true;
-  editingExpenseId = id;
-  
-  showToast("Loading details...", "info");
-
-  try {
-    const data = await apiFetch(`/expenses/${id}`);
-    const { expense, involvedMemberIds } = data;
-
-    addExpenseForm.reset();
-    document.getElementById("expense-modal-title").textContent = "Edit Expense";
-    
-    // 🔒 SAFETY RESET: Explicitly enable button and set update text for editing
-    const saveBtn = document.getElementById("btn-save-expense");
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.innerHTML = "Update Expense";
+  overlay.querySelector('#create-event-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = overlay.querySelector('#ev-name').value.trim();
+    if (!name) return;
+    const btn = overlay.querySelector('#ev-submit');
+    btn.classList.add('btn--loading'); btn.disabled = true;
+    try {
+      const data = await apiFetch(`/chapters/${_chapterId}/events`, { method: 'POST', body: { name } });
+      showToast('Event created!', 'success');
+      ModalManager.close(overlay);
+      await _loadEvents();
+      _switchEvent(data.event.id);
+    } catch (err) {
+      showToast(err.message || 'Failed', 'error');
+      btn.classList.remove('btn--loading'); btn.disabled = false;
     }
-    
-    document.getElementById("btn-delete-expense").style.display = "block";
+  });
 
-    addExpenseForm.querySelector("input[name='amount']").value = expense.amount;
-    addExpenseForm.querySelector("input[name='description']").value = expense.description;
+  setTimeout(() => overlay.querySelector('#ev-name')?.focus(), 350);
+}
 
-    renderPayerAndSplitOptions(expense.payer_member_id, involvedMemberIds);
+/* =============================================
+   EXPENSES
+   ============================================= */
+async function _loadExpenses(append = false) {
+  if (!append) {
+    _state.offset = 0;
+    _state.expenses = [];
+    const list = document.getElementById('expense-list');
+    if (list) list.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${Array(3).fill('<div class="skeleton" style="height:68px;border-radius:var(--radius-lg);"></div>').join('')}
+      </div>
+    `;
+  }
 
-    addExpenseModal.classList.add("active");
+  try {
+    let url = `/expenses/chapter/${_chapterId}?limit=${PAGE_SIZE}&offset=${_state.offset}`;
+    if (_state.currentEventId) url += `&eventId=${_state.currentEventId}`;
+
+    const data = await apiFetch(url);
+    const fetched = Array.isArray(data.expenses) ? data.expenses : [];
+
+    if (append) _state.expenses = [..._state.expenses, ...fetched];
+    else        _state.expenses = fetched;
+
+    window.expenses = _state.expenses;
+
+    _state.total   = data.pagination?.total ?? 0;
+    _state.hasMore = data.pagination?.hasMore ?? false;
+
+    _renderExpenses();
+    _renderLoadMore();
+    _loadHeroSettlements();
+
+    EventBus.emit('expenses:rendered', { expenses: _state.expenses });
 
   } catch (err) {
-    showToast("Failed to load expense details", "error");
-    isEditingExpense = false;
-    editingExpenseId = null;
+    console.error('Expenses load failed:', err);
+    const list = document.getElementById('expense-list');
+    if (list) list.innerHTML = `<div style="text-align:center;padding:32px;color:rgba(255,255,255,0.5);">Failed to load expenses</div>`;
   }
-};
+}
 
-// ✅ FIX #1: Added document.activeElement.blur() to prevent focus traps
-window.closeAddExpenseModal = function() {
-  addExpenseModal.classList.remove("active");
-  
-  // 🔒 Clear focus to prevent focus traps & keyboard issues
-  if (document.activeElement && typeof document.activeElement.blur === 'function') {
-    document.activeElement.blur();
-  }
-  
-  // 🔒 Re-enable the save button and reset to default text
-  const saveBtn = document.getElementById("btn-save-expense");
-  if (saveBtn) {
-    saveBtn.disabled = false;
-    // Always reset to default "Save Expense" since modal opens in add mode by default
-    saveBtn.innerHTML = "Save Expense";
-  }
-  
-  // Reset state after button update
-  isEditingExpense = false;
-  editingExpenseId = null;
-};
+// Expose for feature scripts
+window.loadExpenses = (append) => _loadExpenses(append);
 
-window.toggleSelectAll = function() {
-  const checkboxes = splitContainer.querySelectorAll("input[type='checkbox']");
-  const allChecked = Array.from(checkboxes).every(c => c.checked);
-  
-  checkboxes.forEach(c => {
-    c.checked = !allChecked;
-    const row = c.closest(".split-option");
-    if (c.checked) row.classList.add("selected");
-    else row.classList.remove("selected");
-  });
-};
+function _renderExpenses() {
+  const list = document.getElementById('expense-list');
+  if (!list) return;
 
-window.handleDeleteExpense = async function() {
-  if(!confirm("Are you sure you want to delete this expense?")) return;
-  
-  try {
-    await apiFetch(`/expenses/${editingExpenseId}`, { method: "DELETE" });
-    showToast("Expense deleted", "success");
-    closeAddExpenseModal();
-    loadExpenses();
-  } catch(err) {
-    showToast("Failed to delete", "error");
-  }
-};
+  list.innerHTML = '';
+  const empty = document.getElementById('chapter-empty-state');
 
-// --- FORM SUBMIT (Handles Both Add & Edit) ---
-// --- Updated to include eventId ---
-// ✅ FIX #2: Changed from .onsubmit = to addEventListener for robustness
-addExpenseForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const saveBtn = document.getElementById("btn-save-expense");
-  
-  // 🔒 GUARD CLAUSE: Prevent duplicate submissions if button is already in loading state
-  // This prevents race conditions where multiple clicks stack up pending promises
-  if (saveBtn.disabled || saveBtn.innerHTML.includes('spinner')) {
+  if (!_state.expenses.length) {
+    if (empty) empty.style.display = '';
     return;
   }
-  
-  const formData = new FormData(addExpenseForm);
-  
-  // Normalize: remove commas, currency symbols, spaces
-  const rawAmount = formData.get("amount");
-  const normalizedAmount = String(rawAmount).replace(/,/g, "").replace(/[^\d.]/g, "").trim();
-  const amount = parseFloat(normalizedAmount);
-  const description = formData.get("description") || "";
-  const payerId = parseInt(formData.get("payerMemberId"));
-  const involvedIds = [];
-  splitContainer.querySelectorAll("input:checked").forEach(cb => involvedIds.push(parseInt(cb.value)));
+  if (empty) empty.style.display = 'none';
 
-  // --- Validation ---
-  if (!amount || amount <= 0 || isNaN(amount)) {
-    return showToast("Please enter a valid amount", "error");
-  }
-  if (amount > 9999999) {
-    return showToast("Amount seems too large. Please check and try again.", "error");
-  }
-  if (involvedIds.length === 0) return showToast("Select at least one person to split with", "error");
-
-  // --- STEP 1: PREVENT DOUBLE CLICK & INSTANT FEEDBACK ---
-  saveBtn.disabled = true; // Physically prevent second click
-  saveBtn.innerHTML = `<span class="spinner-small"></span> Saving...`; // Visual feedback
-
-  const payload = {
-    chapterId: chapterId,
-    eventId: currentEventId,
-    amount,
-    description,
-    payerMemberId: payerId,
-    involvedMemberIds: involvedIds
-  };
-
-  // --- OPTIMISTIC UI: Add to list immediately if creating new ---
-  let tempId = "temp-" + Date.now();
-  if (!isEditingExpense) {
-    const payerName = currentMembers.find(m => m.id === payerId)?.member_name || "You";
-    const tempExpense = {
-      id: tempId,
-      amount: amount,
-      description: description,
-      expense_date: new Date().toISOString(),
-      payer_name: payerName,
-      isTemp: true // CSS will make this look slightly faded
-    };
-
-    expenses.unshift(tempExpense);
-    renderExpenses();
-    
-    // 🔒 CHANGE: Use wrapper function to ensure proper button reset
-    closeAddExpenseModal(); 
-  }
-
-  try {
-    if (isEditingExpense) {
-      await apiFetch(`/expenses/${editingExpenseId}`, {
-        method: "PUT",
-        body: payload
-      });
-      showToast("Expense updated", "success");
-      closeAddExpenseModal(); // Close after update (since we don't optimistic update edits yet)
-    } else {
-      await apiFetch("/expenses", {
-        method: "POST",
-        body: payload
-      });
-      // No need to call showToast here if we want "silent" success, or do it anyway:
-      // showToast("Expense saved", "success");
-    }
-    
-    // Refresh to replace optimistic data with real server data
-    loadExpenses(); 
-
-  } catch (err) {
-    // --- ROLLBACK: If server fails, remove the fake entry and re-open/enable ---
-    if (!isEditingExpense) {
-      expenses = expenses.filter(ex => ex.id !== tempId);
-      renderExpenses();
-      addExpenseModal.classList.add("active"); // Re-open so user doesn't lose data
-    }
-    
-    // 🔒 Ensure button is re-enabled and spinner replaced with original text on error
-    saveBtn.disabled = false;
-    saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
-    
-    // ✅ IMPROVED: Display user-friendly error messages from main.js apiFetch
-    // Handles rate limit (429) and server errors (5xx) with clear messaging
-    const errorMsg = err.isRateLimit 
-      ? "You're adding expenses too fast, please wait a moment."
-      : err.isServerError
-        ? "Server is temporarily unavailable. Please try again."
-        : (err.message || "Failed to save expense");
-    
-    showToast(errorMsg, "error");
-    
-  } finally {
-    // ✅ CRITICAL: GUARANTEE button re-enables regardless of success/failure
-    // This ensures the UI never gets stuck in "Saving..." state
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.innerHTML = isEditingExpense ? "Update Expense" : "Save Expense";
-    }
-  }
-});
-
-// --- SUMMARY LOGIC ---
-const summaryModal = document.getElementById("summary-modal");
-const summaryList = document.getElementById("summary-list");
-const summaryGrandTotal = document.getElementById("summary-grand-total");
-
-// --- UPDATED: Summary Modal (Use currentEventId) ---
-window.openSummaryModal = async function() {
-  summaryModal.classList.add("active");
-  summaryList.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
-  
-  // ✅ Update Title based on Context
-  const title = currentEventId 
-    ? events.find(e => e.id === currentEventId)?.name + " Summary"
-    : "Chapter Summary";
-  summaryModal.querySelector("h2").textContent = title;
-
-  try {
-    let url = `/expenses/chapter/${chapterId}/summary`;
-    if (currentEventId) url += `?eventId=${currentEventId}`; // Filter!
-
-    const data = await apiFetch(url);
-    renderSummary(data);
-  } catch (err) {
-    summaryList.innerHTML = '<div style="color:red; text-align:center;">Failed to load summary</div>';
-  }
-};
-
-window.closeSummaryModal = function() {
-  summaryModal.classList.remove("active");
-};
-
-function renderSummary(data) {
-  const { summary, grandTotal } = data;
-  summaryGrandTotal.textContent = `₹${grandTotal}`;
-  summaryList.innerHTML = "";
-
-  const maxVal = Math.max(...summary.map(s => Math.max(parseFloat(s.total_spent), parseFloat(s.total_used))), 1);
-
-  summary.forEach(item => {
-    const spent = parseFloat(item.total_spent);
-    const used = parseFloat(item.total_used);
-    
-    const row = document.createElement("div");
-    row.style.marginBottom = "20px";
-    
-    // ✅ XSS FIX: Escape member_name
-    row.innerHTML = `
-      <div class="summary-row" style="border:none; padding-bottom:5px;">
-        <div class="summary-name">
-          <div class="small-avatar" style="width:30px; height:30px; font-size:0.8rem; background:${getAvatarColor(item.member_name)}">
-            ${escapeHTML(getInitials(item.member_name))}
-          </div>
-          ${escapeHTML(item.member_name)}
-        </div>
-      </div>
-      
-      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-bottom:2px;">
-        <span>Paid</span> <span>₹${spent.toFixed(2)}</span>
-      </div>
-      <div class="summary-bar-bg" style="height:6px; margin-top:0; margin-bottom:8px;">
-        <div class="summary-bar-fill" style="width: ${(spent/maxVal)*100}%; background: #00e676;"></div>
-      </div>
-
-      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666; margin-bottom:2px;">
-        <span>Consumed</span> <span>₹${used.toFixed(2)}</span>
-      </div>
-      <div class="summary-bar-bg" style="height:6px; margin-top:0;">
-        <div class="summary-bar-fill" style="width: ${(used/maxVal)*100}%; background: #d000ff;"></div>
-      </div>
-    `;
-    summaryList.appendChild(row);
-  });
-}
-
-// =========================================================
-// ✅ SETTLEMENT LOGIC (Updated)
-// =========================================================
-const settlementModal = document.getElementById("settlement-modal");
-const settlementList = document.getElementById("settlement-list");
-const settlementLoading = document.getElementById("settlement-loading");
-const settlementEmpty = document.getElementById("settlement-empty");
-
-// --- UPDATED: Settlements Modal (Use currentEventId) ---
-window.openSettlementModal = async function() {
-  settlementModal.classList.add("active");
-  
-  settlementList.innerHTML = "";
-  settlementList.style.display = "none";
-  settlementEmpty.style.display = "none";
-  settlementLoading.style.display = "block";
-
-  // ✅ Update Title
-  const title = currentEventId 
-    ? "Settle Up: " + events.find(e => e.id === currentEventId)?.name
-    : "Who Pays Whom?";
-  settlementModal.querySelector("h2").textContent = title;
-
-  try {
-    let url = `/expenses/chapter/${chapterId}/settlements`;
-    if (currentEventId) url += `?eventId=${currentEventId}`; // Filter!
-
-    const data = await apiFetch(url);
-    renderSettlements(data.settlements);
-  } catch (err) {
-    console.error(err);
-    settlementList.innerHTML = `<div style="color:red; text-align:center;">Failed to calculate settlements</div>`;
-    settlementList.style.display = "block";
-  } finally {
-    settlementLoading.style.display = "none";
-  }
-};
-
-window.closeSettlementModal = function() {
-  settlementModal.classList.remove("active");
-};
-
-function renderSettlements(settlements) {
-  if (!settlements || settlements.length === 0) {
-    settlementEmpty.style.display = "block";
-    loadAndShowSettlementHistoryInModal();
-    return;
-  }
-
-  settlementList.style.display = "block";
-  settlementList.innerHTML = "";
-
-  settlements.forEach(item => {
-    const row = document.createElement("div");
-    row.className = "settle-row-pending";
-
-    // ✅ XSS FIX: Escape from/to names
-    const fromSafe = escapeHTML(item.from).replace(/'/g, "\\'");
-    const toSafe = escapeHTML(item.to).replace(/'/g, "\\'");
-
-    row.innerHTML = `
-      <div class="settle-people">
-        <div class="small-avatar" style="background:${getAvatarColor(item.from)}; width:28px; height:28px; font-size:0.75rem; flex-shrink:0;">
-          ${escapeHTML(getInitials(item.from))}
-        </div>
-        <span><strong>${escapeHTML(item.from)}</strong> → <strong>${escapeHTML(item.to)}</strong></span>
-      </div>
-      <span class="settle-amount-tag">₹${item.amount}</span>
-      <button class="btn-mark-settled" data-from="${fromSafe}" data-to="${toSafe}" data-amount="${item.amount}">✓ Mark</button>
-    `;
-
-    row.querySelector('.btn-mark-settled').addEventListener('click', function() {
-      window._openMarkModal({
-        from: this.dataset.from,
-        to: this.dataset.to,
-        amount: parseFloat(this.dataset.amount)
-      });
-    });
-
-    settlementList.appendChild(row);
-  });
-
-  loadAndShowSettlementHistoryInModal();
-}
-
-async function loadAndShowSettlementHistoryInModal() {
-  try {
-    let url = `/chapters/${chapterId}/settlements/history`;
-    if (currentEventId) url += `?eventId=${currentEventId}`;
-    const data = await apiFetch(url);
-    const history = data.history || [];
-    if (history.length === 0) return;
-
-    const histSection = document.createElement('div');
-    histSection.style.marginTop = '20px';
-
-    const histTitle = document.createElement('div');
-    histTitle.style.cssText = 'font-size:0.85rem; font-weight:700; color:#888; margin-bottom:10px; text-transform:uppercase;';
-    histTitle.textContent = `✅ Completed (${history.length})`;
-    histSection.appendChild(histTitle);
-
-    history.forEach(rec => {
-      const row = document.createElement('div');
-      row.className = 'settled-record-row';
-      row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#f9f9f9; border-radius:8px; border:1px solid #eee; margin-bottom:6px; gap:8px;';
-      // ✅ XSS FIX: Escape from_name, to_name, note
-      row.innerHTML = `
-        <div style="flex:1; min-width:0;">
-          <div style="font-size:0.82rem; color:#555;">
-            <strong>${escapeHTML(rec.from_name)}</strong> → <strong>${escapeHTML(rec.to_name)}</strong>
-          </div>
-          <div style="font-size:0.72rem; color:#aaa; margin-top:2px;">
-            ${new Date(rec.marked_at).toLocaleDateString('en-IN')}${rec.note ? ' · ' + escapeHTML(rec.note) : ''}
-          </div>
-        </div>
-        <span style="font-weight:700; font-size:0.88rem; color:#00875a; flex-shrink:0;">₹${parseFloat(rec.amount).toFixed(2)}</span>
-        <button style="background:none; border:1px solid #ffcdd2; color:#e53935; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer; flex-shrink:0;" data-record-id="${rec.id}">Undo</button>
-      `;
-      row.querySelector('button').addEventListener('click', async function() {
-        const recordId = this.dataset.recordId;
-        if (!confirm('Undo this settlement?')) return;
-        try {
-          await apiFetch(`/chapters/${chapterId}/settlements/history/${recordId}`, { method: 'DELETE' });
-          showToast('Settlement undone', 'info');
-          openSettlementModal();
-        } catch (err) {
-          showToast(err.message || 'Failed', 'error');
-        }
-      });
-      histSection.appendChild(row);
-    });
-
-    settlementList.appendChild(histSection);
-  } catch(e) {
-    console.warn('Could not load settlement history in modal:', e.message);
+  for (const ex of _state.expenses) {
+    list.appendChild(_buildExpenseCard(ex));
   }
 }
 
-window._openMarkModal = function(settlement) {
-  const existing = document.getElementById('mark-settle-modal');
-  if (existing) existing.remove();
+// Expose for feature scripts (feature-categories patches this)
+window.renderExpenses = _renderExpenses;
 
-  const modal = document.createElement('div');
-  modal.id = 'mark-settle-modal';
-  modal.className = 'modal-overlay active';
+function _buildExpenseCard(ex) {
+  const card = document.createElement('div');
+  card.className = 'expense-card' + (ex.isTemp ? ' expense-card--temp' : '');
+  card.dataset.expenseId = ex.id;
 
-  // ✅ XSS FIX: Escape from/to display names
-  const fromDisplay = escapeHTML(settlement.from);
-  const toDisplay = escapeHTML(settlement.to);
-  const amountDisplay = parseFloat(settlement.amount).toFixed(2);
+  const icon     = ex.category_icon || '💰';
+  const name     = escapeHTML(ex.description || 'Untitled');
+  const payer    = escapeHTML(ex.payer_name || 'Unknown');
+  const amount   = `₹${parseFloat(ex.amount).toLocaleString('en-IN')}`;
+  const when     = _timeAgo(ex.expense_date);
 
-  modal.innerHTML = `
-    <div class="modal-box" style="max-width:400px;">
-      <div class="modal-header">
-        <h2>Mark as Settled</h2>
-        <button class="close-modal" type="button">×</button>
-      </div>
-      <div class="mark-settle-form">
-        <div class="mark-settle-summary">
-          <div class="from-to">
-            <strong>${fromDisplay}</strong> pays <strong>${toDisplay}</strong>
-          </div>
-          <div class="max-amount">Pending: ₹${amountDisplay}</div>
-        </div>
-        <div class="mark-settle-amount-input">
-          <span>₹</span>
-          <input type="number" id="settle-amount-input" value="${amountDisplay}" step="0.01" min="0.01">
-        </div>
-        <textarea class="mark-settle-note-input" id="settle-note-input" placeholder="Note (optional, e.g. Paid via GPay)" rows="2"></textarea>
-        <button class="btn-primary" id="btn-confirm-settle" type="button">
-          Confirm Settlement
-        </button>
-      </div>
+  card.innerHTML = `
+    <div class="expense-icon">${icon}</div>
+    <div class="expense-info">
+      <div class="expense-info__name">${name}</div>
+      <div class="expense-info__meta"><strong>${payer}</strong> · ${when}</div>
+    </div>
+    <div class="expense-right">
+      <div class="expense-amount">${amount}</div>
+      ${ex.isTemp ? '' : '<div class="expense-edit-hint">Tap to edit</div>'}
     </div>
   `;
 
-  modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+  if (!ex.isTemp) {
+    card.addEventListener('click', () => _openExpenseModal('edit', ex.id));
+  }
 
-  modal.querySelector('#btn-confirm-settle').addEventListener('click', async function() {
-    const btn = this;
-    const amount = parseFloat(document.getElementById('settle-amount-input').value);
-    const note = document.getElementById('settle-note-input').value.trim();
+  return card;
+}
 
-    if (!amount || amount <= 0) {
+function _renderLoadMore() {
+  const container = document.getElementById('load-more-container');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!_state.hasMore) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'btn-load-more';
+  btn.textContent = 'Load more expenses';
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    _state.offset += PAGE_SIZE;
+    await _loadExpenses(true);
+  });
+  container.appendChild(btn);
+}
+
+/* =============================================
+   SETTLEMENT HERO
+   ============================================= */
+async function _loadHeroSettlements(force = false) {
+  try {
+    let url = `/expenses/chapter/${_chapterId}/settlements`;
+    if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
+    const data = await apiFetch(url, force ? { _noCache: true } : {});
+    _renderHeroSettlements(data.settlements || []);
+  } catch (err) {
+    console.warn('Settlement hero error:', err.message);
+  }
+}
+
+function _renderHeroSettlements(settlements) {
+  const listEl  = document.getElementById('hero-settlement-list');
+  const content = document.getElementById('hero-settlement-body');
+  const btn     = document.getElementById('hero-expand-btn');
+
+  if (!listEl) return;
+
+  // Auto-expand if there are settlements
+  if (settlements.length > 0 && content) {
+    content.classList.add('is-open');
+    btn?.classList.add('is-open');
+    document.getElementById('hero-settlement-header')?.classList.add('is-open');
+  }
+
+  if (!settlements.length) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.5);font-size:var(--text-sm);">🎉 All settled up!</div>';
+    return;
+  }
+
+  listEl.innerHTML = settlements.map(s => `
+    <div class="settle-row">
+      <div class="settle-row__info">
+        <div class="avatar avatar--sm" style="background:${_getAvatarColor(s.from)}">${escapeHTML(_getInitials(s.from))}</div>
+        <div class="settle-row__names"><strong>${escapeHTML(s.from)}</strong> <span style="color:rgba(255,255,255,0.4)">→</span> <strong>${escapeHTML(s.to)}</strong></div>
+      </div>
+      <div class="settle-row__amount">₹${s.amount}</div>
+    </div>
+  `).join('');
+
+  EventBus.emit('settlement:refresh', { settlements });
+}
+
+// Expose for feature scripts
+window.loadHeroSettlements = (force) => _loadHeroSettlements(force);
+window.renderHeroSettlements = _renderHeroSettlements;
+
+// Toggle collapse
+document.getElementById('hero-settlement-header')?.addEventListener('click', (e) => {
+  if (e.target.closest('.icon-btn-sm') && !e.target.closest('#hero-expand-btn')) return;
+  const body = document.getElementById('hero-settlement-body');
+  const btn  = document.getElementById('hero-expand-btn');
+  const header = document.getElementById('hero-settlement-header');
+  body?.classList.toggle('is-open');
+  btn?.classList.toggle('is-open');
+  header?.classList.toggle('is-open');
+});
+
+// Refresh settlements button
+window.refreshSettlements = async () => { await _loadHeroSettlements(true); showToast('Refreshed', 'info'); };
+
+/* =============================================
+   ADD / EDIT EXPENSE MODAL
+   ============================================= */
+async function _openExpenseModal(mode, expenseId) {
+  let existingExpense = null;
+  let involvedIds     = [];
+
+  if (mode === 'edit' && expenseId) {
+    try {
+      showToast('Loading…', 'info');
+      const data = await apiFetch(`/expenses/${expenseId}`);
+      existingExpense = data.expense;
+      involvedIds     = data.involvedMemberIds || [];
+    } catch (err) {
+      showToast('Failed to load expense', 'error');
+      return;
+    }
+  }
+
+  const isEdit = mode === 'edit';
+
+  const overlay = ModalManager.createOverlay(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 class="modal-title">${isEdit ? 'Edit Expense' : 'Add Expense'}</h2>
+      <button class="modal-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="expense-form" style="padding: 0 20px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; max-height:calc(92dvh - 120px); padding-bottom: 24px;">
+
+      <!-- Amount -->
+      <div class="amount-block">
+        <div class="amount-row">
+          <span class="amount-currency">₹</span>
+          <input type="number" class="amount-input" name="amount" id="exp-amount"
+            placeholder="0" min="0.01" step="any" inputmode="decimal"
+            value="${isEdit ? existingExpense?.amount || '' : ''}" required>
+        </div>
+        <div class="amount-underline"></div>
+      </div>
+
+      <!-- Description -->
+      <div class="form-group" style="margin:0">
+        <label class="form-label" for="exp-desc">
+          Description <span class="form-label--optional">(optional)</span>
+        </label>
+        <input type="text" id="exp-desc" name="description" class="form-input"
+          placeholder="e.g. Dinner at Taj" maxlength="100" autocomplete="off"
+          value="${isEdit ? escapeHTML(existingExpense?.description || '') : ''}">
+      </div>
+
+      <!-- Category row injected by feature-categories.js -->
+      <div id="expense-category-inject"></div>
+
+      <!-- Paid by -->
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Paid By</label>
+        <div class="payer-scroll" id="exp-payer-list"></div>
+      </div>
+
+      <!-- Split among -->
+      <div class="form-group" style="margin:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <label class="form-label" style="margin:0">Split Among</label>
+          <button type="button" class="btn btn--ghost" id="exp-select-all" style="padding:4px 10px;font-size:var(--text-xs);">Select All</button>
+        </div>
+        <div class="split-list" id="exp-split-list"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="sheet-actions">
+        <button type="submit" class="btn-save-expense" id="exp-save">${isEdit ? 'Update Expense' : 'Save Expense'}</button>
+        ${isEdit ? '<button type="button" class="btn-delete-expense" id="exp-delete">Delete</button>' : ''}
+      </div>
+    </form>
+  `, { type: 'bottom' });
+
+  overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
+
+  // Render payers and split options
+  _renderPayerOptions(overlay, isEdit ? existingExpense?.payer_member_id : null);
+  _renderSplitOptions(overlay, isEdit ? involvedIds : []);
+
+  // Select all
+  overlay.querySelector('#exp-select-all')?.addEventListener('click', () => {
+    const rows = overlay.querySelectorAll('.split-row');
+    const allSelected = [...rows].every(r => r.classList.contains('is-selected'));
+    rows.forEach(r => {
+      r.classList.toggle('is-selected', !allSelected);
+    });
+  });
+
+  // Delete button
+  if (isEdit) {
+    overlay.querySelector('#exp-delete')?.addEventListener('click', async () => {
+      if (!confirm('Delete this expense?')) return;
+      try {
+        await apiFetch(`/expenses/${expenseId}`, { method: 'DELETE' });
+        showToast('Expense deleted', 'success');
+        ModalManager.close(overlay);
+        await _loadExpenses();
+      } catch (err) { showToast('Failed', 'error'); }
+    });
+  }
+
+  // Emit for feature scripts to inject category selector
+  EventBus.emit('expense:modal:open', { mode, expense: existingExpense });
+
+  // Submit
+  overlay.querySelector('#expense-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const rawAmount = overlay.querySelector('#exp-amount').value;
+    const amount    = parseFloat(String(rawAmount).replace(/,/g, '').trim());
+    if (!amount || amount <= 0 || amount > 9_999_999) {
       showToast('Enter a valid amount', 'error');
       return;
     }
 
-    const fromMember = currentMembers.find(m => m.member_name === fromDisplay);
-    const toMember = currentMembers.find(m => m.member_name === toDisplay);
+    const description = overlay.querySelector('#exp-desc').value.trim();
+    const payerInput  = overlay.querySelector('input[name="payerMemberId"]:checked');
+    const payerId     = payerInput ? parseInt(payerInput.value) : _state.members[0]?.id;
+    const splitIds    = [...overlay.querySelectorAll('.split-row.is-selected')].map(r => parseInt(r.dataset.memberId));
 
-    if (!fromMember || !toMember) {
-      showToast('Could not identify members', 'error');
-      return;
-    }
+    if (!splitIds.length) { showToast('Select at least one person to split with', 'error'); return; }
 
-    setBtnLoading(btn, true);
+    const categoryId = window._pendingCategoryId ?? null;
+    window._pendingCategoryId = undefined;
 
-    try {
-      await apiFetch(`/chapters/${chapterId}/settlements/mark`, {
-        method: 'POST',
-        body: {
-          fromMemberId: fromMember.id,
-          toMemberId: toMember.id,
-          amount,
-          note,
-          eventId: currentEventId || null
-        }
-      });
-      modal.remove();
-      showToast('Settlement marked ✓', 'success');
-      loadExpenses();
-      loadHeroSettlements();
-    } catch (err) {
-      showToast(err.message || 'Failed to mark settlement', 'error');
-      setBtnLoading(btn, false);
-    }
-  });
-
-  document.body.appendChild(modal);
-  setTimeout(() => document.getElementById('settle-amount-input')?.focus(), 100);
-};
-
-// ==========================================
-// ✅ EXCEL EXPORT LOGIC (Unchanged)
-// ==========================================
-window.downloadReport = async function() {
-  const btn = document.querySelector("button[onclick='downloadReport()']");
-  
-  // 🔒 GUARD CLAUSE: Prevent duplicate export requests
-  if (btn && (btn.disabled || btn.innerHTML.includes('spinner'))) {
-    return;
-  }
-  
-  try {
-    if (btn) setBtnLoading(btn, true);
-    
-    // UI Feedback: Show what we are downloading
-    const label = currentEventId 
-      ? "Generating Event Report..." 
-      : "Generating Full Report...";
-    showToast(label, "info");
-
-    // Read CSRF from cookie directly (same as apiFetch does internally)
-    const csrfToken = document.cookie.split('; ')
-      .find(row => row.startsWith('csrf_token='))
-      ?.split('=')[1] || '';
-
-    // ✅ Append eventId if selected
-    let url = `/api/chapters/${chapterId}/export`;
-    if (currentEventId) {
-      url += `?eventId=${currentEventId}`;
-    }
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "X-CSRF-Token": csrfToken
-      },
-      credentials: "include"
-    });
-
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || "Export failed");
-    }
-
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    
-    // Filename is set by the Content-Disposition header in the backend, 
-    // but we can set a fallback here.
-    const cleanName = currentChapter.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    a.download = `hisaab_kitaab_${cleanName}.xlsx`;
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    window.URL.revokeObjectURL(downloadUrl);
-    document.body.removeChild(a);
-
-    showToast("Report downloaded successfully", "success");
-
-  } catch (err) {
-    console.error("Download error:", err);
-    
-    // ✅ IMPROVED: Handle rate limit and server errors for export too
-    const errorMsg = err.isRateLimit 
-      ? "You're requesting reports too fast, please wait a moment."
-      : err.isServerError
-        ? "Server is temporarily unavailable. Please try again."
-        : (err.message || "Failed to download report");
-    
-    showToast(errorMsg, "error");
-  } finally {
-    if (btn) setBtnLoading(btn, false);
-  }
-};
-
-// ✅ NEW: Create Event Logic
-const createEventForm = document.getElementById("create-event-form");
-
-window.openCreateEventModal = function() {
-  createEventForm.reset();
-  createEventModal.classList.add("active");
-  setTimeout(() => createEventForm.querySelector("input").focus(), 100);
-};
-
-window.closeCreateEventModal = function() {
-  createEventModal.classList.remove("active");
-};
-
-createEventForm.onsubmit = async (e) => {
-  e.preventDefault();
-  const btn = createEventForm.querySelector("button[type='submit']");
-  
-  // 🔒 GUARD CLAUSE: Prevent duplicate event creation requests
-  if (btn && (btn.disabled || btn.innerHTML.includes('spinner'))) {
-    return;
-  }
-  
-  const name = createEventForm.name.value.trim();
-  
-  if(!name) return;
-
-  try {
-    setBtnLoading(btn, true);
-    const data = await apiFetch(`/chapters/${chapterId}/events`, {
-      method: "POST",
-      body: { name }
-    });
-    
-    showToast("Event created!", "success");
-    closeCreateEventModal();
-    
-    // Refresh events and auto-switch to new event
-    await loadEvents();
-    switchEvent(data.event.id);
-
-  } catch(err) {
-    // ✅ IMPROVED: Handle rate limit and server errors for event creation
-    const errorMsg = err.isRateLimit 
-      ? "You're creating events too fast, please wait a moment."
-      : err.isServerError
-        ? "Server is temporarily unavailable. Please try again."
-        : (err.message || "Failed to create event");
-    
-    showToast(errorMsg, "error");
-  } finally {
-    setBtnLoading(btn, false);
-  }
-};
-
-// --- UTILS ---
-function getInitials(name) {
-  if (!name) return "?";
-  const words = name.trim().split(/\s+/);
-  if (words.length === 1) return words[0].charAt(0).toUpperCase();
-  return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
-}
-
-function getAvatarColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const h = Math.abs(hash) % 360;
-  return `hsl(${h}, 70%, 60%)`;
-}
-
-function timeAgo(dateString) {
-  const now = new Date();
-  const date = new Date(dateString);
-  const diff = now - date;
-  const minutes = Math.floor(diff / 60000);
-  
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-// Add Member Modal Logic
-const addMemberModal = document.getElementById("add-member-modal");
-const addMemberFormEl = document.getElementById("add-member-form");
-
-window.openAddMemberModal = function() {
-  if(!addMemberFormEl) return; 
-  addMemberFormEl.reset();
-  addMemberModal.classList.add("active");
-  const input = document.getElementById("new-member-name");
-  if (input) setTimeout(() => input.focus(), 100);
-};
-
-window.closeAddMemberModal = function() {
-  if(addMemberModal) addMemberModal.classList.remove("active");
-};
-
-// ✅ REPLACED: New add-member form submit logic with friend lookup
-if(addMemberFormEl) {
-  addMemberFormEl.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    
-    // 🔒 GUARD CLAUSE: Prevent duplicate member addition requests
-    const submitBtn = addMemberFormEl.querySelector('button[type="submit"]');
-    if (submitBtn && (submitBtn.disabled || submitBtn.innerHTML.includes('spinner'))) {
-      return;
-    }
-    
-    const nameInput = document.getElementById("new-member-name");
-    const name = nameInput.value.trim();
-    if (!name) return;
-
-    // LOOKUP: Check if the typed name matches a known friend
-    const matchedFriend = myFriendsCache.find(
-      f => f.name.toLowerCase() === name.toLowerCase() || 
-           f.username.toLowerCase() === name.toLowerCase()
-    );
+    const btn = overlay.querySelector('#exp-save');
+    btn.classList.add('btn--loading'); btn.disabled = true;
 
     const payload = {
-      memberName: matchedFriend ? matchedFriend.name : name,
-      friendId: matchedFriend ? matchedFriend.id : null
+      chapterId: _chapterId,
+      eventId:   _state.currentEventId || null,
+      amount,
+      description,
+      payerMemberId: payerId,
+      involvedMemberIds: splitIds,
+      categoryId,
     };
 
-    try {
-      // Disable button during request if it exists
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `<span class="spinner-small"></span> Adding...`;
-      }
-      
-      const data = await apiFetch(`/chapters/${chapterId}/members`, {
-        method: "POST",
-        body: payload,
-      });
-
-      if (data.ok) {
-        closeModal("add-member-modal");
-        nameInput.value = "";
-        showToast("Member added successfully");
-        loadChapterDetails(); // Refresh the list
-      } else {
-        showToast(data.message || "Failed to add member", "error");
-      }
-    } catch (err) {
-      console.error(err);
-      
-      // ✅ IMPROVED: Handle rate limit and server errors for member addition
-      const errorMsg = err.isRateLimit 
-        ? "You're adding members too fast, please wait a moment."
-        : err.isServerError
-          ? "Server is temporarily unavailable. Please try again."
-          : "Server error";
-      
-      showToast(errorMsg, "error");
-    } finally {
-      // Re-enable button in finally block
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = "Add Member";
-      }
+    // Optimistic UI for add
+    if (!isEdit) {
+      const payer = _state.members.find(m => m.id === payerId);
+      const temp  = { id: `temp-${Date.now()}`, amount, description, expense_date: new Date().toISOString(), payer_name: payer?.member_name, isTemp: true };
+      _state.expenses.unshift(temp);
+      window.expenses = _state.expenses;
+      _renderExpenses();
+      ModalManager.close(overlay);
     }
+
+    try {
+      if (isEdit) {
+        await apiFetch(`/expenses/${expenseId}`, { method: 'PUT', body: payload });
+        showToast('Expense updated', 'success');
+        ModalManager.close(overlay);
+      } else {
+        await apiFetch('/expenses', { method: 'POST', body: payload });
+      }
+      await _loadExpenses();
+      EventBus.emit('expense:saved', { mode });
+
+    } catch (err) {
+      if (!isEdit) {
+        _state.expenses = _state.expenses.filter(ex => !ex.isTemp);
+        window.expenses = _state.expenses;
+        _renderExpenses();
+        // Reopen modal
+        ModalManager.open(overlay);
+      }
+      btn.classList.remove('btn--loading'); btn.disabled = false;
+      showToast(err.message || 'Failed to save', 'error');
+    }
+  });
+
+  setTimeout(() => overlay.querySelector('#exp-amount')?.focus(), 350);
+}
+
+function _renderPayerOptions(overlay, selectedId) {
+  const container = overlay.querySelector('#exp-payer-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+  _state.members.forEach((m, idx) => {
+    const isSelected = selectedId ? m.id === selectedId : idx === 0;
+    const chip = document.createElement('label');
+    chip.className = 'payer-chip' + (isSelected ? ' is-selected' : '');
+    chip.innerHTML = `
+      <input type="radio" name="payerMemberId" value="${m.id}" ${isSelected ? 'checked' : ''} style="position:absolute;opacity:0;pointer-events:none;">
+      ${escapeHTML(m.member_name)}
+    `;
+    chip.addEventListener('click', () => {
+      container.querySelectorAll('.payer-chip').forEach(c => c.classList.remove('is-selected'));
+      chip.classList.add('is-selected');
+    });
+    container.appendChild(chip);
   });
 }
 
-// Helper to close modals by ID (used above)
-function closeModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) modal.classList.remove("active");
+function _renderSplitOptions(overlay, selectedIds) {
+  const container = overlay.querySelector('#exp-split-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const isAdd = !selectedIds.length;
+
+  _state.members.forEach(m => {
+    const isSelected = isAdd || selectedIds.includes(m.id);
+    const row = document.createElement('div');
+    row.className = 'split-row' + (isSelected ? ' is-selected' : '');
+    row.dataset.memberId = m.id;
+    row.innerHTML = `
+      <div class="split-check"></div>
+      <span class="split-row__name">${escapeHTML(m.member_name)}</span>
+    `;
+    row.addEventListener('click', () => row.classList.toggle('is-selected'));
+    container.appendChild(row);
+  });
 }
 
-// Reload chapter details (used after adding member)
+// Expose for feature-creator-label.js compatibility
+window.renderPayerAndSplitOptions = (payerId, splitIds) => {
+  // This will be called from feature scripts if needed
+  // The modal must be open for this to work
+  const overlay = document.querySelector('.modal-overlay.is-open');
+  if (!overlay) return;
+  _renderPayerOptions(overlay, payerId);
+  _renderSplitOptions(overlay, splitIds || []);
+};
 
-async function loadChapterDetails() {
+// Expose openEditExpenseModal for backward compat with feature scripts
+window.openEditExpenseModal = (id) => _openExpenseModal('edit', id);
+window.openAddExpenseModal  = ()   => _openExpenseModal('add');
+
+/* =============================================
+   SUMMARY MODAL
+   ============================================= */
+window.openSummaryModal = async () => {
+  const overlay = ModalManager.createOverlay(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 class="modal-title">Chapter Summary</h2>
+      <button class="modal-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding: 0 20px 24px;">
+      <div class="summary-grand">
+        <div class="summary-grand__label">Total Spent</div>
+        <div class="summary-grand__amount" id="summary-total">Loading…</div>
+      </div>
+      <div id="summary-list" style="max-height:55dvh;overflow-y:auto;"></div>
+    </div>
+  `, { type: 'bottom' });
+
+  overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
+
   try {
-    const data = await apiFetch(`/chapters/${chapterId}`);
-    currentMembers = data.members;
-    await renderMembers(); // await so deletability check completes before paint
+    let url = `/expenses/chapter/${_chapterId}/summary`;
+    if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
+    const data = await apiFetch(url);
+    _renderSummary(overlay, data);
   } catch (err) {
-    console.error("Failed to reload chapter", err);
-  }
-}
-
-// Delete Member
-window.deleteMember = async function(memberId) {
-  if (!confirm("Remove this member? This cannot be undone.")) return;
-
-  try {
-    await apiFetch(`/chapters/${chapterId}/members/${memberId}`, {
-      method: "DELETE"
-    });
-    showToast("Member removed", "info");
-    
-    const data = await apiFetch(`/chapters/${chapterId}`);
-    currentMembers = data.members;
-    renderMembers();
-  } catch (err) {
-    // ✅ IMPROVED: Handle rate limit and server errors for member deletion
-    const errorMsg = err.isRateLimit 
-      ? "Please wait a moment before trying again."
-      : err.isServerError
-        ? "Server is temporarily unavailable. Please try again."
-        : (err.message || "Failed to remove member");
-    
-    showToast(errorMsg, "error");
+    overlay.querySelector('#summary-list').innerHTML = `<p style="color:var(--color-error);text-align:center">Failed to load</p>`;
   }
 };
 
-// ==========================================
-// ✅ SETTLEMENT HERO LOGIC - COMPLETELY REPLACED (Steps 1, 2, 4)
-// ==========================================
-// --- Updated Toggle Logic (Step 4) ---
-const heroCard = document.getElementById('hero-summary-card');
-if (heroCard) {
-    heroCard.onclick = (e) => {
-        // Prevent toggle when clicking refresh button (has stopPropagation in HTML)
-        const content = document.getElementById('hero-details-content');
-        const btn = document.getElementById('hero-expand-btn');
-        content.classList.toggle('active');
-        btn.classList.toggle('active');
-    };
-}
+function _renderSummary(overlay, data) {
+  const { summary, grandTotal } = data;
+  overlay.querySelector('#summary-total').textContent = `₹${grandTotal}`;
 
-// --- Updated Settlement Refresh (Step 2 & 4) ---
-window.refreshSettlements = async function() {
-    // 🔒 GUARD CLAUSE: Prevent duplicate refresh requests
-    const refreshBtn = document.getElementById('hero-refresh-btn');
-    if (refreshBtn && (refreshBtn.disabled || refreshBtn.innerHTML.includes('spinner'))) {
-      return;
-    }
-    
-    try {
-        // Disable refresh button during request
-        if (refreshBtn) {
-          refreshBtn.disabled = true;
-          refreshBtn.innerHTML = `<span class="spinner-small"></span>`;
-        }
-        
-        await loadHeroSettlements(true);
-        showToast("Settlements updated", "info");
-    } catch (err) {
-        console.error("Refresh settlements error:", err);
-        
-        // ✅ IMPROVED: Handle rate limit and server errors for settlement refresh
-        const errorMsg = err.isRateLimit 
-          ? "Please wait a moment before refreshing."
-          : err.isServerError
-            ? "Server is temporarily unavailable. Please try again."
-            : "Failed to refresh";
-        
-        showToast(errorMsg, "error");
-    } finally {
-        // Re-enable refresh button
-        if (refreshBtn) {
-          refreshBtn.disabled = false;
-          refreshBtn.innerHTML = "⟳";
-        }
-    }
-};
+  const maxVal = Math.max(...summary.map(s => Math.max(parseFloat(s.total_spent), parseFloat(s.total_used))), 1);
+  const list = overlay.querySelector('#summary-list');
 
-// --- Data Loading for Hero Settlements (Unchanged core logic) ---
-async function loadHeroSettlements(forceRefresh = false) {
-    try {
-        let url = `/expenses/chapter/${chapterId}/settlements`;
-        if (currentEventId) url += `?eventId=${currentEventId}`;
-
-        const data = await apiFetch(url, forceRefresh ? { _noCache: true } : {});
-        renderHeroSettlements(data.settlements);
-    } catch (err) {
-        console.error("Hero Settlement Error:", err);
-        const listEl = document.getElementById('hero-settlement-list');
-        if (listEl) {
-            listEl.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Error loading settlements</div>';
-        }
-    }
-}
-
-// --- Updated Render Logic (Step 2 & 4) ---
-function renderHeroSettlements(settlements) {
-    const listEl = document.getElementById('hero-settlement-list');
-    const content = document.getElementById('hero-details-content');
-    const btn = document.getElementById('hero-expand-btn');
-
-    // 1. Keep it expanded if there are settlements
-    if (settlements && settlements.length > 0) {
-        content.classList.add('active');
-        btn.classList.add('active');
-    }
-
-    if (!settlements || settlements.length === 0) {
-        listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No pending payments. 🎉</div>';
-        return;
-    }
-
-    // 2. Render List without the "N payments pending" footer
-    listEl.innerHTML = settlements.map(item => `
-        <div class="mini-settle-item" style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
-            <div class="settle-info" style="display:flex; align-items:center; gap:10px;">
-                <div class="small-avatar" style="background:${getAvatarColor(item.from)}; width:24px; height:24px; font-size:0.7rem;">
-                  ${escapeHTML(getInitials(item.from))}
-                </div>
-                <span style="font-size:0.85rem;"><strong>${escapeHTML(item.from)}</strong> <span style="color:#ccc;">→</span> <strong>${escapeHTML(item.to)}</strong></span>
-            </div>
-            <span class="settle-amount" style="font-weight:600; color:#d000ff; font-size:0.9rem;">₹${item.amount}</span>
+  list.innerHTML = summary.map(item => {
+    const spent   = parseFloat(item.total_spent);
+    const used    = parseFloat(item.total_used);
+    const spPct   = ((spent / maxVal) * 100).toFixed(1);
+    const usPct   = ((used  / maxVal) * 100).toFixed(1);
+    return `
+      <div class="summary-row">
+        <div class="summary-row__header">
+          <div class="summary-row__name">
+            <div class="avatar avatar--sm" style="background:${_getAvatarColor(item.member_name)}">${escapeHTML(_getInitials(item.member_name))}</div>
+            ${escapeHTML(item.member_name)}
+          </div>
         </div>
-    `).join('');
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted);display:flex;justify-content:space-between;margin-bottom:3px;"><span>Paid</span><span>₹${spent.toFixed(2)}</span></div>
+        <div class="summary-bar-track"><div class="summary-bar-fill" style="width:${spPct}%;background:var(--color-success)"></div></div>
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted);display:flex;justify-content:space-between;margin:6px 0 3px;"><span>Consumed</span><span>₹${used.toFixed(2)}</span></div>
+        <div class="summary-bar-track"><div class="summary-bar-fill" style="width:${usPct}%;background:var(--color-brand)"></div></div>
+      </div>
+    `;
+  }).join('');
+
+  // Let feature-personal-chapter.js inject buttons
+  EventBus.emit('summary:rendered', { data, overlay });
 }
+
+/* =============================================
+   SETTLE UP MODAL
+   ============================================= */
+window.openSettlementModal = async () => {
+  const overlay = ModalManager.createOverlay(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 class="modal-title">Settle Up</h2>
+      <button class="modal-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding: 0 20px 24px;">
+      <div id="settle-loading" style="text-align:center;padding:32px;">
+        <div class="spinner spinner--dark" style="margin:0 auto 12px;"></div>
+        <p style="font-size:var(--text-sm);color:var(--color-text-muted)">Calculating…</p>
+      </div>
+      <div id="settle-list" style="display:none;"></div>
+      <div id="settle-empty" style="display:none;text-align:center;padding:32px;">
+        <div style="font-size:2.5rem;margin-bottom:12px">🎉</div>
+        <p style="font-weight:700;margin-bottom:4px">All Settled Up!</p>
+        <p style="font-size:var(--text-sm);color:var(--color-text-muted)">No pending payments</p>
+      </div>
+      <div id="settle-history-section" style="margin-top:16px;"></div>
+    </div>
+  `, { type: 'bottom' });
+
+  overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
+
+  try {
+    let url = `/expenses/chapter/${_chapterId}/settlements`;
+    if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
+    const data = await apiFetch(url);
+
+    overlay.querySelector('#settle-loading').style.display = 'none';
+
+    if (!data.settlements?.length) {
+      overlay.querySelector('#settle-empty').style.display = '';
+    } else {
+      const list = overlay.querySelector('#settle-list');
+      list.style.display = '';
+      list.innerHTML = data.settlements.map(s => `
+        <div class="settle-row" style="padding:12px 0;border-bottom:1px solid #f0f0f0;">
+          <div class="settle-row__info">
+            <div class="avatar avatar--sm" style="background:${_getAvatarColor(s.from)}">${escapeHTML(_getInitials(s.from))}</div>
+            <div class="settle-row__names" style="color:var(--color-text-primary)"><strong>${escapeHTML(s.from)}</strong> → <strong>${escapeHTML(s.to)}</strong></div>
+          </div>
+          <span style="font-weight:700;color:var(--color-brand);margin:0 12px;">₹${s.amount}</span>
+          <button class="btn-mark-settled" data-from="${escapeHTML(s.from)}" data-to="${escapeHTML(s.to)}" data-amount="${s.amount}" data-from-id="${s.fromId}" data-to-id="${s.toId}">✓ Mark</button>
+        </div>
+      `).join('');
+
+      list.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-mark-settled');
+        if (!btn) return;
+        window._openMarkModal({
+          from: btn.dataset.from, to: btn.dataset.to,
+          amount: parseFloat(btn.dataset.amount),
+          fromId: parseInt(btn.dataset.fromId), toId: parseInt(btn.dataset.toId),
+        });
+      });
+    }
+
+    // History
+    _loadSettlementHistory(overlay);
+
+  } catch (err) {
+    overlay.querySelector('#settle-loading').innerHTML = `<p style="color:var(--color-error)">Failed to load settlements</p>`;
+  }
+};
+
+async function _loadSettlementHistory(overlay) {
+  try {
+    let url = `/chapters/${_chapterId}/settlements/history`;
+    if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
+    const data = await apiFetch(url);
+    const history = data.history || [];
+    if (!history.length) return;
+
+    const section = overlay.querySelector('#settle-history-section');
+    if (!section) return;
+
+    section.innerHTML = `
+      <div style="font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--color-text-muted);margin-bottom:10px;">✅ Completed (${history.length})</div>
+      ${history.map(r => `
+        <div class="settled-record">
+          <div class="settled-record__info">
+            <div class="settled-record__names"><strong>${escapeHTML(r.from_name)}</strong> → <strong>${escapeHTML(r.to_name)}</strong></div>
+            <div class="settled-record__date">${new Date(r.marked_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}${r.note ? ' · ' + escapeHTML(r.note) : ''}</div>
+          </div>
+          <span class="settled-record__amount">₹${parseFloat(r.amount).toFixed(2)}</span>
+          <button class="btn-undo" data-record-id="${r.id}">Undo</button>
+        </div>
+      `).join('')}
+    `;
+
+    section.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.btn-undo');
+      if (!btn) return;
+      if (!confirm('Undo this settlement?')) return;
+      try {
+        await apiFetch(`/chapters/${_chapterId}/settlements/history/${btn.dataset.recordId}`, { method: 'DELETE' });
+        showToast('Undone', 'info');
+        ModalManager.close(overlay);
+        window.openSettlementModal();
+      } catch (err) { showToast('Failed', 'error'); }
+    });
+  } catch (_) {}
+}
+
+// Mark settlement modal
+window._openMarkModal = (s) => {
+  const fromMember = _state.members.find(m => m.member_name === s.from || m.id === s.fromId);
+  const toMember   = _state.members.find(m => m.member_name === s.to   || m.id === s.toId);
+
+  const overlay = ModalManager.createOverlay(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 class="modal-title">Mark as Settled</h2>
+      <button class="modal-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:16px;">
+      <div style="background:#f5f5f7;border-radius:var(--radius-md);padding:16px;text-align:center;">
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:4px;">
+          <strong>${escapeHTML(s.from)}</strong> pays <strong>${escapeHTML(s.to)}</strong>
+        </div>
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Pending: ₹${parseFloat(s.amount).toFixed(2)}</div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Amount</label>
+        <div style="display:flex;align-items:center;gap:8px;border:1.5px solid #eee;border-radius:var(--radius-md);padding:10px 14px;">
+          <span style="color:var(--color-text-muted)">₹</span>
+          <input type="number" id="mark-amount" step="0.01" min="0.01"
+            value="${parseFloat(s.amount).toFixed(2)}"
+            style="border:none;background:transparent;font-size:var(--text-lg);font-weight:700;color:var(--color-text-primary);flex:1;outline:none;font-family:var(--font-main);">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Note <span class="form-label--optional">(optional)</span></label>
+        <input type="text" id="mark-note" class="form-input" placeholder="e.g. Paid via GPay">
+      </div>
+      <button class="btn btn--brand" id="mark-confirm">Confirm Settlement</button>
+    </div>
+  `, { maxWidth: '400px' });
+
+  overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
+
+  overlay.querySelector('#mark-confirm').addEventListener('click', async () => {
+    const amount = parseFloat(overlay.querySelector('#mark-amount').value);
+    const note   = overlay.querySelector('#mark-note').value.trim();
+    if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+
+    if (!fromMember || !toMember) { showToast('Could not identify members', 'error'); return; }
+
+    const btn = overlay.querySelector('#mark-confirm');
+    btn.classList.add('btn--loading'); btn.disabled = true;
+
+    try {
+      await apiFetch(`/chapters/${_chapterId}/settlements/mark`, {
+        method: 'POST',
+        body: { fromMemberId: fromMember.id, toMemberId: toMember.id, amount, note, eventId: _state.currentEventId },
+      });
+      showToast('Settlement marked ✓', 'success');
+      ModalManager.close(overlay);
+      await _loadExpenses();
+      await _loadHeroSettlements(true);
+    } catch (err) {
+      showToast(err.message || 'Failed', 'error');
+      btn.classList.remove('btn--loading'); btn.disabled = false;
+    }
+  });
+
+  setTimeout(() => overlay.querySelector('#mark-amount')?.focus(), 300);
+};
+
+/* =============================================
+   MEMBERS PANEL
+   ============================================= */
+window.openMembersPanel = () => {
+  document.getElementById('members-panel')?.classList.add('is-open');
+  document.getElementById('panel-backdrop')?.classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeMembersPanel = () => {
+  document.getElementById('members-panel')?.classList.remove('is-open');
+  document.getElementById('panel-backdrop')?.classList.remove('is-open');
+  document.body.style.overflow = '';
+};
+
+document.getElementById('panel-backdrop')?.addEventListener('click', window.closeMembersPanel);
+
+async function _renderMembers() {
+  const list = document.getElementById('members-panel-list');
+  if (!list) return;
+
+  let involvedIds = [];
+  try {
+    const data = await apiFetch(`/chapters/${_chapterId}/members/deletability`);
+    involvedIds = data.involvedMemberIds || [];
+  } catch (_) { involvedIds = _state.members.map(m => m.id); }
+
+  const isAdmin = _state.currentUser.id === _state.chapter.created_by;
+  list.innerHTML = '';
+
+  for (const m of _state.members) {
+    const isCreator  = m.user_id === _state.chapter.created_by;
+    const isInvolved = involvedIds.includes(m.id);
+    const canDelete  = isAdmin && !isCreator && !isInvolved;
+
+    const row = document.createElement('div');
+    row.className = 'member-panel-row';
+    row.innerHTML = `
+      <div class="avatar avatar--sm" style="background:${_getAvatarColor(m.member_name)}">${escapeHTML(_getInitials(m.member_name))}</div>
+      <div class="member-panel-row__name">
+        ${escapeHTML(m.member_name)}
+        ${isCreator ? '<span class="admin-badge">Admin</span>' : ''}
+        ${m.user_id === _state.currentUser.id ? '<span class="you-badge">you</span>' : ''}
+      </div>
+      ${canDelete ? `<button class="remove-member-btn" data-member-id="${m.id}" aria-label="Remove ${escapeHTML(m.member_name)}">×</button>` : ''}
+    `;
+    list.appendChild(row);
+  }
+
+  list.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.remove-member-btn');
+    if (!btn) return;
+    const memberId = btn.dataset.memberId;
+    if (!confirm('Remove this member?')) return;
+    try {
+      await apiFetch(`/chapters/${_chapterId}/members/${memberId}`, { method: 'DELETE' });
+      showToast('Member removed', 'info');
+      const data = await apiFetch(`/chapters/${_chapterId}`);
+      _state.members = data.members;
+      window.currentMembers = data.members;
+      _renderMembers();
+    } catch (err) { showToast(err.message || 'Failed', 'error'); }
+  });
+}
+
+window.openAddMemberModal = () => {
+  const overlay = ModalManager.createOverlay(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 class="modal-title">Add Member</h2>
+      <button class="modal-close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:0 20px 24px;">
+      <form id="add-member-form">
+        <div class="form-group">
+          <label class="form-label" for="am-name">Member Name *</label>
+          <input type="text" id="am-name" class="form-input" required placeholder="Enter name or select friend…" list="friends-suggestions-am" autocomplete="off">
+          <datalist id="friends-suggestions-am">
+            ${_state.members.map(f => `<option value="${escapeHTML(f.member_name)}">`).join('')}
+          </datalist>
+        </div>
+        <button type="submit" class="btn btn--primary" id="am-submit">Add Member</button>
+      </form>
+    </div>
+  `, { type: 'bottom' });
+
+  overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
+  overlay.querySelector('#add-member-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = overlay.querySelector('#am-name').value.trim();
+    if (!name) return;
+    const btn = overlay.querySelector('#am-submit');
+    btn.classList.add('btn--loading'); btn.disabled = true;
+    try {
+      await apiFetch(`/chapters/${_chapterId}/members`, { method: 'POST', body: { memberName: name } });
+      showToast('Member added', 'success');
+      ModalManager.close(overlay);
+      const data = await apiFetch(`/chapters/${_chapterId}`);
+      _state.members = data.members;
+      window.currentMembers = data.members;
+      _renderMembers();
+    } catch (err) {
+      showToast(err.message || 'Failed', 'error');
+      btn.classList.remove('btn--loading'); btn.disabled = false;
+    }
+  });
+  setTimeout(() => overlay.querySelector('#am-name')?.focus(), 350);
+};
+
+/* =============================================
+   EXPORT
+   ============================================= */
+window.downloadReport = async () => {
+  try {
+    showToast('Generating report…', 'info');
+    const csrfToken = CSRFManager.get();
+    let url = `/api/chapters/${_chapterId}/export`;
+    if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
+
+    const res = await fetch(url, { headers: { 'X-CSRF-Token': csrfToken }, credentials: 'include' });
+    if (!res.ok) throw new Error('Export failed');
+
+    const blob = await res.blob();
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `${_state.chapter.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_report.xlsx`,
+    });
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    document.body.removeChild(a);
+    showToast('Report downloaded', 'success');
+  } catch (err) { showToast('Export failed', 'error'); }
+};
+
+/* =============================================
+   NAV MENU
+   ============================================= */
+const _menuBtn  = document.getElementById('chapter-menu-btn');
+const _menuEl   = document.getElementById('chapter-nav-dropdown');
+
+_menuBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = _menuEl?.classList.toggle('is-open');
+  _menuBtn.setAttribute('aria-expanded', String(!!isOpen));
+});
+
+document.addEventListener('click', (e) => {
+  if (!_menuEl?.contains(e.target) && e.target !== _menuBtn) {
+    _menuEl?.classList.remove('is-open');
+  }
+});
+
+/* =============================================
+   FAB
+   ============================================= */
+document.getElementById('chapter-fab')?.addEventListener('click', () => _openExpenseModal('add'));
+
+/* =============================================
+   FRIENDS FOR AUTOCOMPLETE
+   ============================================= */
+let _friendsCache = [];
+async function _loadFriendsForAutocomplete() {
+  try {
+    const data = await apiFetch('/friends');
+    _friendsCache = data.friends || [];
+  } catch (_) {}
+}
+
+/* =============================================
+   UTILS (module-private)
+   ============================================= */
+function _getInitials(name = '') {
+  const w = name.trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return '?';
+  if (w.length === 1) return w[0][0].toUpperCase();
+  return (w[0][0] + w[w.length-1][0]).toUpperCase();
+}
+
+function _getAvatarColor(name = '') {
+  const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#F9CA24','#F0932B','#6C5CE7','#A29BFE','#00B894'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function _timeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return `${Math.floor(d/30)}mo ago`;
+}
+
+// Re-render members when chapter loads
+EventBus.on('chapter:loaded', () => _renderMembers());

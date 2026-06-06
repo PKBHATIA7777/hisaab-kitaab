@@ -2,297 +2,114 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#000000">
   <title>Dashboard - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
-
-  <link rel="stylesheet" href="css/base.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>">
+  
+  <!-- NEW CSS order: tokens → reset → components → dashboard-specific → features -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/features.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-  <meta name="theme-color" content="#ffffff">
-  
-  <!-- iOS PWA Configuration (Phase 5 Step 2) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hisaab">
-  <!-- Prevents white flash on launch — matches app background -->
-  <style>
-    /* Critical above-fold CSS to prevent FOUC on PWA launch */
-    html, body { 
-      background-color: #000000; 
-      -webkit-tap-highlight-color: transparent;
-    }
-  </style>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
 
+  <div class="bubble-container" aria-hidden="true">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
+
   <main id="main-content">
-    <!-- Replaced old bubbles with new mesh background -->
 
-    <div class="bubble-container">
-      <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-      <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    </div>
-
-
-    <!-- <div class="mesh-background">
-      <div class="mesh-orb orb-1"></div>
-      <div class="mesh-orb orb-2"></div>
-      <div class="mesh-orb orb-3"></div>
-    </div> -->
-
-    <!-- Updated Header -->
+    <!-- Header -->
     <header class="app-navbar">
       <div class="nav-content">
-        
         <div class="nav-brand">
           <h1>Hisaab-Kitaab</h1>
         </div>
 
-        <div class="nav-center-desktop">
-        </div>
+        <div class="nav-center-desktop"></div>
 
         <div class="nav-right">
-          <div class="profile-trigger" onclick="openProfileModal()" title="My Profile">
-            <div id="header-profile-icon" class="header-profile-btn">?</div>
+          <button id="profile-trigger" class="profile-btn" title="My Profile">
+            <div id="header-profile-icon" class="header-profile-icon">?</div>
             <span class="profile-name-desktop" id="desktop-profile-name">My Profile</span>
-          </div>
+          </button>
         </div>
-
       </div>
     </header>
 
     <div class="dashboard-container">
       <h2 class="section-title">Create your expense chapter</h2>
       
-      <div class="chapters-grid" id="chapters-grid">
-      </div>
-    </div>
-
-    <!-- Create Chapter Modal -->
-    <div class="modal-overlay" id="create-modal">
-      <div class="modal-box">
-        <div class="modal-header">
-          <h2>New Chapter</h2>
-          <button class="close-modal" aria-label="Close Modal" onclick="closeModal()">×</button>
+      <!-- Search & Sort controls — referenced by new dashboard.js -->
+      <div class="dashboard-controls">
+        <div class="search-wrapper">
+          <input type="text" id="chapter-search" class="search-input" placeholder="Search chapters..." aria-label="Search chapters">
         </div>
-        
-        <form id="create-chapter-form">
-          <label>Chapter Name <span style="color:red">*</span>
-            <input type="text" name="name" required placeholder="e.g. Goa Trip 2025" maxlength="100">
-            <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-10px; margin-bottom:10px;">
-              <span id="name-count">0</span>/100
-            </div>
-          </label>
-
-          <label>Description (Optional)
-            <input type="text" name="description" placeholder="Short tagline (max 50 chars)" maxlength="50">
-            <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:-10px; margin-bottom:10px;">
-              <span id="desc-count">0</span>/50
-            </div>
-          </label>
-
-          <label>Members <span style="color:red">*</span></label>
-          <div class="member-list" id="member-list-container">
-          </div>
-          <button type="button" class="btn-small" onclick="addMemberInput()">+ Add member</button>
-
-          <div style="margin-top: 25px;">
-            <button type="submit" class="btn-primary" aria-label="Create new chapter" role="button">Create Chapter</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Delete Chapter Modal -->
-    <div class="modal-overlay" id="delete-modal">
-      <div class="modal-box" style="max-width: 400px; text-align: center;">
-        <div style="font-size: 3rem; margin-bottom: 10px;">🗑️</div>
-        <h2 style="margin-top: 0;">Delete Chapter?</h2>
-        <p style="color: #666; margin-bottom: 25px;">
-          Are you sure? This will permanently delete this chapter and all its expenses.
-        </p>
-        
-        <div style="display: flex; gap: 10px; justify-content: center;">
-          <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-          <button class="btn-primary" id="confirm-delete-btn" style="background: #ff1744; border:none;">
-            Yes, Delete
-          </button>
+        <div class="sort-wrapper">
+          <select id="chapter-sort" class="sort-select" aria-label="Sort chapters">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+          </select>
         </div>
       </div>
+
+      <div class="chapters-grid" id="chapters-grid"></div>
     </div>
 
-    <!-- Profile Modal -->
-    <div class="modal-overlay" id="profile-modal">
-      <div class="modal-box" style="max-width: 420px; padding: 0;">
-        
-        <div style="padding: 20px; text-align: right;">
-          <button class="close-modal" aria-label="Close" onclick="closeProfileModal()">×</button>
-        </div>
+    <!-- 
+      ALL MODALS REMOVED FROM HTML
+      They are now created dynamically by dashboard.js via ModalManager.createOverlay()
+      - Create Chapter Modal
+      - Delete Chapter Modal  
+      - Profile Modal
+      - Friend Details Modal
+      - Friend Actions Modal
+    -->
 
-        <div style="padding: 0 30px 30px 30px; overflow-y: auto; max-height: 80dvh;">
-          
-          <div class="profile-header-section">
-            <div id="profile-avatar" class="profile-avatar-large">?</div>
-            <div style="display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-              <h2 id="profile-realname" class="profile-name" style="margin:0;">Loading...</h2>
-              <button id="btn-edit-name" onclick="openEditName()" 
-                style="background:none; border:none; cursor:pointer; color:#d000ff; font-size:0.85rem; font-weight:600; padding:4px 8px; border-radius:6px; border:1px solid rgba(208,0,255,0.3);">
-                ✏️ Edit
-              </button>
-            </div>
-
-            <!-- Inline edit form (hidden by default) -->
-            <div id="edit-name-form" style="display:none; margin-top:10px;">
-              <input type="text" id="input-edit-name" maxlength="100"
-                style="width:100%; padding:10px; border-radius:10px; border:2px solid #d000ff; font-family:var(--font-main); font-size:1rem; text-align:center; outline:none; margin-bottom:8px;">
-              <div style="display:flex; gap:8px; justify-content:center;">
-                <button onclick="saveEditName()" 
-                  style="padding:8px 20px; background:#000; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:var(--font-main); font-weight:600; font-size:0.9rem;">
-                  Save
-                </button>
-                <button onclick="cancelEditName()"
-                  style="padding:8px 16px; background:#f0f0f0; color:#333; border:none; border-radius:8px; cursor:pointer; font-family:var(--font-main); font-size:0.9rem;">
-                  Cancel
-                </button>
-              </div>
-            </div>
-            <p id="profile-username" class="profile-username">@...</p>
-          </div>
-
-          <div class="profile-section-title">
-            <span>My Friends</span>
-            <button id="btn-add-friend-mode" class="btn-small" onclick="openAddFriendMode()" style="background:#f0f0f0;">+ Add</button>
-          </div>
-          
-          <div id="friends-section-content" style="position: relative; min-height: 100px;">
-            
-            <div id="friends-list-view">
-              <div id="friends-list-container">
-              </div>
-              <div id="friends-empty-state" style="display:none; text-align:center; padding:20px; color:#999; font-size:0.85rem;">
-                No friends added yet.
-              </div>
-            </div>
-
-            <form id="friend-form" style="display: none; background: #f9f9f9; padding: 15px; border-radius: 12px; border: 1px solid #eee;">
-              <h4 id="friend-form-title" style="margin:0 0 15px 0; font-size:0.95rem; color:#333;">Add New Friend</h4>
-              
-              <input type="hidden" name="friendId">
-              <label style="font-size:0.8rem;">Full Name <span style="color:red">*</span></label>
-              <input type="text" name="name" required placeholder="e.g. Rahul Kumar" style="margin-bottom:10px; padding:8px;">
-
-              <label style="font-size:0.8rem;">Username (Unique) <span style="color:red">*</span></label>
-              <input type="text" name="username" required placeholder="e.g. rahul123" style="margin-bottom:10px; padding:8px;">
-
-              <label style="font-size:0.8rem;">Email <span style="color:red">*</span></label>
-              <input type="email" name="email" required placeholder="rahul@example.com" style="margin-bottom:10px; padding:8px;">
-
-              <div style="display:flex; gap:10px;">
-                <div style="flex:1;">
-                  <label style="font-size:0.8rem;">Phone (Opt)</label>
-                  <input type="text" name="phone" placeholder="Landline" style="margin-bottom:10px; padding:8px;">
-                </div>
-                <div style="flex:1;">
-                  <label style="font-size:0.8rem;">Mobile (Opt)</label>
-                  <input type="text" name="mobile" placeholder="Mobile" style="margin-bottom:10px; padding:8px;">
-                </div>
-              </div>
-
-              <div style="display:flex; gap:10px; margin-top:5px;">
-                <button type="submit" class="btn-primary" style="padding:8px; font-size:0.9rem;">Save</button>
-                <button type="button" class="btn-secondary" onclick="cancelFriendEdit()" style="padding:8px; font-size:0.9rem; margin-top:0;">Cancel</button>
-              </div>
-            </form>
-
-          </div>
-
-          <!-- PWA Install Section in Profile -->
-<div id="profile-install-section" class="profile-section-title" style="cursor:pointer;" onclick="handleProfileInstallClick()">
-  <span>📲 Install App</span>
-  <span id="profile-install-badge" style="font-size:0.75rem; background:rgba(208,0,255,0.1); color:#d000ff; padding:2px 8px; border-radius:6px; font-weight:600;">Get App</span>
-</div>
-<div id="profile-install-hint" style="font-size:0.82rem; color:#888; margin-bottom:16px; padding:0 4px; line-height:1.5;"></div>
-
-          <div class="profile-section-title">Account</div>
-          <button type="button" class="btn-secondary" id="logout-btn-profile" style="color: #ff1744; border-color: #ffcdd2; background: #fff;">
-            Log Out
-          </button>
-
-        </div>
-      </div>
-    </div>
-
-    <!-- ✅ UPDATED FRIEND DETAILS MODAL (as per your request) -->
-    <div class="modal-overlay" id="friend-details-modal">
-      <div class="modal-box" style="max-width: 400px;">
-        
-        <div style="position: relative; margin-bottom: 10px;">
-          <button class="close-modal" onclick="closeFriendDetails()" style="position: absolute; left: 0; top: -10px;">←</button>
-          
-          <div style="text-align: right;">
-            <button onclick="openFriendActions()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; padding:5px;">⋮</button>
-          </div>
-        </div>
-
-        <div style="text-align: center; margin-top: 10px;">
-          <div id="fd-avatar" class="profile-avatar-large" style="width:70px; height:70px; font-size:2rem; margin-bottom:10px;">?</div>
-          <h2 id="fd-name" style="margin:0; font-size:1.5rem; color:#333;">...</h2>
-          <p id="fd-username" style="color:#888; margin:0; font-size:0.9rem;">@...</p>
-        </div>
-
-        <div class="settlement-card">
-          <div class="settlement-label" id="fd-status-label">Net Balance</div>
-          <div class="settlement-amount-large" id="fd-grand-total">...</div>
-          
-          <button class="btn-refresh-small" onclick="refreshFriendSettlements()">
-            <span>🔄</span> Refresh
-          </button>
-        </div>
-
-        <h4 style="margin: 20px 0 10px 0; font-size: 0.9rem; color: #888; text-transform: uppercase;">Shared Chapters</h4>
-        <div id="fd-chapters-list" style="max-height: 200px; overflow-y: auto;">
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ✅ UPDATED FRIEND ACTIONS MODAL (Action Sheet) -->
-    <div class="modal-overlay" id="friend-actions-modal" style="z-index: 2100;">
-      <div class="modal-box" style="max-width: 300px; padding: 20px; text-align: center;">
-        <h3 style="margin-top:0;">Manage Friend</h3>
-        <button class="btn-secondary" onclick="triggerFriendEdit()" style="margin-bottom: 10px;">Edit Details</button>
-        <button class="btn-secondary" onclick="triggerFriendDelete()" style="color: #ff1744; border-color: #ffcdd2;">Delete Friend</button>
-        <button class="btn-secondary" onclick="closeFriendActions()" style="margin-top: 10px; border:none; color:#666;">Cancel</button>
-      </div>
-    </div>
-
-
-
-  <!-- ADD THIS as the first script in every HTML file, before any other scripts -->
-<script src="js/core/storage.js"></script>
-<script src="js/core/sanitize.js"></script>
-    <script src="js/pwa/install-manager.js"></script>
-    <script src="js/core/csrf.js"></script>
-    <script src="js/core/session.js"></script>
-    <script src="js/core/api-cache.js"></script>
-    <script src="js/main.js"></script>
-    <script src="js/dashboard.js"></script>
-    <script src="js/feature-creator-label.js"></script>
-    <script src="js/feature-personal-chapter.js"></script>
-    <script src="js/feature-categories.js"></script>
   </main>
+
+  <!-- 
+    FAB is outside any stacking context — never trapped.
+    z-index: var(--z-sticky) = 100, sufficient since no wrapper has isolation.
+  -->
+  <button class="fab" id="dashboard-fab" aria-label="Create new chapter">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+
+  <!-- Scripts — order matters -->
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/sanitize.js"></script>
+  <script src="js/core/csrf.js"></script>
+  <script src="js/core/session.js"></script>
+  <script src="js/core/api-cache.js"></script>
+  <script src="js/core/event-bus.js"></script>
+  <script src="js/core/modal-manager.js"></script>
+  <script src="js/pwa/offline-queue.js"></script>
+  <script src="js/pwa/install-manager.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/dashboard.js"></script>
+  <!-- Feature scripts — use EventBus, not monkey-patching -->
+  <script src="js/feature-creator-label.js"></script>
+  <script src="js/feature-personal-chapter.js"></script>
+  <script src="js/feature-categories.js"></script>
 
   <footer class="app-footer">
     <div class="footer-content">
@@ -300,7 +117,6 @@
         <h4>Hisaab-Kitaab</h4>
         <p>The smartest way to track expenses and settle debts with friends and family.</p>
       </div>
-      
       <div class="footer-col">
         <h4>Quick Links</h4>
         <div class="footer-links">
@@ -309,7 +125,6 @@
           <a href="privacy.html">Privacy Policy</a>
         </div>
       </div>
-  
       <div class="footer-col">
         <h4>Developer</h4>
         <div class="dev-branding">
@@ -320,7 +135,6 @@
         </div>
       </div>
     </div>
-    
     <div class="footer-bottom">
       &copy; 2026 Hisaab-Kitaab. All rights reserved.
     </div>

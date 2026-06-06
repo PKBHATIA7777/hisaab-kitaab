@@ -1,0 +1,81 @@
+/* client/css/tokens.css */
+:root {
+  /* Brand */
+  --color-brand:        #d000ff;
+  --color-brand-dark:   #8a00e0;
+  --color-brand-light:  rgba(208, 0, 255, 0.12);
+
+  /* Neutrals */
+  --color-black:        #000000;
+  --color-bg:           #05000a;
+  --color-surface:      #ffffff;
+  --color-surface-dark: rgba(255, 255, 255, 0.06);
+  --color-border:       rgba(255, 255, 255, 0.10);
+  --color-border-light: rgba(0, 0, 0, 0.06);
+
+  /* Text */
+  --color-text-primary:   #111111;
+  --color-text-secondary: #666666;
+  --color-text-muted:     #999999;
+  --color-text-white:     #ffffff;
+  --color-text-white-dim: rgba(255, 255, 255, 0.65);
+
+  /* Status */
+  --color-success:  #00c853;
+  --color-error:    #ff1744;
+  --color-warning:  #f57c00;
+  --color-info:     #2979ff;
+
+  /* Spacing scale (8px base) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Border radius */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm:    0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:    0 4px 16px rgba(0,0,0,0.12);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.20);
+  --shadow-brand: 0 8px 24px rgba(208, 0, 255, 0.35);
+
+  /* Z-index ladder — every z-index in the app uses one of these */
+  --z-base:     1;
+  --z-sticky:   100;
+  --z-dropdown: 200;
+  --z-panel:    300;
+  --z-modal:    400;
+  --z-toast:    500;
+
+  /* Typography */
+  --font-main: 'Poppins', system-ui, sans-serif;
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+  --text-3xl:  2rem;
+
+  /* Transitions */
+  --transition-fast:   150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow:   350ms cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Layout */
+  --nav-height:    56px;
+  --fab-size:      56px;
+  --max-content:   680px;
+  --max-dashboard: 1200px;
+}

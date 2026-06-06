@@ -1,29 +1,32 @@
 /* client/js/feature-bulk-event.js */
 /* Feature 5: Multi-select expenses + bulk assign to event */
-/* Include in chapter.html AFTER chapter.js */
-/* <script src="js/feature-bulk-event.js"></script> */
+/* Refactored for Phase 6: Uses EventBus instead of monkey-patching and setTimeout polling */
 
 // ─────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────
 let isSelectMode = false;
 let selectedExpenseIds = new Set();
+let _pendingAssignReopen = false;
 
 // ─────────────────────────────────────────────────────────────
 // INJECT "Select" option into chapter nav dropdown
 // ─────────────────────────────────────────────────────────────
 function injectSelectModeButton() {
-  const dropdown = document.getElementById('chapter-menu-dropdown');
+  // Support both old and new dropdown IDs
+  const dropdown = document.getElementById('chapter-menu-dropdown') || document.getElementById('chapter-nav-dropdown');
   if (!dropdown) return;
   if (document.getElementById('select-mode-btn')) return;
 
-  const hr = dropdown.querySelector('hr');
+  const hr = dropdown.querySelector('hr') || dropdown.querySelector('.nav-dropdown__divider');
   const btn = document.createElement('button');
   btn.id = 'select-mode-btn';
   btn.type = 'button';
+  btn.className = 'nav-dropdown__item'; // Match new class if present
   btn.innerHTML = '<span>☑️</span> Select Expenses';
   btn.onclick = () => {
-    document.getElementById('chapter-menu-dropdown').classList.remove('active');
+    dropdown.classList.remove('active');
+    dropdown.setAttribute('aria-expanded', 'false');
     enterSelectMode();
   };
 
@@ -42,7 +45,7 @@ function enterSelectMode() {
   selectedExpenseIds.clear();
 
   // Hide FAB
-  const fab = document.querySelector('.fab-btn');
+  const fab = document.querySelector('.fab');
   if (fab) fab.style.display = 'none';
 
   // Rebuild expense list in selectable mode
@@ -57,7 +60,7 @@ function exitSelectMode() {
   selectedExpenseIds.clear();
 
   // Show FAB again
-  const fab = document.querySelector('.fab-btn');
+  const fab = document.querySelector('.fab');
   if (fab) fab.style.display = '';
 
   // Rebuild expense list normally
@@ -74,7 +77,7 @@ function exitSelectMode() {
 // RENDER EXPENSES IN SELECT MODE
 // ─────────────────────────────────────────────────────────────
 function renderExpensesInSelectMode() {
-  const listEl = document.getElementById('expense-list-container');
+  const listEl = document.getElementById('expense-list') || document.getElementById('expense-list-container');
   if (!listEl || !window.expenses) return;
 
   listEl.innerHTML = '';
@@ -184,7 +187,6 @@ window.removeFromEvent = async function() {
     showToast(`${ids.length} expense(s) removed from event`, 'success');
     exitSelectMode();
 
-    // Refresh expenses
     if (typeof window.loadExpenses === 'function') window.loadExpenses();
 
   } catch (err) {
@@ -202,12 +204,10 @@ window.openEventAssignSheet = async function() {
     return;
   }
 
-  // Check if any selected expenses are already in an event
   if (window.expenses) {
     const selectedExpenses = window.expenses.filter(ex => selectedExpenseIds.has(String(ex.id)));
     const inOtherEvent = selectedExpenses.filter(ex => ex.event_id && ex.event_id !== window.currentEventId);
     if (inOtherEvent.length > 0) {
-      const uniqueEventIds = [...new Set(inOtherEvent.map(e => e.event_id))];
       const confirmed = confirm(
         `${inOtherEvent.length} of the selected expenses are already in another event.\n\n` +
         `Moving them will remove them from their current event. Continue?`
@@ -216,7 +216,6 @@ window.openEventAssignSheet = async function() {
     }
   }
 
-  // Build and show sheet
   const existing = document.getElementById('event-assign-sheet-modal');
   if (existing) existing.remove();
 
@@ -249,7 +248,6 @@ window.openEventAssignSheet = async function() {
   `;
   document.body.appendChild(modal);
 
-  // Load events
   await populateEventAssignOptions();
 };
 
@@ -258,7 +256,6 @@ async function populateEventAssignOptions() {
   if (!container) return;
 
   const events = window.events || [];
-
   let html = '';
 
   if (events.length > 0) {
@@ -272,7 +269,6 @@ async function populateEventAssignOptions() {
     `).join('');
   }
 
-  // "Create New Event" option
   html += `
     <div class="event-assign-option event-assign-new" onclick="createNewEventFromAssign()">
       <div class="event-assign-icon">+</div>
@@ -287,49 +283,22 @@ async function populateEventAssignOptions() {
 }
 
 window.selectAssignEvent = function(el, eventId) {
-  // Deselect all
   document.querySelectorAll('.event-assign-option').forEach(o => o.classList.remove('selected-event'));
   el.classList.add('selected-event');
   document.getElementById('chosen-event-id').value = eventId;
 
-  // Enable confirm button
   const btn = document.getElementById('btn-confirm-assign');
   if (btn) btn.disabled = false;
 };
 
 window.createNewEventFromAssign = function() {
-  // Close assign sheet
   document.getElementById('event-assign-sheet-modal')?.remove();
-
-  // Open the existing create event modal
+  _pendingAssignReopen = true;
+  
   if (typeof window.openCreateEventModal === 'function') {
     window.openCreateEventModal();
-
-    // After event is created, reopen assign sheet
-    // We watch for new events by hooking the create event form submit
-    hookCreateEventForAssign();
   }
 };
-
-function hookCreateEventForAssign() {
-  const form = document.getElementById('create-event-form');
-  if (!form) return;
-
-  const _origSubmit = form.onsubmit;
-  form.onsubmit = async function(e) {
-    // Call original
-    await _origSubmit.call(this, e);
-
-    // After creation, reload events and reopen assign sheet
-    setTimeout(async () => {
-      await window.loadEvents?.();
-      window.openEventAssignSheet?.();
-    }, 500);
-
-    // Restore original
-    form.onsubmit = _origSubmit;
-  };
-}
 
 window.confirmBulkAssign = async function() {
   const eventId = document.getElementById('chosen-event-id')?.value;
@@ -357,7 +326,6 @@ window.confirmBulkAssign = async function() {
     document.getElementById('event-assign-sheet-modal')?.remove();
     exitSelectMode();
 
-    // Reload expenses and events
     if (typeof window.loadExpenses === 'function') window.loadExpenses();
     if (typeof window.loadEvents === 'function') {
       await window.loadEvents();
@@ -373,7 +341,7 @@ window.confirmBulkAssign = async function() {
 // LONG PRESS to enter select mode on expense cards
 // ─────────────────────────────────────────────────────────────
 function attachLongPressToExpenseCards() {
-  const listEl = document.getElementById('expense-list-container');
+  const listEl = document.getElementById('expense-list') || document.getElementById('expense-list-container');
   if (!listEl) return;
 
   let pressTimer;
@@ -385,7 +353,6 @@ function attachLongPressToExpenseCards() {
     pressTimer = setTimeout(() => {
       if (navigator.vibrate) navigator.vibrate(30);
       enterSelectMode();
-      // Select the long-pressed card
       const expenseId = card.dataset?.expenseId || '';
       if (expenseId) toggleExpenseSelection(card, expenseId);
     }, 600);
@@ -401,44 +368,30 @@ function attachLongPressToExpenseCards() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PATCH renderExpenses to attach long press after render
+// EVENT BUS WIRING (Replaces all setTimeout polling & monkey-patching)
 // ─────────────────────────────────────────────────────────────
-(function() {
-  const tryPatch = () => {
-    if (typeof window.renderExpenses !== 'function') {
-      setTimeout(tryPatch, 300);
-      return;
-    }
 
-    const _orig = window.renderExpenses;
-    window.renderExpenses = function() {
-      _orig();
-      if (!isSelectMode) {
-        // Attach long press to new cards
-        attachLongPressToExpenseCards();
-      }
-    };
-  };
+// Inject select button when chapter nav is ready
+EventBus.on('chapter:loaded', injectSelectModeButton);
+// Fallback for immediate execution if DOM is already ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectSelectModeButton);
+} else {
+  injectSelectModeButton();
+}
 
-  if (document.getElementById('expense-list-container')) {
-    tryPatch();
+// Attach long press when expenses are rendered
+EventBus.on('expenses:rendered', () => {
+  if (!isSelectMode) {
+    attachLongPressToExpenseCards();
   }
-})();
+});
 
-// ─────────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('chapter-menu-dropdown')) {
-    // Wait longer for chapter.js dropdown to fully initialize
-    const tryInject = () => {
-      const dropdown = document.getElementById('chapter-menu-dropdown');
-      if (dropdown && dropdown.querySelector('button')) {
-        injectSelectModeButton();
-      } else {
-        setTimeout(tryInject, 300);
-      }
-    };
-    setTimeout(tryInject, 500);
+// Reopen assign sheet after a new event is created
+EventBus.on('event:created', () => {
+  if (_pendingAssignReopen) {
+    _pendingAssignReopen = false;
+    // Small delay to ensure events list is updated in the background
+    setTimeout(() => window.openEventAssignSheet?.(), 300);
   }
 });

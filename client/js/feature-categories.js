@@ -1,12 +1,6 @@
 /* client/js/feature-categories.js */
 /* Feature 4: Expense Categories + Monthly View in My Expenses */
-/* FIX v2:
-   - Category ID now injected via window.getSelectedCategoryId() called from chapter.js submit patch
-   - /categories/monthly route fixed (was hitting /:id due to route order bug)
-   - Personal view tabs only shown on is_personal chapters
-   - selectCategoryPill toggle-off fixed
-   - Profile section injection timing fixed
-*/
+/* Refactored for Phase 6: Uses EventBus instead of monkey-patching and setTimeout polling */
 
 // ─────────────────────────────────────────────────────────────
 // STATE
@@ -18,6 +12,7 @@ let selectedCategoryId = null;
 // LOAD CATEGORIES FROM API
 // ─────────────────────────────────────────────────────────────
 async function loadCategories() {
+  if (allCategories.length > 0) return allCategories;
   try {
     const data = await apiFetch('/categories');
     allCategories = data.categories || [];
@@ -50,50 +45,52 @@ function renderCategoryPills(containerId, currentCategoryId) {
     const color = isSelected ? '#fff' : cat.color;
 
     return `
-      <button class="category-pill ${isSelected ? 'selected' : ''}"
+      <button type="button" class="category-pill ${isSelected ? 'selected' : ''}"
         data-cat-id="${cat.id}"
         data-cat-color="${cat.color}"
-        style="background:${bg}; border-color:${border}; color:${color};"
-        onclick="selectCategoryPill(this, ${cat.id}, '${cat.color}')">
+        style="background:${bg}; border-color:${border}; color:${color};">
         ${cat.icon} ${cat.name}
       </button>
     `;
   }).join('');
-}
 
-window.selectCategoryPill = function(btn, categoryId, color) {
-  const container = btn.closest('.category-pill-container');
-  if (!container) return;
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('.category-pill');
+    if (!btn) return;
+    const catId = parseInt(btn.dataset.catId);
+    const color = btn.dataset.catColor || '#888';
+    
+    // Deselect all
+    container.querySelectorAll('.category-pill').forEach(b => {
+      const c = b.dataset.catColor || '#888';
+      b.classList.remove('selected');
+      b.style.background = `${c}22`;
+      b.style.borderColor = `${c}55`;
+      b.style.color = c;
+    });
 
-  // Deselect all
-  container.querySelectorAll('.category-pill').forEach(b => {
-    const c = b.dataset.catColor || '#888';
-    b.classList.remove('selected');
-    b.style.background = `${c}22`;
-    b.style.borderColor = `${c}55`;
-    b.style.color = c;
+    // Toggle off if same category clicked again
+    if (selectedCategoryId === catId) {
+      selectedCategoryId = null;
+      return;
+    }
+
+    // Select clicked
+    btn.classList.add('selected');
+    btn.style.background = color;
+    btn.style.borderColor = color;
+    btn.style.color = '#fff';
+    selectedCategoryId = catId;
   });
-
-  // Toggle off if same category clicked again
-  if (selectedCategoryId === categoryId) {
-    selectedCategoryId = null;
-    return;
-  }
-
-  // Select clicked
-  btn.classList.add('selected');
-  btn.style.background = color;
-  btn.style.borderColor = color;
-  btn.style.color = '#fff';
-  selectedCategoryId = categoryId;
-};
+}
 
 // ─────────────────────────────────────────────────────────────
 // INJECT CATEGORY ROW INTO EXPENSE MODAL
 // ─────────────────────────────────────────────────────────────
 async function injectCategoryRowInExpenseModal(currentCategoryId) {
-  const form = document.getElementById('add-expense-form');
-  if (!form) return;
+  // Find injection point in the open modal
+  const injectEl = document.getElementById('expense-category-inject') || document.getElementById('add-expense-form');
+  if (!injectEl) return;
 
   // Remove existing row
   const existing = document.getElementById('expense-category-row');
@@ -103,11 +100,23 @@ async function injectCategoryRowInExpenseModal(currentCategoryId) {
     await loadCategories();
   }
 
-  // Find insertion point — before the Paid By field group
+  // If using the dedicated injection point
+  if (document.getElementById('expense-category-inject')) {
+    injectEl.innerHTML = `
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Category <span class="form-label--optional">(optional)</span></label>
+        <div class="category-pill-container" id="expense-category-pills"></div>
+      </div>
+    `;
+    renderCategoryPills('expense-category-pills', currentCategoryId);
+    return;
+  }
+
+  // Fallback for old form structure: find insertion point before Paid By
+  const form = injectEl;
   const payerContainer = document.getElementById('payer-selection-container');
   let insertBefore = payerContainer ? payerContainer.closest('.expense-field-group') : null;
 
-  // Fallback: find by label text
   if (!insertBefore) {
     const allLabels = form.querySelectorAll('label, .expense-field-label');
     for (const lbl of allLabels) {
@@ -132,7 +141,6 @@ async function injectCategoryRowInExpenseModal(currentCategoryId) {
   if (insertBefore) {
     form.insertBefore(row, insertBefore);
   } else {
-    // Fallback: insert before the actions block
     const actionsDiv = form.querySelector('.expense-sheet-actions');
     if (actionsDiv) form.insertBefore(row, actionsDiv);
     else form.appendChild(row);
@@ -149,104 +157,21 @@ window.getSelectedCategoryId = function() {
 };
 
 // ─────────────────────────────────────────────────────────────
-// PATCH openAddExpenseModal and openEditExpenseModal
+// Intercept apiFetch to inject categoryId (cleaner approach)
 // ─────────────────────────────────────────────────────────────
 (function() {
-  const tryPatch = () => {
-    if (typeof window.openAddExpenseModal !== 'function') {
-      setTimeout(tryPatch, 200);
-      return;
-    }
-
-    const _origOpen = window.openAddExpenseModal;
-    window.openAddExpenseModal = async function() {
-      _origOpen();
-      selectedCategoryId = null;
-      await injectCategoryRowInExpenseModal(null);
-    };
-
-    // Only patch edit if it exists
-    const patchEdit = () => {
-      if (typeof window.openEditExpenseModal !== 'function') {
-        setTimeout(patchEdit, 200);
-        return;
+  const orig = window.apiFetch;
+  if (!orig) return;
+  
+  window.apiFetch = async function(path, options = {}) {
+    if ((path === '/expenses' && options.method === 'POST') ||
+        (typeof path === 'string' && path.startsWith('/expenses/') && options.method === 'PUT')) {
+      if (options.body && typeof options.body === 'object' && selectedCategoryId !== null) {
+        options.body.categoryId = selectedCategoryId;
       }
-      const _origEdit = window.openEditExpenseModal;
-      window.openEditExpenseModal = async function(id) {
-        // Call original and wait a tick for modal to open
-        await _origEdit(id);
-        try {
-          const data = await apiFetch(`/expenses/${id}`);
-          const catId = data.expense?.category_id || null;
-          selectedCategoryId = catId;
-          await injectCategoryRowInExpenseModal(catId);
-        } catch (err) {
-          await injectCategoryRowInExpenseModal(null);
-        }
-      };
-    };
-    patchEdit();
-  };
-
-  if (document.getElementById('add-expense-modal')) {
-    tryPatch();
-  }
-})();
-
-// ─────────────────────────────────────────────────────────────
-// PATCH addExpenseForm submit — inject categoryId into payload
-// ─────────────────────────────────────────────────────────────
-// NOTE: chapter.js builds payload manually, NOT from FormData.
-// We use a capture-phase listener to set window._pendingCategoryId
-// and then patch the apiFetch call via a submit interceptor.
-(function() {
-  const tryPatch = () => {
-    const form = document.getElementById('add-expense-form');
-    if (!form) return;
-
-    // Capture phase: runs before chapter.js submit handler
-    form.addEventListener('submit', () => {
-      // Store currently selected category so chapter.js submit can read it
-      window._pendingCategoryId = selectedCategoryId || null;
-    }, true);
-  };
-
-  if (document.getElementById('add-expense-form')) {
-    tryPatch();
-  }
-})();
-
-// ─────────────────────────────────────────────────────────────
-// PATCH chapter.js apiFetch calls for expenses to include categoryId
-// We wrap the global apiFetch to intercept expense POST/PUT calls
-// ─────────────────────────────────────────────────────────────
-(function() {
-  const tryPatch = () => {
-    if (typeof window.apiFetch !== 'function') {
-      setTimeout(tryPatch, 200);
-      return;
     }
-
-    const _origApiFetch = window.apiFetch;
-    window.apiFetch = async function(path, options = {}) {
-      // Intercept expense add/update to inject categoryId
-      if (
-        (path === '/expenses' && options.method === 'POST') ||
-        (typeof path === 'string' && path.startsWith('/expenses/') && options.method === 'PUT')
-      ) {
-        if (options.body && typeof options.body === 'object' && window._pendingCategoryId !== undefined) {
-          options.body.categoryId = window._pendingCategoryId;
-          window._pendingCategoryId = undefined; // Clear after use
-        }
-      }
-      return _origApiFetch.call(this, path, options);
-    };
+    return orig.call(this, path, options);
   };
-
-  // Run after DOMContentLoaded to ensure apiFetch exists
-  document.addEventListener('DOMContentLoaded', tryPatch);
-  // Also try immediately in case it's already defined
-  if (typeof window.apiFetch === 'function') tryPatch();
 })();
 
 // ─────────────────────────────────────────────────────────────
@@ -270,50 +195,18 @@ function addCategoryBadgeToExpenseCard(card, expense) {
   `;
   badge.innerHTML = `${expense.category_icon || '📦'} ${expense.category_name}`;
 
-  const infoEl = card.querySelector('.expense-info p');
+  const infoEl = card.querySelector('.expense-info p') || card.querySelector('.expense-info__meta');
   if (infoEl) infoEl.insertAdjacentElement('afterend', badge);
 }
 
 // ─────────────────────────────────────────────────────────────
-// PATCH renderExpenses to add category badges
-// ─────────────────────────────────────────────────────────────
-(function() {
-  const tryPatch = () => {
-    if (typeof window.renderExpenses !== 'function') {
-      setTimeout(tryPatch, 300);
-      return;
-    }
-
-    const _orig = window.renderExpenses;
-    window.renderExpenses = function() {
-      _orig();
-
-      const expenseListEl = document.getElementById('expense-list-container');
-      if (!expenseListEl || !window.expenses) return;
-
-      const cards = expenseListEl.querySelectorAll('.expense-card');
-      cards.forEach((card, idx) => {
-        const expense = window.expenses[idx];
-        if (expense) addCategoryBadgeToExpenseCard(card, expense);
-      });
-    };
-  };
-
-  if (document.getElementById('expense-list-container')) {
-    tryPatch();
-  }
-})();
-
-// ─────────────────────────────────────────────────────────────
 // MY EXPENSES: Monthly + Category view
 // ─────────────────────────────────────────────────────────────
-
 let personalViewMode = 'list';
 let personalMonthlyData = null;
 
 async function loadPersonalMonthlyData() {
   try {
-    // NOTE: route is GET /api/categories/monthly (fixed route order on server)
     const data = await apiFetch('/categories/monthly');
     personalMonthlyData = data;
     return data;
@@ -326,7 +219,7 @@ async function loadPersonalMonthlyData() {
 function injectPersonalViewTabs() {
   if (document.getElementById('personal-view-tabs')) return;
 
-  const expenseList = document.getElementById('expense-list-container');
+  const expenseList = document.getElementById('expense-list') || document.getElementById('expense-list-container');
   if (!expenseList) return;
 
   const tabs = document.createElement('div');
@@ -352,7 +245,7 @@ window.switchPersonalView = async function(mode, btn) {
   document.querySelectorAll('.personal-tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 
-  const listEl = document.getElementById('expense-list-container');
+  const listEl = document.getElementById('expense-list') || document.getElementById('expense-list-container');
   const personalViewEl = document.getElementById('personal-view-content');
 
   if (mode === 'list') {
@@ -478,13 +371,11 @@ function renderCategoryView(container) {
 // ─────────────────────────────────────────────────────────────
 // PROFILE: Category management section
 // ─────────────────────────────────────────────────────────────
-
 function injectCategorySectionInProfile() {
   const profileModal = document.getElementById('profile-modal');
   if (!profileModal) return;
   if (document.getElementById('profile-categories-section')) return;
 
-  // Find the Account section title
   const sectionTitles = profileModal.querySelectorAll('.profile-section-title');
   let accountTitle = null;
   sectionTitles.forEach(el => {
@@ -653,50 +544,45 @@ window.deleteCategoryById = async function(id, name) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// HOOK: openProfileModal — inject category section
+// EVENT BUS WIRING (Replaces all setTimeout polling & monkey-patching)
 // ─────────────────────────────────────────────────────────────
-(function() {
-  const tryPatch = () => {
-    if (typeof window.openProfileModal !== 'function') {
-      setTimeout(tryPatch, 300);
-      return;
-    }
 
-    const _orig = window.openProfileModal;
-    window.openProfileModal = function() {
-      _orig();
-      setTimeout(() => {
-        injectCategorySectionInProfile();
-        loadAndRenderProfileCategories();
-      }, 150);
-    };
-  };
+// When expense modal opens, inject category row
+EventBus.on('expense:modal:open', async ({ mode, expense }) => {
+  await loadCategories();
+  selectedCategoryId = expense?.category_id || null;
+  await injectCategoryRowInExpenseModal(selectedCategoryId);
+});
 
-  if (document.getElementById('profile-modal')) tryPatch();
-})();
+// When modal closes, clear selection
+EventBus.on('expense:modal:close', () => {
+  selectedCategoryId = null;
+});
 
-// ─────────────────────────────────────────────────────────────
-// HOOK: inject personal view tabs only on personal chapters
-// ─────────────────────────────────────────────────────────────
-(function() {
-  if (!document.getElementById('expense-list-container')) return;
+// After expenses render, add category badges
+EventBus.on('expenses:rendered', ({ expenses }) => {
+  const listEl = document.getElementById('expense-list') || document.getElementById('expense-list-container');
+  if (!listEl || !expenses) return;
 
-  const waitForChapter = setInterval(() => {
-    if (!window.currentChapter) return;
-    clearInterval(waitForChapter);
+  const cards = listEl.querySelectorAll('.expense-card');
+  cards.forEach((card, idx) => {
+    const ex = expenses[idx];
+    if (ex) addCategoryBadgeToExpenseCard(card, ex);
+  });
+});
 
-    if (window.currentChapter.is_personal) {
-      injectPersonalViewTabs();
-      loadPersonalMonthlyData();
-    }
-  }, 400);
-})();
+// When profile modal opens, inject category section
+EventBus.on('profile:modal:open', () => {
+  setTimeout(() => {
+    injectCategorySectionInProfile();
+    loadAndRenderProfileCategories();
+  }, 150);
+});
 
-// ─────────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('add-expense-modal')) {
-    loadCategories();
+// When chapter loads, inject personal view tabs if applicable
+EventBus.on('chapter:loaded', ({ chapter }) => {
+  if (chapter?.is_personal) {
+    injectPersonalViewTabs();
+    loadPersonalMonthlyData();
   }
 });

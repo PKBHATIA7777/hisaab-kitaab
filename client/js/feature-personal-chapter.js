@@ -1,11 +1,6 @@
 /* client/js/feature-personal-chapter.js */
 /* Feature 3: "My Expenses" personal chapter + cross-chapter sync */
-/* FIX v2:
-   - window.chapterId vs chapterId scope fixed (chapter.js defines it as const, not on window)
-   - markPersonalChaptersOnGrid now uses correct data-chapter-id attribute timing
-   - reloadChaptersGrid called correctly after personal chapter creation
-   - Sync status uses correct chapterId reference
-*/
+/* Refactored for Phase 6: Uses EventBus instead of monkey-patching and setTimeout polling */
 
 // ─────────────────────────────────────────────────────────────
 // STATE
@@ -15,11 +10,8 @@ let syncStatusCache = {};
 
 // ─────────────────────────────────────────────────────────────
 // Helper: get chapterId safely from chapter page
-// chapter.js declares: const chapterId = urlParams.get("id");
-// It is NOT on window, so we read from URL params instead
 // ─────────────────────────────────────────────────────────────
 function getCurrentChapterId() {
-  // Try window.chapterId first (if someone set it), then URL param
   if (window.chapterId) return window.chapterId;
   const params = new URLSearchParams(window.location.search);
   return params.get('id');
@@ -42,7 +34,7 @@ async function checkAndRenderPersonalChapterBanner() {
           if (recheck.hasPersonalChapter) {
             document.getElementById('personal-chapter-banner')?.remove();
             personalChapterData = recheck.chapter;
-            await reloadChaptersGrid();
+            if (typeof reloadChaptersGrid === 'function') reloadChaptersGrid();
           }
         } catch(_) {}
       }, 3000);
@@ -86,14 +78,12 @@ window.createPersonalChapterNow = async function() {
 
 // ─────────────────────────────────────────────────────────────
 // DASHBOARD: Mark personal chapters with badge
-// Called after renderGrid — cards have data-chapter-id set
 // ─────────────────────────────────────────────────────────────
 function markPersonalChaptersOnGrid() {
   if (!window.allChapters) return;
 
   window.allChapters.forEach(ch => {
     if (!ch.is_personal) return;
-    // Find by data-chapter-id attribute (set by dashboard.js renderGrid patch)
     const card = document.querySelector(`.chapter-card[data-chapter-id="${ch.id}"]`);
     if (!card) return;
     if (card.querySelector('.personal-chapter-badge')) return;
@@ -103,7 +93,6 @@ function markPersonalChaptersOnGrid() {
     badge.textContent = 'My Expenses';
     card.appendChild(badge);
 
-    // Hide delete option for personal chapters
     const deleteBtn = card.querySelector('.menu-item.delete');
     if (deleteBtn) deleteBtn.style.display = 'none';
   });
@@ -374,29 +363,8 @@ window.dismissSyncWarning = async function() {
 };
 
 // ─────────────────────────────────────────────────────────────
-// OVERRIDE renderSummary to add "Add to My Expenses" button
+// Inject "Add to My Expenses" button into summary modal
 // ─────────────────────────────────────────────────────────────
-(function() {
-  const tryOverride = () => {
-    if (typeof window.renderSummary !== 'function') {
-      setTimeout(tryOverride, 300);
-      return;
-    }
-
-    const _orig = window.renderSummary;
-    window.renderSummary = async function(data) {
-      _orig(data);
-      const cid = getCurrentChapterId();
-      if (cid) await checkSyncStatus();
-      addPersonalButtonsToSummary(data);
-    };
-  };
-
-  if (document.getElementById('summary-modal')) {
-    tryOverride();
-  }
-})();
-
 function addPersonalButtonsToSummary(data) {
   if (!window.currentUser || !data || !data.summary) return;
 
@@ -430,20 +398,18 @@ function addPersonalButtonsToSummary(data) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// INIT
+// EVENT BUS WIRING (Replaces all setTimeout polling & monkey-patching)
 // ─────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  // Dashboard page
-  if (document.getElementById('chapters-grid')) {
-    // Wait for dashboard.js to finish loading chapters
-    const waitForChapters = setInterval(() => {
-      if (window.allChapters !== undefined) {
-        clearInterval(waitForChapters);
-        checkAndRenderPersonalChapterBanner();
-        setTimeout(markPersonalChaptersOnGrid, 800);
-      }
-    }, 200);
-    // Safety timeout
-    setTimeout(() => clearInterval(waitForChapters), 10000);
-  }
+
+// Dashboard: When chapters grid is rendered
+EventBus.on('chapters:rendered', () => {
+  checkAndRenderPersonalChapterBanner();
+  markPersonalChaptersOnGrid();
+});
+
+// Chapter Page: When summary modal opens
+EventBus.on('summary:modal:open', async ({ data }) => {
+  const cid = getCurrentChapterId();
+  if (cid) await checkSyncStatus();
+  addPersonalButtonsToSummary(data);
 });

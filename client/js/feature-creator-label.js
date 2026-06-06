@@ -1,37 +1,14 @@
 /* client/js/feature-creator-label.js */
 /* Feature 2: Creator row in chapter creation + "You" label inside chapters */
-/* Include in dashboard.html AFTER dashboard.js */
-/* Include in chapter.html AFTER chapter.js */
-/* <script src="js/feature-creator-label.js"></script> */
+/* Refactored for Phase 6: Uses EventBus instead of monkey-patching and setTimeout polling */
 
 // ─────────────────────────────────────────────────────────────
 // DASHBOARD SIDE: Inject creator row when "New Chapter" modal opens
 // ─────────────────────────────────────────────────────────────
 
-// We wrap the existing openModal from dashboard.js
-(function() {
-  // Wait for dashboard.js to be fully loaded
-  const _waitAndWrap = () => {
-    const originalOpenModal = window.openModal;
-    if (!originalOpenModal) {
-      setTimeout(_waitAndWrap, 100);
-      return;
-    }
-
-    window.openModal = function() {
-      // Call original
-      originalOpenModal();
-
-      // After original runs, inject creator row into member list
-      injectCreatorRow();
-    };
-  };
-
-  // Only run on dashboard page
-  if (document.getElementById('create-modal')) {
-    _waitAndWrap();
-  }
-})();
+if (document.getElementById('create-modal')) {
+  EventBus.on('chapter:modal:open', injectCreatorRow);
+}
 
 function injectCreatorRow() {
   const user = window.currentUser;
@@ -43,7 +20,6 @@ function injectCreatorRow() {
   const existing = memberContainer.querySelector('.creator-member-row');
   if (existing) existing.remove();
 
-  // Use safe fallbacks if helpers not loaded yet
   const name = user.realName || user.username || '?';
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   const colors = ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#f0932b','#6c5ce7'];
@@ -73,7 +49,6 @@ function toggleCreatorMembership(e) {
   const isAdded = row.dataset.creatorAdded === 'true';
 
   if (isAdded) {
-    // Warn before removing
     const confirmed = confirm(
       'Removing yourself means you won\'t appear in expense splits by default.\n\nAre you sure?'
     );
@@ -95,46 +70,35 @@ function toggleCreatorMembership(e) {
 
 // ─────────────────────────────────────────────────────────────
 // Intercept createChapter form submission to include/exclude creator
+// (No polling needed since script is loaded at the end of <body>)
 // ─────────────────────────────────────────────────────────────
-(function() {
-  const tryWrap = () => {
-    const createForm = document.getElementById('create-chapter-form');
-    if (!createForm) return;
-
-    // Listen on form submit to add creatorExcluded flag
-    createForm.addEventListener('submit', (e) => {
-      const creatorRow = document.querySelector('.creator-member-row');
-      if (creatorRow) {
-        const isAdded = creatorRow.dataset.creatorAdded === 'true';
-        // Add a hidden input the form can read
-        let hiddenInput = createForm.querySelector('input[name="creatorExcluded"]');
-        if (!hiddenInput) {
-          hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = 'creatorExcluded';
-          createForm.appendChild(hiddenInput);
-        }
-        hiddenInput.value = (!isAdded).toString();
+const createForm = document.getElementById('create-chapter-form');
+if (createForm) {
+  createForm.addEventListener('submit', (e) => {
+    const creatorRow = document.querySelector('.creator-member-row');
+    if (creatorRow) {
+      const isAdded = creatorRow.dataset.creatorAdded === 'true';
+      let hiddenInput = createForm.querySelector('input[name="creatorExcluded"]');
+      if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'creatorExcluded';
+        createForm.appendChild(hiddenInput);
       }
-    }, true); // capture phase so it runs before dashboard.js submit
-  };
-
-  if (document.getElementById('create-chapter-form')) {
-    tryWrap();
-  }
-})();
+      hiddenInput.value = (!isAdded).toString();
+    }
+  }, true); // capture phase so it runs before dashboard.js submit
+}
 
 // ─────────────────────────────────────────────────────────────
 // CHAPTER PAGE SIDE: Add "you" label wherever member names appear
 // ─────────────────────────────────────────────────────────────
 
-// Helper: returns true if member belongs to current user
 function isMemberCurrentUser(member) {
   if (!window.currentUser) return false;
   return member.user_id && parseInt(member.user_id) === parseInt(window.currentUser.id);
 }
 
-// Returns display name with (you) suffix if applicable
 window.getMemberDisplayName = function(member) {
   if (isMemberCurrentUser(member)) {
     return `${member.member_name} <span class="you-badge">you</span>`;
@@ -142,7 +106,6 @@ window.getMemberDisplayName = function(member) {
   return member.member_name;
 };
 
-// Plain text version (no HTML) for use in places that don't render HTML
 window.getMemberDisplayNamePlain = function(member) {
   if (isMemberCurrentUser(member)) {
     return `${member.member_name} (you)`;
@@ -150,32 +113,18 @@ window.getMemberDisplayNamePlain = function(member) {
   return member.member_name;
 };
 
+function addYouToSettlementName(name) {
+  if (!window.currentUser || !window.currentMembers) return name;
+  const member = (window.currentMembers || []).find(
+    m => m.member_name === name && isMemberCurrentUser(m)
+  );
+  return member ? `${name} <span class="you-badge">you</span>` : name;
+}
+
 // ─────────────────────────────────────────────────────────────
-// OVERRIDE renderMembers in chapter.js to add "you" label
-// This is additive only — the original logic runs unchanged
+// Add "you" badges to member list (dropdown/panel)
 // ─────────────────────────────────────────────────────────────
-(function() {
-  const tryOverride = () => {
-    if (!window.renderMembers) {
-      setTimeout(tryOverride, 200);
-      return;
-    }
-
-    // We will patch renderMembers by re-running after it finishes
-    // and adding "you" badges to matching rows
-    const _orig = window.renderMembers;
-    window.renderMembers = async function() {
-      await _orig.apply(this, arguments);
-      addYouBadgesToMemberList();
-    };
-  };
-
-  if (document.getElementById('member-list-content')) {
-    tryOverride();
-  }
-})();
-
-function addYouBadgesToMemberList() {
+function _addYouBadgesToMemberList() {
   if (!window.currentUser || !window.currentMembers) return;
 
   const memberListEl = document.getElementById('member-list-content');
@@ -183,14 +132,10 @@ function addYouBadgesToMemberList() {
 
   const items = memberListEl.querySelectorAll('.dropdown-member-item');
   items.forEach(item => {
-    // Find the name text node
     const nameEl = item.querySelector('.member-name-text');
     if (!nameEl) return;
-
-    // Check if already has badge
     if (nameEl.querySelector('.you-badge')) return;
 
-    // Find member data by name match
     const nameText = nameEl.childNodes[0]?.textContent?.trim();
     if (!nameText) return;
 
@@ -207,79 +152,65 @@ function addYouBadgesToMemberList() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────
-// Add "you" label in settlement hero/modal
-// ─────────────────────────────────────────────────────────────
-function addYouToSettlementName(name) {
-  if (!window.currentUser || !window.currentMembers) return name;
-  const member = (window.currentMembers || []).find(
-    m => m.member_name === name && isMemberCurrentUser(m)
-  );
-  return member ? `${name} <span class="you-badge">you</span>` : name;
-}
+EventBus.on('chapter:loaded', ({ members, currentUser }) => {
+  // Sync global state if passed via event payload
+  if (members) window.currentMembers = members;
+  if (currentUser) window.currentUser = currentUser;
+  
+  _addYouBadgesToMemberList();
+  EventBus.on('expenses:rendered', _addYouBadgesToMemberList);
+  EventBus.on('members:rendered', _addYouBadgesToMemberList);
+});
 
 // ─────────────────────────────────────────────────────────────
 // Add "you" label in payer/split options inside expense modal
-// Patch renderPayerAndSplitOptions to mark current user
 // ─────────────────────────────────────────────────────────────
-(function() {
-  const tryPatch = () => {
-    // Wait for chapter.js
-    if (typeof window.renderPayerAndSplitOptions === 'undefined') {
-      setTimeout(tryPatch, 300);
-      return;
-    }
+function _addYouBadges(openModal) {
+  if (!window.currentUser || !window.currentMembers) return;
 
-    const _orig = window.renderPayerAndSplitOptions;
-    window.renderPayerAndSplitOptions = function(selectedPayerId, selectedSplitIds) {
-      _orig(selectedPayerId, selectedSplitIds);
-
-      // After render, patch the labels for current user
-      if (!window.currentUser || !window.currentMembers) return;
-
-      // Payer options
-      const payerContainer = document.getElementById('payer-selection-container');
-      if (payerContainer) {
-        payerContainer.querySelectorAll('.payer-option').forEach(el => {
-          const radio = el.querySelector('input[type=radio]');
-          if (!radio) return;
-          const memberId = parseInt(radio.value);
-          const member = (window.currentMembers || []).find(m => m.id === memberId);
-          if (member && isMemberCurrentUser(member)) {
-            const nameDiv = el.querySelector('div');
-            if (nameDiv && !nameDiv.querySelector('.you-badge')) {
-              const badge = document.createElement('span');
-              badge.className = 'you-badge';
-              badge.textContent = 'you';
-              nameDiv.appendChild(badge);
-            }
-          }
-        });
+  // Payer options
+  const payerContainer = openModal.querySelector('#payer-selection-container') || document.getElementById('payer-selection-container');
+  if (payerContainer) {
+    payerContainer.querySelectorAll('.payer-option').forEach(el => {
+      const radio = el.querySelector('input[type=radio]');
+      if (!radio) return;
+      const memberId = parseInt(radio.value);
+      const member = (window.currentMembers || []).find(m => m.id === memberId);
+      if (member && isMemberCurrentUser(member)) {
+        const nameDiv = el.querySelector('div');
+        if (nameDiv && !nameDiv.querySelector('.you-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'you-badge';
+          badge.textContent = 'you';
+          nameDiv.appendChild(badge);
+        }
       }
-
-      // Split options
-      const splitContainer = document.getElementById('split-selection-container');
-      if (splitContainer) {
-        splitContainer.querySelectorAll('.split-option').forEach(el => {
-          const checkbox = el.querySelector('input[type=checkbox]');
-          if (!checkbox) return;
-          const memberId = parseInt(checkbox.value);
-          const member = (window.currentMembers || []).find(m => m.id === memberId);
-          if (member && isMemberCurrentUser(member)) {
-            const nameSpan = el.querySelector('span');
-            if (nameSpan && !nameSpan.querySelector('.you-badge')) {
-              const badge = document.createElement('span');
-              badge.className = 'you-badge';
-              badge.textContent = 'you';
-              nameSpan.appendChild(badge);
-            }
-          }
-        });
-      }
-    };
-  };
-
-  if (document.getElementById('add-expense-modal')) {
-    tryPatch();
+    });
   }
-})();
+
+  // Split options
+  const splitContainer = openModal.querySelector('#split-selection-container') || document.getElementById('split-selection-container');
+  if (splitContainer) {
+    splitContainer.querySelectorAll('.split-option').forEach(el => {
+      const checkbox = el.querySelector('input[type=checkbox]');
+      if (!checkbox) return;
+      const memberId = parseInt(checkbox.value);
+      const member = (window.currentMembers || []).find(m => m.id === memberId);
+      if (member && isMemberCurrentUser(member)) {
+        const nameSpan = el.querySelector('span');
+        if (nameSpan && !nameSpan.querySelector('.you-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'you-badge';
+          badge.textContent = 'you';
+          nameSpan.appendChild(badge);
+        }
+      }
+    });
+  }
+}
+
+EventBus.on('expense:modal:open', () => {
+  const openModal = document.querySelector('.modal-overlay.is-open');
+  if (!openModal) return;
+  _addYouBadges(openModal);
+});

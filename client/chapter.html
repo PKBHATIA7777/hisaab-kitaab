@@ -4,323 +4,154 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>Chapter Details - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff' font-family='Arial, sans-serif'>₹</text></svg>" />
-
-  <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/features.css">
-  <link rel="stylesheet" href="css/chapter-page.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com        " />
-  <link rel="preconnect" href="https://fonts.gstatic.com        " crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins        :wght@300;400;600;700&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-  <meta name="theme-color" content="#ffffff">
+  <title>Chapter — Hisaab-Kitaab</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>" />
   
-  <!-- iOS PWA Configuration (Phase 5 Step 2) -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Hisaab">
-  <!-- Prevents white flash on launch — matches app background -->
-  <style>
-    /* Critical above-fold CSS to prevent FOUC on PWA launch */
-    html, body { 
-      background-color: #000000; 
-      -webkit-tap-highlight-color: transparent;
-    }
-  </style>
+  <!-- NEW CSS order: tokens → reset → components → chapter-specific -->
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/reset.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/chapter.css" />
+  <link rel="stylesheet" href="css/features.css" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hisaab" />
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  <div class="chapter-page-wrapper" id="main-content">
+  <div class="bubble-container" aria-hidden="true">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  </div>
 
-    <!-- Sticky Top Navigation -->
-    <nav class="chapter-nav" id="chapter-nav" aria-label="Chapter navigation">
+  <!-- 
+    CRITICAL: .chapter-page has NO isolation, NO z-index.
+    FAB is OUTSIDE .chapter-page so it's never trapped.
+    All modals created by ModalManager are appended to <body>.
+  -->
+  <div class="chapter-page" id="main-content">
+
+    <!-- Sticky Nav -->
+    <nav class="chapter-nav" aria-label="Chapter navigation">
       <a href="dashboard.html" class="nav-icon-btn" aria-label="Back to Dashboard">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
       </a>
-      <div class="chapter-nav-title">
-        <span id="nav-chapter-name"></span>
-      </div>
-      <div class="chapter-nav-actions">
-        <button id="chapter-menu-btn" class="nav-icon-btn" aria-label="More options" aria-haspopup="true" aria-expanded="false">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+
+      <div class="chapter-nav__title" id="nav-chapter-name"></div>
+
+      <div class="nav-dropdown-wrapper">
+        <button class="nav-icon-btn" id="chapter-menu-btn" aria-label="More options" aria-haspopup="true" aria-expanded="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
         </button>
+
+        <div id="chapter-nav-dropdown" class="nav-dropdown" role="menu" aria-hidden="true">
+          <button class="nav-dropdown__item" role="menuitem" onclick="openSummaryModal()"><span>📊</span> Summary</button>
+          <button class="nav-dropdown__item" role="menuitem" onclick="openSettlementModal()"><span>🤝</span> Settle Up</button>
+          <button class="nav-dropdown__item" role="menuitem" onclick="downloadReport()"><span>📥</span> Export Report</button>
+          <div class="nav-dropdown__divider"></div>
+          <button class="nav-dropdown__item" role="menuitem" onclick="openMembersPanel()"><span>👥</span> Members</button>
+        </div>
       </div>
     </nav>
 
-    <!-- Dropdown Menu -->
-    <div id="chapter-menu-dropdown" class="chapter-dropdown" role="menu" aria-hidden="true">
-      <button type="button" role="menuitem" onclick="openSummaryModal()"><span aria-hidden="true">📊</span> Summary</button>
-      <button type="button" role="menuitem" onclick="openSettlementModal()"><span aria-hidden="true">🤝</span> Settle Up</button>
-      <button type="button" role="menuitem" onclick="downloadReport()"><span aria-hidden="true">📥</span> Export Report</button>
-      <div class="dropdown-divider"></div>
-      <button type="button" role="menuitem" id="nav-members-trigger"><span aria-hidden="true">👥</span> Members</button>
-    </div>
-
-    <!-- Members Panel -->
-    <div id="member-dropdown" class="member-panel" aria-hidden="true">
-      <div class="member-panel-header">
-        <h3>Members</h3>
-        <button onclick="document.getElementById('member-dropdown').classList.remove('active')" class="panel-close-btn" aria-label="Close members panel">×</button>
-      </div>
-      <div id="member-list-content" class="member-panel-list"></div>
-      <div id="admin-actions" class="member-panel-admin" style="display:none;">
-        <button class="btn-add-member" type="button" onclick="openAddMemberModal()">+ Add Member</button>
-      </div>
-    </div>
-
-    <!-- Page Content -->
+    <!-- Main content -->
     <main class="chapter-main">
 
-      <!-- Chapter Header -->
-      <div id="chapter-skeleton" class="chapter-skeleton-wrapper">
-        <div class="skeleton skeleton-avatar"></div>
-        <div class="skeleton skeleton-title"></div>
-        <div class="skeleton skeleton-subtitle"></div>
-        <div class="skeleton-cards-row">
-          <div class="skeleton skeleton-card-sm"></div>
-          <div class="skeleton skeleton-card-sm"></div>
-          <div class="skeleton skeleton-card-sm"></div>
-        </div>
+      <!-- Hero skeleton (replaced by JS after load) -->
+      <div class="hero-skeleton" id="chapter-hero-skeleton" aria-hidden="true">
+        <div class="hero-skeleton__icon skeleton"></div>
+        <div class="hero-skeleton__title skeleton"></div>
+        <div class="hero-skeleton__subtitle skeleton"></div>
       </div>
 
-      <div id="chapter-content" class="chapter-hero" style="display:none;" aria-label="Chapter details">
-        <div class="chapter-hero-icon" id="chapter-icon-display" aria-hidden="true"></div>
-        <h1 class="chapter-hero-title" id="chapter-title"></h1>
-        <p class="chapter-hero-desc" id="chapter-desc"></p>
+      <!-- Hero (hidden until loaded) -->
+      <div class="chapter-hero" id="chapter-hero" style="display:none;">
+        <div class="chapter-hero__icon" id="chapter-icon"></div>
+        <h1 class="chapter-hero__title" id="chapter-title"></h1>
+        <p class="chapter-hero__desc" id="chapter-desc"></p>
       </div>
 
-      <!-- Settlement Hero Card -->
-      <section class="settlement-section" id="settlement-hero-section" aria-label="Current settlements">
-        <div class="settlement-card-header" id="hero-summary-card" role="button" tabindex="0" aria-expanded="true">
-          <div class="settlement-card-label">
-            <span class="settlement-dot" aria-hidden="true"></span>
+      <!-- Settlements -->
+      <section class="settlement-section" aria-label="Settlements">
+        <div class="settlement-header" id="hero-settlement-header" role="button" tabindex="0" aria-expanded="false">
+          <div class="settlement-label">
+            <div class="settlement-dot" aria-hidden="true"></div>
             Settlements
           </div>
-          <div class="settlement-card-actions">
-            <button class="icon-btn-sm refresh-mini-btn" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh settlements">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <div class="settlement-actions">
+            <button class="icon-btn-sm" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
-            <button class="icon-btn-sm hero-toggle-btn" id="hero-expand-btn" aria-label="Toggle settlement details">
-              <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            <button class="icon-btn-sm" id="hero-expand-btn" aria-label="Toggle settlements">
+              <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
           </div>
         </div>
-        <div class="settlement-collapse" id="hero-details-content">
-          <div id="hero-settlement-list" class="settlement-list-inner"></div>
+        <div class="settlement-body" id="hero-settlement-body">
+          <div class="settlement-list" id="hero-settlement-list"></div>
         </div>
       </section>
 
-      <!-- Event Tabs -->
-      <div id="events-strip-container" class="events-strip" role="tablist" aria-label="Filter by event"></div>
+      <!-- Events strip -->
+      <div id="events-strip" class="events-strip" role="tablist" aria-label="Filter by event"></div>
 
       <!-- Expenses -->
-    <section class="expenses-section" aria-label="Expense list">
-  <div id="expense-list-container" class="expense-list"></div>
-  <!-- Load More container — managed by chapter.js renderLoadMoreButton() -->
-  <div id="load-more-container" style="text-align:center; padding: 0 16px;"></div>
-  <div class="empty-state-placeholder" id="chapter-empty-state" style="display:none;" role="status">
-          <div class="empty-state-icon" aria-hidden="true">💸</div>
-          <p class="empty-state-title">No expenses yet</p>
-          <p class="empty-state-subtitle">Tap the + button to add your first expense</p>
+      <section class="expenses-section" aria-label="Expenses">
+        <div class="expense-list" id="expense-list"></div>
+        <div id="load-more-container" class="load-more-container"></div>
+        <div class="empty-state" id="chapter-empty-state" style="display:none;" role="status">
+          <div class="empty-state__icon">💸</div>
+          <div class="empty-state__title">No expenses yet</div>
+          <div class="empty-state__subtitle">Tap the + button to add your first expense</div>
         </div>
       </section>
 
     </main>
   </div>
 
-  <!-- FAB -->
-  <button class="fab-btn" type="button" onclick="openAddExpenseModal()" aria-label="Add new expense">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  <!--
+    FAB is outside .chapter-page — never inside any stacking context.
+    z-index: var(--z-sticky) = 100, which is sufficient since no wrapper has isolation.
+  -->
+  <button class="fab" id="chapter-fab" aria-label="Add new expense">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
 
-  <!-- === MODALS === -->
-
-  <!-- Add Member Modal -->
-  <div class="modal-overlay" id="add-member-modal">
-    <div class="modal-box" style="max-width:400px;">
-      <div class="modal-header">
-        <h2>Add Member</h2>
-        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeAddMemberModal()">×</button>
-      </div>
-      <form id="add-member-form">
-        <div class="form-group">
-          <label for="new-member-name">Member Name</label>
-          <input
-            type="text"
-            id="new-member-name"
-            class="form-input"
-            placeholder="Enter name or select friend..."
-            list="friends-datalist"
-            required
-          />
-          <datalist id="friends-datalist"></datalist>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-text" onclick="closeModal('add-member-modal')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Add</button>
-        </div>
-      </form>
+  <!-- Members panel (slide-in drawer) — also outside .chapter-page -->
+  <div id="members-panel" class="members-panel" aria-label="Members">
+    <div class="members-panel__header">
+      <h3 class="members-panel__title">Members</h3>
+      <button class="members-panel__close" onclick="closeMembersPanel()" aria-label="Close">×</button>
+    </div>
+    <div class="members-panel__list" id="members-panel-list"></div>
+    <div class="members-panel__footer" id="member-panel-admin" style="display:none;">
+      <button class="btn-add-member" onclick="openAddMemberModal()">+ Add Member</button>
     </div>
   </div>
+  <div id="panel-backdrop" class="panel-backdrop"></div>
 
-  <!-- Add Expense Modal (Bottom Sheet) -->
-  <div class="expense-sheet-overlay" id="add-expense-modal" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
-    <div class="expense-sheet" role="document">
-      <!-- Drag handle -->
-      <div class="expense-sheet-handle" aria-hidden="true"></div>
-
-      <!-- Header -->
-      <div class="expense-sheet-header">
-        <h2 class="expense-sheet-title" id="expense-modal-title">Add Expense</h2>
-        <button class="expense-sheet-close" aria-label="Close" type="button" onclick="closeAddExpenseModal()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-
-      <!-- Scrollable body -->
-      <form id="add-expense-form" class="expense-sheet-body">
-
-        <!-- Amount -->
-        <div class="expense-amount-block">
-          <div class="expense-amount-row">
-            <span class="expense-currency-symbol">₹</span>
-            <input
-              type="number"
-              name="amount"
-              placeholder="0"
-              required
-              class="expense-amount-input"
-              inputmode="decimal"
-              min="0.01"
-              step="any"
-              autocomplete="off"
-            />
-          </div>
-          <div class="expense-amount-underline"></div>
-        </div>
-
-        <!-- Description -->
-        <div class="expense-field-group">
-          <label class="expense-field-label" for="expense-desc-input">
-            Description <span class="expense-field-optional">(Optional)</span>
-          </label>
-          <input
-            type="text"
-            id="expense-desc-input"
-            name="description"
-            placeholder="e.g. Dinner at Taj"
-            maxlength="100"
-            class="expense-text-input"
-            autocomplete="off"
-          />
-        </div>
-
-        <!-- Category — injected here by feature-categories.js -->
-
-        <!-- Paid By -->
-        <div class="expense-field-group">
-          <label class="expense-field-label">Paid By</label>
-          <div class="expense-payer-scroll" id="payer-selection-container"></div>
-        </div>
-
-        <!-- Split Among -->
-        <div class="expense-field-group">
-          <div class="expense-split-header">
-            <span class="expense-field-label" style="margin:0;">Split Among</span>
-            <button type="button" class="expense-select-all-btn" onclick="toggleSelectAll()">Select All</button>
-          </div>
-          <div class="expense-split-list" id="split-selection-container"></div>
-        </div>
-
-        <!-- Actions -->
-        <div class="expense-sheet-actions">
-          <button type="submit" class="expense-save-btn" id="btn-save-expense">Save Expense</button>
-          <button
-            type="button"
-            id="btn-delete-expense"
-            class="expense-delete-btn"
-            style="display:none;"
-            onclick="handleDeleteExpense()"
-          >Delete</button>
-        </div>
-
-      </form>
-    </div>
-  </div>
-
-  <!-- Summary Modal -->
-  <div class="modal-overlay" id="summary-modal">
-    <div class="modal-box" style="max-width:450px;">
-      <div class="modal-header">
-        <h2>Chapter Summary</h2>
-        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeSummaryModal()">×</button>
-      </div>
-      <div style="text-align:center; margin-bottom:25px;">
-        <div style="font-size:0.9rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Total Spent</div>
-        <div id="summary-grand-total" style="font-size:2.5rem; font-weight:700; color:#333;">₹0.00</div>
-      </div>
-      <div id="summary-list" style="max-height:300px; overflow-y:auto;"></div>
-    </div>
-  </div>
-
-  <!-- Settlement Modal -->
-  <div class="modal-overlay" id="settlement-modal">
-    <div class="modal-box" style="max-width:450px;">
-      <div class="modal-header">
-        <h2>Who Pays Whom?</h2>
-        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeSettlementModal()">×</button>
-      </div>
-      <div id="settlement-loading" style="text-align:center; padding:20px; display:none;">
-        <div class="spinner" style="margin:0 auto; width:30px; height:30px; border-width:3px;"></div>
-        <p style="margin-top:10px; color:#888; font-size:0.9rem;">Calculating debts...</p>
-      </div>
-      <div id="settlement-list" style="max-height:350px; overflow-y:auto;"></div>
-      <div id="settlement-empty" style="text-align:center; padding:30px; display:none;">
-        <div style="font-size:3rem;">🎉</div>
-        <h3 style="margin:10px 0 5px 0;">All Settled Up!</h3>
-        <p style="color:#888; font-size:0.9rem;">No one owes anything to anyone.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Create Event Modal -->
-  <div class="modal-overlay" id="create-event-modal">
-    <div class="modal-box" style="max-width:400px;">
-      <div class="modal-header">
-        <h2>New Event</h2>
-        <button class="close-modal" aria-label="Close Modal" type="button" onclick="closeCreateEventModal()">×</button>
-      </div>
-      <form id="create-event-form">
-        <p style="color:#666; font-size:0.9rem; margin-bottom:20px; line-height:1.5;">
-          Events are sub-folders inside this chapter (like "Goa Trip" or "Diwali Party").<br><br>
-          <strong>Note:</strong> All chapter members are automatically included.
-        </p>
-        <label>Event Name <span style="color:red">*</span></label>
-        <input type="text" name="name" required placeholder="e.g. Weekend Getaway" maxlength="50" />
-        <div style="margin-top:25px;">
-          <button type="submit" class="btn-primary">Create Event</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Scripts -->
-   <!-- ADD THIS as the first script in every HTML file, before any other scripts -->
-<script src="js/core/storage.js"></script>
-   <script src="js/core/sanitize.js"></script>
+  <!-- Scripts — order matters -->
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/sanitize.js"></script>
   <script src="js/core/csrf.js"></script>
   <script src="js/core/session.js"></script>
   <script src="js/core/api-cache.js"></script>
+  <script src="js/core/event-bus.js"></script>
+  <script src="js/core/modal-manager.js"></script>
   <script src="js/pwa/offline-queue.js"></script>
   <script src="js/main.js"></script>
   <script src="js/chapter.js"></script>
+  <!-- Feature scripts — use EventBus, not monkey-patching -->
   <script src="js/feature-settlements.js"></script>
-  <script src="js/feature-creator-label.js"></script>
-  <script src="js/feature-personal-chapter.js"></script>
   <script src="js/feature-categories.js"></script>
+  <script src="js/feature-personal-chapter.js"></script>
   <script src="js/feature-bulk-event.js"></script>
+  <script src="js/feature-creator-label.js"></script>
 </body>
 </html>
