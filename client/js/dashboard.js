@@ -324,7 +324,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Init failed", err);
     
     if (err.status === 401 || err.status === 403) {
-      window.location.href = "login.html";
+      // Clear the session_expiry cookie so the login-page guard doesn't
+      // immediately redirect back to dashboard — breaking the reload loop.
+      var past = 'expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'session_expiry=; ' + past + ' SameSite=Lax';
+      document.cookie = 'session_expiry=; ' + past + ' SameSite=None; Secure';
+      window.location.replace("login.html?expired=true");
     } else {
       // ✅ FIX: Retry Button
       showToast("Failed to load data", "error", {

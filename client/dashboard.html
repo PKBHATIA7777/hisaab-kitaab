@@ -35,6 +35,45 @@
   </style>
 </head>
 <body>
+  <!-- ── REDIRECT LOOP GUARD ──────────────────────────────────────────────
+       Runs synchronously before any other script. Detects if dashboard is
+       being reloaded in a tight loop (auth_token expired but session_expiry
+       cookie still alive) and breaks the cycle by clearing both cookies and
+       forcing a hard redirect to login.
+  ──────────────────────────────────────────────────────────────────────── -->
+  <script>
+    (function () {
+      // If login explicitly sent us here after expiry, do nothing — let
+      // the page load normally so dashboard.js can call /auth/me and fail cleanly.
+      // (This path should never reach dashboard in practice, but just in case.)
+
+      var GUARD_KEY = '__dash_redirects';
+      var now = Date.now();
+      var raw = sessionStorage.getItem(GUARD_KEY);
+      var data = raw ? JSON.parse(raw) : { count: 0, time: 0 };
+
+      if (now - data.time < 5000) {
+        data.count++;
+      } else {
+        data.count = 1;
+        data.time = now;
+      }
+      sessionStorage.setItem(GUARD_KEY, JSON.stringify(data));
+
+      if (data.count > 3) {
+        // We've loaded dashboard 3+ times in 5 s — almost certainly a loop.
+        // Nuke both auth cookies and hard-redirect to login.
+        var past = 'expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'auth_token=; '     + past + ' SameSite=Lax';
+        document.cookie = 'auth_token=; '     + past + ' SameSite=None; Secure';
+        document.cookie = 'session_expiry=; ' + past + ' SameSite=Lax';
+        document.cookie = 'session_expiry=; ' + past + ' SameSite=None; Secure';
+        sessionStorage.removeItem(GUARD_KEY);
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+
   <a href="#main-content" class="skip-link">Skip to content</a>
 
   <main id="main-content">

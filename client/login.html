@@ -57,6 +57,11 @@
   <script>
     (function() {
       try {
+        // If we were sent here because the token expired, do NOT redirect back.
+        // This is what breaks the loop — dashboard clears session_expiry and
+        // appends ?expired=true so we know to stay on the login page.
+        if (window.location.search.indexOf('expired=true') !== -1) return;
+
         var cookie = document.cookie.split('; ').find(function(r) {
           return r.startsWith('session_expiry=');
         });
