@@ -1,0 +1,20 @@
+/* Add to global.css */
+/* Any interactive element that is smaller than the touch target minimum
+   gets an invisible hit area via pseudo-element */
+.icon-btn-sm,
+.modal-close,
+.expense-sheet-close {
+  position: relative;
+}
+
+.icon-btn-sm::before,
+.modal-close::before,
+.expense-sheet-close::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+}

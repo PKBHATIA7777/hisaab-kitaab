@@ -7,16 +7,34 @@
   <title>Dashboard - Hisaab-Kitaab</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>">
   
-  <!-- NEW CSS order: tokens → reset → components → dashboard-specific → features -->
+  <!-- NEW CSS Architecture -->
   <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/reset.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components/button.css">
+  <link rel="stylesheet" href="css/components/card.css">
+  <link rel="stylesheet" href="css/components/modal.css">
+  <link rel="stylesheet" href="css/components/form.css">
+  <link rel="stylesheet" href="css/components/toast.css">
+  <link rel="stylesheet" href="css/components/skeleton.css">
+  <link rel="stylesheet" href="css/components/fab.css">
+  <link rel="stylesheet" href="css/components/avatar.css">
+  <link rel="stylesheet" href="css/components/empty-state.css">
+  <link rel="stylesheet" href="css/components/badge.css">
+  <link rel="stylesheet" href="css/layout/navbar.css">
+  <link rel="stylesheet" href="css/layout/footer.css">
+  <link rel="stylesheet" href="css/pages/dashboard.css">
   <link rel="stylesheet" href="css/features.css">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preload"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  </noscript>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -134,6 +152,7 @@
   </button>
 
   <!-- Scripts — order matters -->
+  <!-- Core (unchanged) -->
   <script src="js/core/storage.js"></script>
   <script src="js/core/sanitize.js"></script>
   <script src="js/core/csrf.js"></script>
@@ -141,14 +160,33 @@
   <script src="js/core/api-cache.js"></script>
   <script src="js/core/event-bus.js"></script>
   <script src="js/core/modal-manager.js"></script>
+
+  <!-- New infrastructure -->
+  <script src="js/api/error-handler.js"></script>
+  <script src="js/utils/avatar.js"></script>
+  <script src="js/utils/time.js"></script>
+  <script src="js/utils/format.js"></script>
+  <script src="js/ui/toast.js"></script>
+  <script src="js/ui/button.js"></script>
+  <script src="js/ui/form-validator.js"></script>
+
+  <!-- PWA -->
   <script src="js/pwa/offline-queue.js"></script>
   <script src="js/pwa/install-manager.js"></script>
+
+  <!-- main.js (slimmed — only server wakeup + google auth + session monitor) -->
   <script src="js/main.js"></script>
-  <script src="js/dashboard.js"></script>
-  <!-- Feature scripts — use EventBus, not monkey-patching -->
-  <script src="js/feature-creator-label.js"></script>
-  <script src="js/feature-personal-chapter.js"></script>
-  <script src="js/feature-categories.js"></script>
+
+  <!-- Dashboard features -->
+  <script src="js/features/dashboard/chapters-grid.js"></script>
+  <script src="js/features/dashboard/chapter-modal.js"></script>
+  <script src="js/features/dashboard/profile-modal.js"></script>
+  <script src="js/features/creator-label.js"></script>
+  <script src="js/features/personal-chapter.js"></script>
+  <script src="js/features/categories.js"></script>
+
+  <!-- Page orchestrator — must be last -->
+  <script src="js/pages/dashboard-page.js"></script>
 
   <footer class="app-footer">
     <div class="footer-content">

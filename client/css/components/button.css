@@ -1,0 +1,84 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: var(--touch-min);
+  padding: 0 var(--s-5);
+  border-radius: var(--r-md);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--dur-fast) var(--ease);
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+
+/* Variants */
+.btn--primary   { background: var(--text-primary); color: #fff; width: 100%; }
+.btn--primary:hover { background: #222; }
+
+.btn--brand {
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  color: #fff;
+  box-shadow: var(--brand-glow);
+  width: 100%;
+}
+.btn--brand:hover { filter: brightness(1.1); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--surface-border);
+}
+.btn--ghost:hover { background: var(--surface-alt); }
+
+.btn--danger {
+  background: var(--negative-bg);
+  color: var(--negative);
+  border: 1.5px solid rgba(255,23,68,0.2);
+}
+.btn--danger:hover { background: #ffe0e0; }
+
+.btn--text {
+  background: transparent;
+  color: var(--brand);
+  padding: var(--s-1) var(--s-2);
+  min-height: unset;
+}
+
+/* Sizes */
+.btn--sm  { min-height: 36px; padding: 0 var(--s-3); font-size: var(--text-xs); }
+.btn--lg  { min-height: 52px; padding: 0 var(--s-8); font-size: var(--text-base); }
+.btn--icon { width: var(--touch-min); padding: 0; border-radius: var(--r-md); }
+.btn--icon-round { border-radius: 50%; }
+
+/* Loading state */
+.btn--loading {
+  pointer-events: none;
+  color: transparent !important;
+}
+.btn--loading::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin var(--dur-slow) linear infinite;
+}
+.btn--ghost.btn--loading::after,
+.btn--danger.btn--loading::after {
+  border-color: rgba(0,0,0,0.15);
+  border-top-color: var(--text-primary);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

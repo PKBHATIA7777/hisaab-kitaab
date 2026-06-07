@@ -74,16 +74,16 @@ function exitSelectMode() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// RENDER EXPENSES IN SELECT MODE
+// RENDER EXPENSES IN SELECT MODE (XSS FIXED)
 // ─────────────────────────────────────────────────────────────
 function renderExpensesInSelectMode() {
-  const listEl = document.getElementById('expense-list') || document.getElementById('expense-list-container');
+  const listEl = document.getElementById('expense-list');
   if (!listEl || !window.expenses) return;
 
   listEl.innerHTML = '';
 
   if (window.expenses.length === 0) {
-    listEl.innerHTML = '<div style="text-align:center; padding:30px; color:rgba(255,255,255,0.5);">No expenses to select.</div>';
+    listEl.innerHTML = '<div class="empty-state empty-state--inline"><p class="empty-state__subtitle">No expenses to select.</p></div>';
     return;
   }
 
@@ -92,17 +92,44 @@ function renderExpensesInSelectMode() {
     card.className = 'expense-card selectable';
     card.dataset.expenseId = ex.id;
 
-    card.innerHTML = `
-      <div class="expense-select-check" id="check-${ex.id}"></div>
-      <div class="expense-info">
-        <h4>${ex.description || 'Untitled Expense'}</h4>
-        <p>paid by <strong>${ex.payer_name || 'Unknown'}</strong> · ${typeof window.timeAgo === 'function' ? window.timeAgo(ex.expense_date) : (typeof timeAgo === 'function' ? timeAgo(ex.expense_date) : '')}</p>
-        ${ex.event_id ? `<span style="font-size:0.7rem; color:#d000ff; font-weight:600;">📌 In event</span>` : ''}
-      </div>
-      <div style="text-align:right;">
-        <div class="expense-amount">₹${ex.amount}</div>
-      </div>
-    `;
+    // ALL user content goes through textContent (no XSS)
+    const checkEl = document.createElement('div');
+    checkEl.className = 'expense-select-check';
+    checkEl.id = `check-${ex.id}`;
+
+    const infoEl = document.createElement('div');
+    infoEl.className = 'expense-info';
+    
+    const nameEl = document.createElement('div');
+    nameEl.className = 'expense-info__name';
+    nameEl.textContent = ex.description || 'Untitled Expense'; 
+
+    const metaEl = document.createElement('p');
+    metaEl.className = 'expense-info__meta';
+    
+    const payerStrong = document.createElement('strong');
+    payerStrong.textContent = ex.payer_name || 'Unknown';
+    
+    metaEl.append('paid by ', payerStrong);
+    
+    if (ex.event_id) {
+      const tag = document.createElement('span');
+      tag.className = 'badge badge--brand';
+      tag.style.fontSize = '0.65rem';
+      tag.textContent = 'In event';
+      metaEl.append(' ', tag);
+    }
+
+    infoEl.appendChild(nameEl);
+    infoEl.appendChild(metaEl);
+
+    const amountEl = document.createElement('div');
+    amountEl.className = 'expense-amount';
+    amountEl.textContent = `₹${parseFloat(ex.amount).toLocaleString('en-IN')}`;
+
+    card.appendChild(checkEl);
+    card.appendChild(infoEl);
+    card.appendChild(amountEl);
 
     card.addEventListener('click', () => toggleExpenseSelection(card, ex.id));
     listEl.appendChild(card);

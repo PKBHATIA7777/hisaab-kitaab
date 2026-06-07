@@ -286,6 +286,10 @@ function _buildExpenseCard(ex) {
   const amount   = `₹${parseFloat(ex.amount).toLocaleString('en-IN')}`;
   const when     = _timeAgo(ex.expense_date);
 
+  // Accessibility attributes
+  card.setAttribute('role', 'article');
+  card.setAttribute('aria-label', `${name}, paid by ${payer}, ${amount}`);
+
   card.innerHTML = `
     <div class="expense-icon">${icon}</div>
     <div class="expense-info">
@@ -357,12 +361,19 @@ function _renderHeroSettlements(settlements) {
   }
 
   listEl.innerHTML = settlements.map(s => `
-    <div class="settle-row">
+    <div class="settle-row" role="listitem">
       <div class="settle-row__info">
-        <div class="avatar avatar--sm" style="background:${_getAvatarColor(s.from)}">${escapeHTML(_getInitials(s.from))}</div>
-        <div class="settle-row__names"><strong>${escapeHTML(s.from)}</strong> <span style="color:rgba(255,255,255,0.4)">→</span> <strong>${escapeHTML(s.to)}</strong></div>
+        ${renderAvatar(s.from, { size: 'sm' })}
+        <div class="settle-row__names">
+          <strong>${escapeHTML(s.from)}</strong>
+          <span class="settle-row__arrow" aria-label="owes">→</span>
+          <strong>${escapeHTML(s.to)}</strong>
+        </div>
       </div>
-      <div class="settle-row__amount">₹${s.amount}</div>
+      <div class="settle-row__amount" aria-label="Amount: ₹${s.amount}">
+        <span aria-hidden="true">💸</span>
+        ₹${s.amount}
+      </div>
     </div>
   `).join('');
 

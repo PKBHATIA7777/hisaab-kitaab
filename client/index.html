@@ -18,13 +18,65 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preload"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  </noscript>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="theme-color" content="#ffffff">
   
+  <!-- Critical above-fold CSS — eliminates render-blocking for auth pages -->
+  <style>
+    /* Page foundation */
+    html, body {
+      background-color: #000000;
+      margin: 0;
+      font-family: 'Poppins', system-ui, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Brand header */
+    .brand-header {
+      text-align: center;
+      padding: 48px 20px 20px;
+      position: relative;
+      z-index: 1;
+    }
+    .brand-header h1 {
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 6px;
+      letter-spacing: -0.5px;
+    }
+    .brand-header p {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.55);
+      margin: 0;
+    }
+    /* Auth card shell */
+    .auth-wrapper {
+      display: flex;
+      justify-content: center;
+      padding: 0 16px 40px;
+      position: relative;
+      z-index: 1;
+    }
+    .auth-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+    }
+  </style>
+
   <!-- iOS PWA Configuration (Phase 5 Step 2) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

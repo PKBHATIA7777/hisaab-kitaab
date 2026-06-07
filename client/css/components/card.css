@@ -1,0 +1,105 @@
+.card {
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  padding: var(--card-pad);
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+.card--interactive {
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .card--interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.card--interactive:active { transform: scale(0.98); }
+
+/* Dark surface card (on dark background) */
+.card--dark {
+  background: var(--bg-overlay);
+  border-color: rgba(255,255,255,0.08);
+  border-radius: var(--card-radius);
+}
+
+.card--dark .card__title   { color: var(--text-on-dark); }
+.card--dark .card__subtitle { color: var(--text-on-dark-2); }
+
+/* Chapter card */
+.chapter-card {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chapter-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--s-2);
+}
+
+.chapter-card__name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+  word-break: break-word;
+  padding: var(--s-2) 0;
+}
+
+.chapter-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border-top: var(--card-border);
+  padding-top: var(--s-2);
+  margin-top: auto;
+}
+
+/* Add card variant */
+.chapter-card--add {
+  background: transparent;
+  border: 2px dashed rgba(255,255,255,0.2);
+  box-shadow: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .chapter-card--add:hover {
+    border-color: var(--brand);
+    background: var(--brand-light);
+  }
+}
+
+.chapter-card--add__icon {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: var(--text-xl);
+  box-shadow: var(--brand-glow);
+}
+
+.chapter-card--add__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: rgba(255,255,255,0.75);
+}
