@@ -11,7 +11,7 @@
   margin: 0 auto;
   width: 100%;
   /* Do NOT add position:relative or z-index here — it traps modal stacking context */
-  isolation: isolate;
+  /* isolation: isolate; */
 }
 
 /* --- Navigation --- */
@@ -123,7 +123,8 @@
   overflow: hidden;
 }
 
-.member-panel.active { right: 0; }
+.member-panel.active,
+.member-panel.is-open { right: 0; }
 
 .member-panel-header {
   display: flex;
@@ -293,18 +294,19 @@
   transition: transform 0.25s ease;
 }
 
-.hero-toggle-btn.active .chevron-icon {
+.hero-toggle-btn.active .chevron-icon,
+.icon-btn-sm.is-open .chevron-icon {
   transform: rotate(180deg);
 }
 
 /* Settlement collapse */
-.settlement-collapse {
+.settlement-body {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease;
 }
 
-.settlement-collapse.active {
+.settlement-body.is-open {
   max-height: 600px;
 }
 
@@ -543,7 +545,8 @@
   z-index: 290;
   backdrop-filter: blur(2px);
 }
-.panel-backdrop.active { display: block; }
+.panel-backdrop.active,
+.panel-backdrop.is-open { display: block; }
 
 /* Mobile adjustments */
 @media (max-width: 480px) {
@@ -984,3 +987,34 @@
     overflow: hidden;
   }
 }
+
+
+
+
+.members-panel { 
+  position: fixed;
+  top: 0; right: -320px;
+  width: 300px; height: 100dvh;
+  background: #fff;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  z-index: var(--z-panel);
+  transition: right 0.28s cubic-bezier(0.25,0.8,0.25,1);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.members-panel.is-open { right: 0; }
+.members-panel__header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.members-panel__header h3 { margin: 0; font-size: 1.1rem; color: #333; }
+.members-panel__close {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: #f5f5f7; border: none; font-size: 1.3rem;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; color: #555;
+}
+.members-panel__list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.members-panel__footer { padding: 12px 16px 20px; border-top: 1px solid #f0f0f0; }
+#panel-backdrop.is-open { display: block; }

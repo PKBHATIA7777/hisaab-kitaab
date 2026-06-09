@@ -8,11 +8,21 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>" />
   
   <!-- NEW CSS order: tokens → reset → components → chapter-specific -->
-  <link rel="stylesheet" href="css/tokens.css" />
-  <link rel="stylesheet" href="css/reset.css" />
-  <link rel="stylesheet" href="css/components.css" />
-  <link rel="stylesheet" href="css/chapter-page.css" />
-  <link rel="stylesheet" href="css/features.css" />
+<link rel="stylesheet" href="css/tokens.css" />
+<link rel="stylesheet" href="css/reset.css" />
+<link rel="stylesheet" href="css/global.css" />
+<link rel="stylesheet" href="css/components/button.css" />
+<link rel="stylesheet" href="css/components/card.css" />
+<link rel="stylesheet" href="css/components/modal.css" />
+<link rel="stylesheet" href="css/components/form.css" />
+<link rel="stylesheet" href="css/components/toast.css" />
+<link rel="stylesheet" href="css/components/skeleton.css" />
+<link rel="stylesheet" href="css/components/fab.css" />
+<link rel="stylesheet" href="css/components/avatar.css" />
+<link rel="stylesheet" href="css/components/empty-state.css" />
+<link rel="stylesheet" href="css/components/badge.css" />
+<link rel="stylesheet" href="css/chapter-page.css" />
+<link rel="stylesheet" href="css/features.css" />
   
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -41,7 +51,7 @@
     FAB is OUTSIDE .chapter-page so it's never trapped.
     All modals created by ModalManager are appended to <body>.
   -->
-  <div class="chapter-page" id="main-content">
+  <div class="chapter-page chapter-page-wrapper" id="main-content">
 
     <!-- Sticky Nav -->
     <nav class="chapter-nav" aria-label="Chapter navigation">

@@ -1,0 +1,13 @@
+.avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.avatar--sm  { width: 28px; height: 28px; font-size: var(--text-xs); border-radius: var(--r-sm); }
+.avatar--md  { width: 40px; height: 40px; font-size: var(--text-sm); }
+.avatar--lg  { width: 64px; height: 64px; font-size: var(--text-xl); }
+.avatar--xl  { width: 80px; height: 80px; font-size: var(--text-2xl); }

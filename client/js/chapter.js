@@ -396,7 +396,7 @@ document.getElementById('hero-settlement-header')?.addEventListener('click', (e)
 });
 
 // Refresh settlements button
-window.refreshSettlements = async () => { await _loadHeroSettlements(true); showToast('Refreshed', 'info'); };
+window.refreshSettlements = debounce(async () => { await _loadHeroSettlements(true); showToast('Refreshed', 'info'); }, 1000);
 
 /* =============================================
    ADD / EDIT EXPENSE MODAL

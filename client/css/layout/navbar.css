@@ -1,0 +1,41 @@
+.app-navbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  height: var(--nav-height);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--s-5);
+}
+.nav-brand h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  background: linear-gradient(135deg, #fff 0%, var(--brand) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+.nav-right { display: flex; align-items: center; gap: var(--s-3); }
+.profile-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.15);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  color: #fff;
+  cursor: pointer;
+  background: rgba(255,255,255,0.1);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.profile-btn:hover { border-color: var(--brand); }

@@ -81,6 +81,7 @@ function renderCategoryPills(containerId, currentCategoryId) {
     btn.style.borderColor = color;
     btn.style.color = '#fff';
     selectedCategoryId = catId;
+    window._pendingCategoryId = catId;
   });
 }
 
@@ -155,24 +156,6 @@ async function injectCategoryRowInExpenseModal(currentCategoryId) {
 window.getSelectedCategoryId = function() {
   return selectedCategoryId;
 };
-
-// ─────────────────────────────────────────────────────────────
-// Intercept apiFetch to inject categoryId (cleaner approach)
-// ─────────────────────────────────────────────────────────────
-(function() {
-  const orig = window.apiFetch;
-  if (!orig) return;
-  
-  window.apiFetch = async function(path, options = {}) {
-    if ((path === '/expenses' && options.method === 'POST') ||
-        (typeof path === 'string' && path.startsWith('/expenses/') && options.method === 'PUT')) {
-      if (options.body && typeof options.body === 'object' && selectedCategoryId !== null) {
-        options.body.categoryId = selectedCategoryId;
-      }
-    }
-    return orig.call(this, path, options);
-  };
-})();
 
 // ─────────────────────────────────────────────────────────────
 // EXPENSE CARD: Show category badge on each expense
@@ -551,6 +534,7 @@ window.deleteCategoryById = async function(id, name) {
 EventBus.on('expense:modal:open', async ({ mode, expense }) => {
   await loadCategories();
   selectedCategoryId = expense?.category_id || null;
+  window._pendingCategoryId = selectedCategoryId;
   await injectCategoryRowInExpenseModal(selectedCategoryId);
 });
 
