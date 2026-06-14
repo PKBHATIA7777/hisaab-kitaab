@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#000000" />
   <title>Chapter — Hisaab-Kitaab</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>" />
@@ -39,7 +39,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Hisaab" />
 </head>
-<body>
+<body class="has-fab-gradient">
+  <!-- ARIA live region must exist before any toast fires -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
   <a href="#main-content" class="skip-link">Skip to content</a>
 
   <div class="bubble-container" aria-hidden="true">
@@ -135,6 +138,14 @@
     FAB is outside .chapter-page — never inside any stacking context.
     z-index: var(--z-sticky) = 100, which is sufficient since no wrapper has isolation.
   -->
+  <!-- Shown only when pending settlements exist -->
+  <div class="settle-cta-bar" id="settle-cta-bar" style="display:none" aria-live="polite">
+    <button class="settle-cta-btn" onclick="openSettlementModal()" aria-label="Open settle up">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+      Settle Up
+    </button>
+  </div>
+
   <button class="fab" id="chapter-fab" aria-label="Add new expense">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
@@ -152,22 +163,21 @@
   </div>
   <div id="panel-backdrop" class="panel-backdrop"></div>
 
-  <!-- Scripts — order matters -->
-  <script src="js/core/storage.js"></script>
-  <script src="js/core/sanitize.js"></script>
-  <script src="js/core/csrf.js"></script>
-  <script src="js/core/session.js"></script>
-  <script src="js/core/api-cache.js"></script>
-  <script src="js/core/event-bus.js"></script>
-  <script src="js/core/modal-manager.js"></script>
-  <script src="js/pwa/offline-queue.js"></script>
-  <script src="js/main.js"></script>
-  <script src="js/chapter.js"></script>
-  <!-- Feature scripts — use EventBus, not monkey-patching -->
-  <script src="js/feature-settlements.js"></script>
-  <script src="js/feature-categories.js"></script>
-  <script src="js/feature-personal-chapter.js"></script>
-  <script src="js/feature-bulk-event.js"></script>
-  <script src="js/feature-creator-label.js"></script>
+  <!-- Scripts — deferred so HTML parses first, order preserved -->
+  <script src="js/core/storage.js" defer></script>
+  <script src="js/core/sanitize.js" defer></script>
+  <script src="js/core/csrf.js" defer></script>
+  <script src="js/core/session.js" defer></script>
+  <script src="js/core/api-cache.js" defer></script>
+  <script src="js/core/event-bus.js" defer></script>
+  <script src="js/core/modal-manager.js" defer></script>
+  <script src="js/pwa/offline-queue.js" defer></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/chapter.js" defer></script>
+  <script src="js/feature-settlements.js" defer></script>
+  <script src="js/feature-categories.js" defer></script>
+  <script src="js/feature-personal-chapter.js" defer></script>
+  <script src="js/feature-bulk-event.js" defer></script>
+  <script src="js/feature-creator-label.js" defer></script>
 </body>
 </html>

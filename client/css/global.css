@@ -6,6 +6,18 @@ body {
   overflow-x: hidden;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+  /* user-select intentionally NOT set globally — users should be able to
+     copy amounts, names, and other content. Only interactive control
+     elements (buttons, nav) suppress selection via their own rules. */
+}
+/* Suppress text selection only on UI chrome — not on content */
+.app-navbar,
+.chapter-nav,
+.fab,
+.settle-cta-bar,
+.nav-icon-btn,
+.btn,
+.event-pill {
   user-select: none;
   -webkit-user-select: none;
 }

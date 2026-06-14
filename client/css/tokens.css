@@ -1,128 +1,146 @@
 :root {
   /* ── BRAND ─────────────────────────────────────── */
-  --brand:           #d000ff;
-  --brand-dark:      #8a00e0;
-  --brand-light:     rgba(208, 0, 255, 0.12);
-  --brand-glow:      0 8px 24px rgba(208, 0, 255, 0.35);
+  --brand: #d000ff;
+  --brand-dark: #8a00e0;
+  --brand-light: rgba(208, 0, 255, 0.12);
+  --brand-glow: 0 8px 24px rgba(208, 0, 255, 0.35);
 
   /* ── BACKGROUND SCALE ───────────────────────────── */
-  --bg-base:         #05000a;
-  --bg-elevated:     #0d0018;
-  --bg-overlay:      rgba(255, 255, 255, 0.06);
-  --bg-glass:        rgba(0, 0, 0, 0.85);
-  --bg-glass-light:  rgba(255, 255, 255, 0.08);
+  --bg-base: #05000a;
+  --bg-elevated: #0d0018;
+  --bg-overlay: rgba(255, 255, 255, 0.06);
+  --bg-glass: rgba(0, 0, 0, 0.85);
+  --bg-glass-light: rgba(255, 255, 255, 0.08);
 
   /* ── SURFACE (cards, modals, inputs) ────────────── */
-  --surface:         #ffffff;
-  --surface-alt:     #f7f7f9;
-  --surface-border:  rgba(0, 0, 0, 0.06);
+  --surface: #ffffff;
+  --surface-alt: #f7f7f9;
+  --surface-border: rgba(0, 0, 0, 0.06);
 
   /* ── TEXT ───────────────────────────────────────── */
-  --text-primary:    #111111;
-  --text-secondary:  #666666;
-  --text-muted:      #999999;
-  --text-on-dark:    rgba(255, 255, 255, 0.90);
-  --text-on-dark-2:  rgba(255, 255, 255, 0.55);
-  --text-on-dark-3:  rgba(255, 255, 255, 0.30);
+  --text-primary: #111111;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --text-on-dark: rgba(255, 255, 255, 0.90);
+  --text-on-dark-2: rgba(255, 255, 255, 0.70);
+  /* raised from 0.55 — passes WCAG AA on dark bg */
+  --text-on-dark-3: rgba(255, 255, 255, 0.50);
+  /* raised from 0.30 — use only for de-emphasised text */
 
   /* ── SEMANTIC ───────────────────────────────────── */
-  --positive:        #00c853;
-  --positive-bg:     rgba(0, 200, 83, 0.10);
-  --negative:        #ff1744;
-  --negative-bg:     rgba(255, 23, 68, 0.10);
-  --warning:         #f57c00;
-  --info:            #2979ff;
+  --positive: #00c853;
+  --positive-bg: rgba(0, 200, 83, 0.10);
+  --negative: #ff1744;
+  --negative-bg: rgba(255, 23, 68, 0.10);
+  --warning: #f57c00;
+  --info: #2979ff;
 
   /* ── SPACING (8px base) ─────────────────────────── */
-  --s-1:  4px;   --s-2:  8px;   --s-3: 12px;
-  --s-4: 16px;   --s-5: 20px;   --s-6: 24px;
-  --s-8: 32px;   --s-10: 40px;  --s-12: 48px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
 
   /* ── RADIUS ─────────────────────────────────────── */
-  --r-sm:   8px;
-  --r-md:   12px;
-  --r-lg:   16px;
-  --r-xl:   24px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
   --r-full: 9999px;
 
   /* ── SHADOWS ─────────────────────────────────────── */
-  --shadow-sm:   0 2px 8px rgba(0,0,0,0.08);
-  --shadow-md:   0 4px 16px rgba(0,0,0,0.12);
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.20);
-  --shadow-xl:   0 16px 48px rgba(0,0,0,0.28);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.20);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.28);
 
   /* ── TYPOGRAPHY ─────────────────────────────────── */
-  --font:        'Poppins', system-ui, sans-serif;
-  --text-xs:     0.75rem;    /* 12px */
-  --text-sm:     0.875rem;   /* 14px */
-  --text-base:   1rem;       /* 16px */
-  --text-lg:     1.125rem;   /* 18px */
-  --text-xl:     1.25rem;    /* 20px */
-  --text-2xl:    1.5rem;     /* 24px */
-  --text-3xl:    2rem;       /* 32px */
-  --text-4xl:    2.5rem;     /* 40px */
+  --font: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --text-xs: 0.75rem;
+  /* 12px */
+  --text-sm: 0.875rem;
+  /* 14px */
+  --text-base: 1rem;
+  /* 16px */
+  --text-lg: 1.125rem;
+  /* 18px */
+  --text-xl: 1.25rem;
+  /* 20px */
+  --text-2xl: 1.5rem;
+  /* 24px */
+  --text-3xl: 2rem;
+  /* 32px */
+  --text-4xl: 2.5rem;
+  /* 40px */
 
-  --leading-tight:   1.2;
-  --leading-normal:  1.5;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
   --leading-relaxed: 1.7;
 
-  --weight-normal:   400;
-  --weight-medium:   500;
+  --weight-normal: 400;
+  --weight-medium: 500;
   --weight-semibold: 600;
-  --weight-bold:     700;
+  --weight-bold: 700;
 
   /* ── MOTION ─────────────────────────────────────── */
-  --dur-instant:  50ms;
-  --dur-fast:     150ms;
-  --dur-normal:   250ms;
-  --dur-slow:     400ms;
-  --dur-page:     300ms;
+  --dur-instant: 50ms;
+  --dur-fast: 150ms;
+  --dur-normal: 250ms;
+  --dur-slow: 400ms;
+  --dur-page: 300ms;
 
-  --ease:         cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-out:     cubic-bezier(0, 0, 0.2, 1);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
 
   /* ── Z-INDEX LADDER ──────────────────────────────── */
-  --z-base:      1;
-  --z-card:      10;
-  --z-sticky:    100;
-  --z-dropdown:  200;
-  --z-panel:     300;
-  --z-modal:     400;
-  --z-toast:     500;
+  --z-base: 1;
+  --z-card: 10;
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-panel: 300;
+  --z-modal: 400;
+  --z-toast: 500;
 
   /* ── COMPONENT TOKENS ────────────────────────────── */
-  --nav-height:  56px;
-  --fab-size:    56px;
-  --input-h:     44px;   /* Touch target */
-  --touch-min:   44px;   /* WCAG 2.5.5 */
+  --nav-height: 56px;
+  --fab-size: 56px;
+  --input-h: 44px;
+  /* Touch target */
+  --touch-min: 44px;
+  /* WCAG 2.5.5 */
 
   /* Card */
-  --card-bg:      var(--surface);
-  --card-radius:  var(--r-lg);
-  --card-pad:     var(--s-5);
-  --card-shadow:  var(--shadow-sm);
-  --card-border:  1px solid var(--surface-border);
+  --card-bg: var(--surface);
+  --card-radius: var(--r-lg);
+  --card-pad: var(--s-5);
+  --card-shadow: var(--shadow-sm);
+  --card-border: 1px solid var(--surface-border);
 
   /* Modal */
-  --modal-radius:     var(--r-xl);
-  --modal-pad:        var(--s-6);
-  --modal-max-width:  480px;
+  --modal-radius: var(--r-xl);
+  --modal-pad: var(--s-6);
+  --modal-max-width: 480px;
 
   /* Input */
-  --input-bg:       var(--surface-alt);
+  --input-bg: var(--surface-alt);
   --input-bg-focus: var(--surface);
-  --input-radius:   var(--r-md);
-  --input-border:   1.5px solid transparent;
+  --input-radius: var(--r-md);
+  --input-border: 1.5px solid transparent;
   --input-border-focus: 1.5px solid var(--brand);
   --input-shadow-focus: 0 0 0 3px var(--brand-light);
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --dur-fast:    0ms;
-    --dur-normal:  0ms;
-    --dur-slow:    0ms;
-    --dur-page:    0ms;
+    --dur-fast: 0ms;
+    --dur-normal: 0ms;
+    --dur-slow: 0ms;
+    --dur-page: 0ms;
   }
 }

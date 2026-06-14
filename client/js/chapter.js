@@ -8,16 +8,17 @@ window.chapterId = _chapterId; // for feature scripts
 
 if (!_chapterId) window.location.href = 'dashboard.html';
 
+let _loadExpensesAbort = null; // Cancels in-flight expense loads on rapid tab switches
 let _state = {
-  currentUser:    null,
-  chapter:        null,
-  members:        [],
-  expenses:       [],
-  events:         [],
+  currentUser: null,
+  chapter: null,
+  members: [],
+  expenses: [],
+  events: [],
   currentEventId: null,
-  offset:         0,
-  total:          0,
-  hasMore:        false,
+  offset: 0,
+  total: 0,
+  hasMore: false,
 };
 
 const PAGE_SIZE = 50;
@@ -26,6 +27,33 @@ window.currentChapter = null;
 window.currentMembers = [];
 window.expenses = [];
 window.events = [];
+
+/* =============================================
+   CONFIRM DIALOG (replaces native confirm())
+   ============================================= */
+function _confirmDialog(title, subtitle = '') {
+  return new Promise((resolve) => {
+    const overlay = ModalManager.createOverlay(`
+      <div style="padding: 24px 20px;">
+        <p style="font-size:var(--text-lg);font-weight:var(--weight-bold);color:var(--text-primary);margin-bottom:6px;">${escapeHTML(title)}</p>
+        ${subtitle ? `<p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:20px;">${escapeHTML(subtitle)}</p>` : '<div style="margin-bottom:20px;"></div>'}
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn--danger" id="_confirm-yes" style="flex:1">Delete</button>
+          <button class="btn btn--ghost" id="_confirm-no" style="flex:1">Cancel</button>
+        </div>
+      </div>
+    `, { maxWidth: '360px', closeOnBackdrop: false });
+
+    overlay.querySelector('#_confirm-yes').addEventListener('click', () => {
+      ModalManager.close(overlay);
+      resolve(true);
+    });
+    overlay.querySelector('#_confirm-no').addEventListener('click', () => {
+      ModalManager.close(overlay);
+      resolve(false);
+    });
+  });
+}
 
 /* =============================================
    INIT
@@ -38,11 +66,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     ]);
 
     _state.currentUser = authData.user;
-    _state.chapter     = chapterData.chapter;
-    _state.members     = chapterData.members;
+    _state.chapter = chapterData.chapter;
+    _state.members = chapterData.members;
 
     // Expose for feature scripts
-    window.currentUser    = authData.user;
+    window.currentUser = authData.user;
     window.currentChapter = chapterData.chapter;
     window.currentMembers = chapterData.members;
 
@@ -63,6 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
   } catch (err) {
+    if (err.isAuthRedirect) return; // Navigation already triggered
     console.error('Chapter load failed:', err);
     showToast('Failed to load chapter', 'error');
     setTimeout(() => window.location.href = 'dashboard.html', 2000);
@@ -86,11 +115,11 @@ function _renderChapterInfo() {
 
   // Hero
   const titleEl = document.getElementById('chapter-title');
-  const descEl  = document.getElementById('chapter-desc');
-  const iconEl  = document.getElementById('chapter-icon');
+  const descEl = document.getElementById('chapter-desc');
+  const iconEl = document.getElementById('chapter-icon');
 
   if (titleEl) titleEl.textContent = ch.name;
-  if (descEl)  {
+  if (descEl) {
     descEl.textContent = ch.description || '';
     descEl.style.display = ch.description ? '' : 'none';
   }
@@ -212,7 +241,12 @@ function _openCreateEventModal() {
    EXPENSES
    ============================================= */
 async function _loadExpenses(append = false) {
+  // Cancel any previous in-flight request to prevent out-of-order rendering
+  if (!append && _loadExpensesAbort) {
+    _loadExpensesAbort.abort();
+  }
   if (!append) {
+    _loadExpensesAbort = new AbortController();
     _state.offset = 0;
     _state.expenses = [];
     const list = document.getElementById('expense-list');
@@ -227,15 +261,15 @@ async function _loadExpenses(append = false) {
     let url = `/expenses/chapter/${_chapterId}?limit=${PAGE_SIZE}&offset=${_state.offset}`;
     if (_state.currentEventId) url += `&eventId=${_state.currentEventId}`;
 
-    const data = await apiFetch(url);
+    const data = await apiFetch(url, { signal: _loadExpensesAbort?.signal });
     const fetched = Array.isArray(data.expenses) ? data.expenses : [];
 
     if (append) _state.expenses = [..._state.expenses, ...fetched];
-    else        _state.expenses = fetched;
+    else _state.expenses = fetched;
 
     window.expenses = _state.expenses;
 
-    _state.total   = data.pagination?.total ?? 0;
+    _state.total = data.pagination?.total ?? 0;
     _state.hasMore = data.pagination?.hasMore ?? false;
 
     _renderExpenses();
@@ -245,6 +279,7 @@ async function _loadExpenses(append = false) {
     EventBus.emit('expenses:rendered', { expenses: _state.expenses });
 
   } catch (err) {
+    if (err.name === 'AbortError') return; // Tab switched — silently ignore
     console.error('Expenses load failed:', err);
     const list = document.getElementById('expense-list');
     if (list) list.innerHTML = `<div style="text-align:center;padding:32px;color:rgba(255,255,255,0.5);">Failed to load expenses</div>`;
@@ -280,11 +315,11 @@ function _buildExpenseCard(ex) {
   card.className = 'expense-card' + (ex.isTemp ? ' expense-card--temp' : '');
   card.dataset.expenseId = ex.id;
 
-  const icon     = ex.category_icon || '💰';
-  const name     = escapeHTML(ex.description || 'Untitled');
-  const payer    = escapeHTML(ex.payer_name || 'Unknown');
-  const amount   = `₹${parseFloat(ex.amount).toLocaleString('en-IN')}`;
-  const when     = _timeAgo(ex.expense_date);
+  const icon = ex.category_icon || '💰';
+  const name = escapeHTML(ex.description || 'Untitled');
+  const payer = escapeHTML(ex.payer_name || 'Unknown');
+  const amount = `₹${parseFloat(ex.amount).toLocaleString('en-IN')}`;
+  const when = _timeAgo(ex.expense_date);
 
   // Accessibility attributes
   card.setAttribute('role', 'article');
@@ -303,7 +338,15 @@ function _buildExpenseCard(ex) {
   `;
 
   if (!ex.isTemp) {
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
     card.addEventListener('click', () => _openExpenseModal('edit', ex.id));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        _openExpenseModal('edit', ex.id);
+      }
+    });
   }
 
   return card;
@@ -342,9 +385,9 @@ async function _loadHeroSettlements(force = false) {
 }
 
 function _renderHeroSettlements(settlements) {
-  const listEl  = document.getElementById('hero-settlement-list');
+  const listEl = document.getElementById('hero-settlement-list');
   const content = document.getElementById('hero-settlement-body');
-  const btn     = document.getElementById('hero-expand-btn');
+  const btn = document.getElementById('hero-expand-btn');
 
   if (!listEl) return;
 
@@ -377,6 +420,12 @@ function _renderHeroSettlements(settlements) {
     </div>
   `).join('');
 
+  // Show/hide the persistent Settle Up CTA
+  const ctaBar = document.getElementById('settle-cta-bar');
+  if (ctaBar) {
+    ctaBar.style.display = settlements.length > 0 ? '' : 'none';
+  }
+
   EventBus.emit('settlement:refresh', { settlements });
 }
 
@@ -388,7 +437,7 @@ window.renderHeroSettlements = _renderHeroSettlements;
 document.getElementById('hero-settlement-header')?.addEventListener('click', (e) => {
   if (e.target.closest('.icon-btn-sm') && !e.target.closest('#hero-expand-btn')) return;
   const body = document.getElementById('hero-settlement-body');
-  const btn  = document.getElementById('hero-expand-btn');
+  const btn = document.getElementById('hero-expand-btn');
   const header = document.getElementById('hero-settlement-header');
   body?.classList.toggle('is-open');
   btn?.classList.toggle('is-open');
@@ -403,14 +452,14 @@ window.refreshSettlements = debounce(async () => { await _loadHeroSettlements(tr
    ============================================= */
 async function _openExpenseModal(mode, expenseId) {
   let existingExpense = null;
-  let involvedIds     = [];
+  let involvedIds = [];
 
   if (mode === 'edit' && expenseId) {
     try {
       showToast('Loading…', 'info');
       const data = await apiFetch(`/expenses/${expenseId}`);
       existingExpense = data.expense;
-      involvedIds     = data.involvedMemberIds || [];
+      involvedIds = data.involvedMemberIds || [];
     } catch (err) {
       showToast('Failed to load expense', 'error');
       return;
@@ -494,7 +543,8 @@ async function _openExpenseModal(mode, expenseId) {
   // Delete button
   if (isEdit) {
     overlay.querySelector('#exp-delete')?.addEventListener('click', async () => {
-      if (!confirm('Delete this expense?')) return;
+      const confirmed = await _confirmDialog('Delete this expense?', 'This cannot be undone.');
+      if (!confirmed) return;
       try {
         await apiFetch(`/expenses/${expenseId}`, { method: 'DELETE' });
         showToast('Expense deleted', 'success');
@@ -512,16 +562,16 @@ async function _openExpenseModal(mode, expenseId) {
     e.preventDefault();
 
     const rawAmount = overlay.querySelector('#exp-amount').value;
-    const amount    = parseFloat(String(rawAmount).replace(/,/g, '').trim());
+    const amount = parseFloat(String(rawAmount).replace(/,/g, '').trim());
     if (!amount || amount <= 0 || amount > 9_999_999) {
       showToast('Enter a valid amount', 'error');
       return;
     }
 
     const description = overlay.querySelector('#exp-desc').value.trim();
-    const payerInput  = overlay.querySelector('input[name="payerMemberId"]:checked');
-    const payerId     = payerInput ? parseInt(payerInput.value) : _state.members[0]?.id;
-    const splitIds    = [...overlay.querySelectorAll('.split-row.is-selected')].map(r => parseInt(r.dataset.memberId));
+    const payerInput = overlay.querySelector('input[name="payerMemberId"]:checked');
+    const payerId = payerInput ? parseInt(payerInput.value) : _state.members[0]?.id;
+    const splitIds = [...overlay.querySelectorAll('.split-row.is-selected')].map(r => parseInt(r.dataset.memberId));
 
     if (!splitIds.length) { showToast('Select at least one person to split with', 'error'); return; }
 
@@ -533,7 +583,7 @@ async function _openExpenseModal(mode, expenseId) {
 
     const payload = {
       chapterId: _chapterId,
-      eventId:   _state.currentEventId || null,
+      eventId: _state.currentEventId || null,
       amount,
       description,
       payerMemberId: payerId,
@@ -541,10 +591,19 @@ async function _openExpenseModal(mode, expenseId) {
       categoryId,
     };
 
+    // Snapshot form state before any optimistic changes (used to restore on failure)
+    const formSnapshot = {
+      amount,
+      description,
+      payerId,
+      splitIds: [...splitIds],
+      categoryId,
+    };
+
     // Optimistic UI for add
     if (!isEdit) {
       const payer = _state.members.find(m => m.id === payerId);
-      const temp  = { id: `temp-${Date.now()}`, amount, description, expense_date: new Date().toISOString(), payer_name: payer?.member_name, isTemp: true };
+      const temp = { id: `temp-${Date.now()}`, amount, description, expense_date: new Date().toISOString(), payer_name: payer?.member_name, isTemp: true };
       _state.expenses.unshift(temp);
       window.expenses = _state.expenses;
       _renderExpenses();
@@ -564,14 +623,41 @@ async function _openExpenseModal(mode, expenseId) {
 
     } catch (err) {
       if (!isEdit) {
+        // Roll back the optimistic expense
         _state.expenses = _state.expenses.filter(ex => !ex.isTemp);
         window.expenses = _state.expenses;
         _renderExpenses();
-        // Reopen modal
+
+        // Reopen modal and restore all form values from snapshot
         ModalManager.open(overlay);
+        setTimeout(() => {
+          const amountInput = overlay.querySelector('#exp-amount');
+          const descInput = overlay.querySelector('#exp-desc');
+          if (amountInput) amountInput.value = formSnapshot.amount;
+          if (descInput) descInput.value = formSnapshot.description;
+
+          // Restore payer selection
+          overlay.querySelectorAll('.payer-chip').forEach(chip => {
+            const radio = chip.querySelector('input[type="radio"]');
+            const isSelected = radio && parseInt(radio.value) === formSnapshot.payerId;
+            chip.classList.toggle('is-selected', isSelected);
+            if (isSelected && radio) radio.checked = true;
+          });
+
+          // Restore split selections
+          overlay.querySelectorAll('.split-row').forEach(row => {
+            const id = parseInt(row.dataset.memberId);
+            row.classList.toggle('is-selected', formSnapshot.splitIds.includes(id));
+          });
+
+          // Restore category
+          if (formSnapshot.categoryId) {
+            window._pendingCategoryId = formSnapshot.categoryId;
+          }
+        }, 50);
       }
       btn.classList.remove('btn--loading'); btn.disabled = false;
-      showToast(err.message || 'Failed to save', 'error');
+      showToast(err.message || 'Failed to save. Please try again.', 'error');
     }
   });
 
@@ -632,7 +718,7 @@ window.renderPayerAndSplitOptions = (payerId, splitIds) => {
 
 // Expose openEditExpenseModal for backward compat with feature scripts
 window.openEditExpenseModal = (id) => _openExpenseModal('edit', id);
-window.openAddExpenseModal  = ()   => _openExpenseModal('add');
+window.openAddExpenseModal = () => _openExpenseModal('add');
 
 /* =============================================
    SUMMARY MODAL
@@ -675,10 +761,10 @@ function _renderSummary(overlay, data) {
   const list = overlay.querySelector('#summary-list');
 
   list.innerHTML = summary.map(item => {
-    const spent   = parseFloat(item.total_spent);
-    const used    = parseFloat(item.total_used);
-    const spPct   = ((spent / maxVal) * 100).toFixed(1);
-    const usPct   = ((used  / maxVal) * 100).toFixed(1);
+    const spent = parseFloat(item.total_spent);
+    const used = parseFloat(item.total_used);
+    const spPct = ((spent / maxVal) * 100).toFixed(1);
+    const usPct = ((used / maxVal) * 100).toFixed(1);
     return `
       <div class="summary-row">
         <div class="summary-row__header">
@@ -787,7 +873,7 @@ async function _loadSettlementHistory(overlay) {
         <div class="settled-record">
           <div class="settled-record__info">
             <div class="settled-record__names"><strong>${escapeHTML(r.from_name)}</strong> → <strong>${escapeHTML(r.to_name)}</strong></div>
-            <div class="settled-record__date">${new Date(r.marked_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}${r.note ? ' · ' + escapeHTML(r.note) : ''}</div>
+            <div class="settled-record__date">${new Date(r.marked_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}${r.note ? ' · ' + escapeHTML(r.note) : ''}</div>
           </div>
           <span class="settled-record__amount">₹${parseFloat(r.amount).toFixed(2)}</span>
           <button class="btn-undo" data-record-id="${r.id}">Undo</button>
@@ -798,7 +884,8 @@ async function _loadSettlementHistory(overlay) {
     section.addEventListener('click', async (e) => {
       const btn = e.target.closest('.btn-undo');
       if (!btn) return;
-      if (!confirm('Undo this settlement?')) return;
+      const confirmed = await _confirmDialog('Undo this settlement?', 'The payment will return to pending.');
+      if (!confirmed) return;
       try {
         await apiFetch(`/chapters/${_chapterId}/settlements/history/${btn.dataset.recordId}`, { method: 'DELETE' });
         showToast('Undone', 'info');
@@ -806,13 +893,13 @@ async function _loadSettlementHistory(overlay) {
         window.openSettlementModal();
       } catch (err) { showToast('Failed', 'error'); }
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // Mark settlement modal
 window._openMarkModal = (s) => {
   const fromMember = _state.members.find(m => m.member_name === s.from || m.id === s.fromId);
-  const toMember   = _state.members.find(m => m.member_name === s.to   || m.id === s.toId);
+  const toMember = _state.members.find(m => m.member_name === s.to || m.id === s.toId);
 
   const overlay = ModalManager.createOverlay(`
     <div class="modal-handle"></div>
@@ -850,7 +937,7 @@ window._openMarkModal = (s) => {
 
   overlay.querySelector('#mark-confirm').addEventListener('click', async () => {
     const amount = parseFloat(overlay.querySelector('#mark-amount').value);
-    const note   = overlay.querySelector('#mark-note').value.trim();
+    const note = overlay.querySelector('#mark-note').value.trim();
     if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
 
     if (!fromMember || !toMember) { showToast('Could not identify members', 'error'); return; }
@@ -907,9 +994,9 @@ async function _renderMembers() {
   list.innerHTML = '';
 
   for (const m of _state.members) {
-    const isCreator  = m.user_id === _state.chapter.created_by;
+    const isCreator = m.user_id === _state.chapter.created_by;
     const isInvolved = involvedIds.includes(m.id);
-    const canDelete  = isAdmin && !isCreator && !isInvolved;
+    const canDelete = isAdmin && !isCreator && !isInvolved;
 
     const row = document.createElement('div');
     row.className = 'member-panel-row';
@@ -929,7 +1016,8 @@ async function _renderMembers() {
     const btn = e.target.closest('.remove-member-btn');
     if (!btn) return;
     const memberId = btn.dataset.memberId;
-    if (!confirm('Remove this member?')) return;
+    const confirmed = await _confirmDialog('Remove this member?', 'This cannot be undone.');
+    if (!confirmed) return;
     try {
       await apiFetch(`/chapters/${_chapterId}/members/${memberId}`, { method: 'DELETE' });
       showToast('Member removed', 'info');
@@ -1003,7 +1091,7 @@ window.downloadReport = async () => {
     const blob = await res.blob();
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(blob),
-      download: `${_state.chapter.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_report.xlsx`,
+      download: `${_state.chapter.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.xlsx`,
     });
     document.body.appendChild(a);
     a.click();
@@ -1016,18 +1104,45 @@ window.downloadReport = async () => {
 /* =============================================
    NAV MENU
    ============================================= */
-const _menuBtn  = document.getElementById('chapter-menu-btn');
-const _menuEl   = document.getElementById('chapter-nav-dropdown');
+const _menuBtn = document.getElementById('chapter-menu-btn');
+const _menuEl = document.getElementById('chapter-nav-dropdown');
 
 _menuBtn?.addEventListener('click', (e) => {
   e.stopPropagation();
   const isOpen = _menuEl?.classList.toggle('is-open');
   _menuBtn.setAttribute('aria-expanded', String(!!isOpen));
+  if (isOpen) {
+    // Focus first menu item when opened via keyboard/click
+    const firstItem = _menuEl?.querySelector('[role="menuitem"]');
+    firstItem?.focus();
+  }
+});
+
+// Keyboard navigation inside the dropdown
+_menuEl?.addEventListener('keydown', (e) => {
+  const items = [...(_menuEl.querySelectorAll('[role="menuitem"]'))];
+  const idx = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    items[(idx + 1) % items.length]?.focus();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    items[(idx - 1 + items.length) % items.length]?.focus();
+  } else if (e.key === 'Escape') {
+    _menuEl.classList.remove('is-open');
+    _menuBtn?.setAttribute('aria-expanded', 'false');
+    _menuBtn?.focus();
+  } else if (e.key === 'Tab') {
+    // Close menu on Tab — user is moving away
+    _menuEl.classList.remove('is-open');
+    _menuBtn?.setAttribute('aria-expanded', 'false');
+  }
 });
 
 document.addEventListener('click', (e) => {
   if (!_menuEl?.contains(e.target) && e.target !== _menuBtn) {
     _menuEl?.classList.remove('is-open');
+    _menuBtn?.setAttribute('aria-expanded', 'false');
   }
 });
 
@@ -1044,7 +1159,7 @@ async function _loadFriendsForAutocomplete() {
   try {
     const data = await apiFetch('/friends');
     _friendsCache = data.friends || [];
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /* =============================================
@@ -1054,11 +1169,11 @@ function _getInitials(name = '') {
   const w = name.trim().split(/\s+/).filter(Boolean);
   if (!w.length) return '?';
   if (w.length === 1) return w[0][0].toUpperCase();
-  return (w[0][0] + w[w.length-1][0]).toUpperCase();
+  return (w[0][0] + w[w.length - 1][0]).toUpperCase();
 }
 
 function _getAvatarColor(name = '') {
-  const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#F9CA24','#F0932B','#6C5CE7','#A29BFE','#00B894'];
+  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#F9CA24', '#F0932B', '#6C5CE7', '#A29BFE', '#00B894'];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
@@ -1074,8 +1189,18 @@ function _timeAgo(ts) {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 30) return `${d}d ago`;
-  return `${Math.floor(d/30)}mo ago`;
+  return `${Math.floor(d / 30)}mo ago`;
 }
 
 // Re-render members when chapter loads
 EventBus.on('chapter:loaded', () => _renderMembers());
+
+// Re-render when background cache revalidation brings fresh expense data
+EventBus.on('cache:revalidated', ({ path }) => {
+  if (path.includes(`/expenses/chapter/${_chapterId}`)) {
+    _loadExpenses();
+  }
+  if (path.includes(`/expenses/chapter/${_chapterId}/settlements`)) {
+    _loadHeroSettlements(true);
+  }
+});

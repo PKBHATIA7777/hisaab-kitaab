@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#000000">
   <title>Dashboard - Hisaab-Kitaab</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>">
@@ -41,7 +41,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hisaab">
 </head>
-<body>
+<body class="has-fab-gradient">
+  <!-- ARIA live region must exist before any toast fires -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
   <!-- ── REDIRECT LOOP GUARD ──────────────────────────────────────────────
        Runs synchronously before any other script. Detects if dashboard is
        being reloaded in a tight loop (auth_token expired but session_expiry
@@ -151,43 +154,32 @@
     </svg>
   </button>
 
-  <!-- Scripts — order matters -->
-  <!-- Core (unchanged) -->
-  <script src="js/core/storage.js"></script>
-  <script src="js/core/sanitize.js"></script>
-  <script src="js/core/csrf.js"></script>
-  <script src="js/core/session.js"></script>
-  <script src="js/core/api-cache.js"></script>
-  <script src="js/core/event-bus.js"></script>
-  <script src="js/core/modal-manager.js"></script>
-
-  <!-- New infrastructure -->
-  <script src="js/api/error-handler.js"></script>
-  <script src="js/utils/avatar.js"></script>
-  <script src="js/utils/time.js"></script>
-  <script src="js/utils/format.js"></script>
-  <script src="js/ui/toast.js"></script>
-  <script src="js/ui/button.js"></script>
-  <script src="js/ui/form-validator.js"></script>
-
-  <!-- PWA -->
-  <script src="js/pwa/offline-queue.js"></script>
-  <script src="js/pwa/install-manager.js"></script>
-
-  <!-- main.js (slimmed — only server wakeup + google auth + session monitor) -->
-  <script src="js/main.js"></script>
-
-  <!-- Dashboard features -->
-  <script src="js/features/dashboard/chapters-grid.js"></script>
-  <script src="js/features/dashboard/chapter-card-menu.js"></script>
-  <script src="js/features/dashboard/chapter-modal.js"></script>
-  <script src="js/features/dashboard/profile-modal.js"></script>
-  <script src="js/features/creator-label.js"></script>
-  <script src="js/features/personal-chapter.js"></script>
-  <script src="js/features/categories.js"></script>
-
-  <!-- Page orchestrator — must be last -->
-  <script src="js/pages/dashboard-page.js"></script>
+  <!-- Scripts — deferred for faster page paint, order preserved by defer -->
+  <script src="js/core/storage.js" defer></script>
+  <script src="js/core/sanitize.js" defer></script>
+  <script src="js/core/csrf.js" defer></script>
+  <script src="js/core/session.js" defer></script>
+  <script src="js/core/api-cache.js" defer></script>
+  <script src="js/core/event-bus.js" defer></script>
+  <script src="js/core/modal-manager.js" defer></script>
+  <script src="js/api/error-handler.js" defer></script>
+  <script src="js/utils/avatar.js" defer></script>
+  <script src="js/utils/time.js" defer></script>
+  <script src="js/utils/format.js" defer></script>
+  <script src="js/ui/toast.js" defer></script>
+  <script src="js/ui/button.js" defer></script>
+  <script src="js/ui/form-validator.js" defer></script>
+  <script src="js/pwa/offline-queue.js" defer></script>
+  <script src="js/pwa/install-manager.js" defer></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/features/dashboard/chapters-grid.js" defer></script>
+  <script src="js/features/dashboard/chapter-card-menu.js" defer></script>
+  <script src="js/features/dashboard/chapter-modal.js" defer></script>
+  <script src="js/features/dashboard/profile-modal.js" defer></script>
+  <script src="js/features/creator-label.js" defer></script>
+  <script src="js/features/personal-chapter.js" defer></script>
+  <script src="js/features/categories.js" defer></script>
+  <script src="js/pages/dashboard-page.js" defer></script>
 
   <footer class="app-footer">
     <div class="footer-content">

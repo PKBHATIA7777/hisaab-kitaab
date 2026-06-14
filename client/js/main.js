@@ -136,13 +136,18 @@ const CONFIG = {
           // Fresh — return immediately, no network call
           return cached.data;
         }
-        // Stale — return cached data immediately, then revalidate in background
-        // We fire the real fetch but don't await it here; the caller gets
-        // the stale data instantly and the cache is updated for the next call.
+        // Stale — return cached data immediately, revalidate in background.
+        // After revalidation, emit an event so listening components can re-render.
         (async () => {
           try {
             const fresh = await window.apiFetch(path, { ...options, _noCache: true });
-            if (fresh) cache.set(path, fresh);
+            if (fresh) {
+              cache.set(path, fresh);
+              // Notify any subscriber that wants to react to fresh data
+              if (window.EventBus) {
+                window.EventBus.emit('cache:revalidated', { path, data: fresh });
+              }
+            }
           } catch (_) { /* background revalidation failure is silent */ }
         })();
         return cached.data;
@@ -185,11 +190,18 @@ const CONFIG = {
       } catch (err) {
         clearTimeout(timeoutId);
         
-        // ── OFFLINE QUEUE FOR EXPENSE CREATION ─────────────────
-        // If offline and trying to add an expense, queue it for later sync
-        if (!navigator.onLine && options.body && options.method === "POST") {
-          const isExpenseAdd = path === "/expenses";
-          if (isExpenseAdd && window.OfflineQueue) {
+        // ── OFFLINE QUEUE FOR MUTATIONS ──────────────────────────
+        // Queue supported write operations when offline so they sync on reconnect
+        const QUEUEABLE = [
+          { pattern: /^\/expenses$/, method: 'POST' },
+          { pattern: /^\/expenses\/\d+$/, method: 'PUT' },
+          { pattern: /^\/chapters\/\d+\/settlements\/mark$/, method: 'POST' },
+        ];
+        const shouldQueue = !navigator.onLine &&
+          options.body &&
+          QUEUEABLE.some(r => r.method === method && r.pattern.test(path));
+
+        if (shouldQueue && window.OfflineQueue) {
             await window.OfflineQueue.enqueue({
               path,
               method: options.method,
@@ -198,9 +210,7 @@ const CONFIG = {
             if (window.showToast) {
               window.showToast("Saved offline — will sync when connected", "info");
             }
-            // Return a synthetic success-like response to prevent rollback
             return { ok: true, offline: true, expense: { id: `offline-${Date.now()}`, ...options.body } };
-          }
         }
         // ── END OFFLINE QUEUE ─────────────────────────────────
 
@@ -268,18 +278,18 @@ if (res.status === 401) {
         : false;
 
       if (refreshed) {
-        // Retry the original request once with fresh cookies
-        // Mark as post-refresh to prevent another refresh attempt
-        return makeRequest(attempt + 1);
+        // Retry once with fresh cookies.
+        // _isRefreshAttempt prevents a second refresh call if this retry also gets a 401.
+        return makeRequest(attempt + 1, { ...options, _isRefreshAttempt: true });
       }
     }
 
-    // Refresh failed or already tried — redirect to login
-    // Small delay to allow any pending UI updates
+    // Refresh failed — redirect to login.
+    // Throw so callers' catch blocks run and don't try to destructure undefined.
     setTimeout(() => {
       window.location.href = "login.html?expired=true";
     }, 200);
-    return;
+    throw Object.assign(new Error('Session expired'), { status: 401, isAuthRedirect: true });
   }
   // On auth pages or silent: fall through to throw error normally
 }

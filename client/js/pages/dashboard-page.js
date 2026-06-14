@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await ChaptersGrid.load();
 
   } catch (err) {
+    if (err.isAuthRedirect) return; // Navigation already triggered
     if (err.status === 401 || err.status === 403) {
       ['session_expiry'].forEach(name => {
         document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;

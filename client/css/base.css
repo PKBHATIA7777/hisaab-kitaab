@@ -4,7 +4,8 @@
    /* @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap'); */
   
   :root {
-    --font-main: 'Poppins', sans-serif;
+    --font-main: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    --font: var(--font-main); /* alias so base.css pages are compatible with tokens.css */
     --color-primary: #000000;
     --primary-color: #d000ff;
     --bg-gradient: linear-gradient(180deg, #000000 0%, #1a0029 100%);
@@ -43,9 +44,7 @@
     /* Laptop: Add default spacing (overridden later for Desktop Navbar) */
     padding-bottom: 0;
   
-    overscroll-behavior-y: none; 
-    user-select: none;
-    -webkit-user-select: none;
+    overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
   }
   input, textarea, .selectable {
@@ -1853,7 +1852,8 @@
 
 /* 3. Bottom Fade Gradient (Prevents hard cut-off) */
 /* We add this pseudo-element to the body or main container */
-body::after {
+/* Bottom fade gradient — only on app pages that have a FAB */
+.has-fab-gradient::after {
   content: "";
   position: fixed;
   bottom: 0;
@@ -1863,8 +1863,6 @@ body::after {
   background: linear-gradient(to top, #000000 10%, transparent 100%);
   pointer-events: none;
   z-index: 50;
-  /* Ensure this never interferes with modals */
-  isolation: auto;
 }
 
 

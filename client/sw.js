@@ -114,26 +114,26 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 3. JS/CSS — Network ALWAYS. Never serve stale code.
-  // Cache is written for offline fallback only, but network is always tried first
-  // and we do NOT serve from cache if network succeeds.
+  // 3. JS/CSS — Network first with cache fallback.
+  // Tries network; if it fails (offline) serves from cache so the app shell works.
+  // Cache is updated on every successful network response.
   if (url.pathname.match(/\.(js|css)$/)) {
     e.respondWith(
-      fetch(e.request, { cache: 'no-store' })
-        .then((response) => {
+      caches.open(SHELL_CACHE).then(async (cache) => {
+        try {
+          const response = await fetch(e.request);
           if (response.ok) {
-            // Update cache in background for offline fallback only
-            const clone = response.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(e.request, clone));
+            cache.put(e.request, response.clone());
           }
           return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(e.request);
-          return cached || new Response("/* offline */", {
-            headers: { "Content-Type": "text/javascript" }
+        } catch (_) {
+          // Offline — serve from cache
+          const cached = await cache.match(e.request);
+          return cached || new Response('/* offline */', {
+            headers: { 'Content-Type': 'text/javascript' }
           });
-        })
+        }
+      })
     );
     return;
   }

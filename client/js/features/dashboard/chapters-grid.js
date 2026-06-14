@@ -18,9 +18,9 @@ const ChaptersGrid = (() => {
         const tb = b.last_opened_at || b.created_at;
         return new Date(tb) - new Date(ta);
       },
-      newest:  (a, b) => new Date(b.created_at) - new Date(a.created_at),
-      oldest:  (a, b) => new Date(a.created_at) - new Date(b.created_at),
-      az:      (a, b) => a.name.localeCompare(b.name),
+      newest: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+      oldest: (a, b) => new Date(a.created_at) - new Date(b.created_at),
+      az: (a, b) => a.name.localeCompare(b.name),
       members: (a, b) => b.member_count - a.member_count,
     };
     return sorted.sort(sorters[_sortKey] || sorters.last_opened);
@@ -34,8 +34,8 @@ const ChaptersGrid = (() => {
 
   function _buildCard(chapter) {
     const initials = getInitials(chapter.name);
-    const color    = getAvatarColor(chapter.name);
-    const time     = window.timeAgo(chapter.created_at);
+    const color = getAvatarColor(chapter.name);
+    const time = window.timeAgo(chapter.created_at);
     const isPersonal = chapter.is_personal;
     const isArchived = chapter.is_archived;
 
@@ -75,7 +75,7 @@ const ChaptersGrid = (() => {
       if (e.target.closest('.chapter-card__menu')) return;
       navigateToChapter(chapter.id);
     });
-    
+
     card.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -88,8 +88,8 @@ const ChaptersGrid = (() => {
     const prefetch = () => {
       if (prefetched) return;
       prefetched = true;
-      apiFetch(`/chapters/${chapter.id}`).catch(() => {});
-      apiFetch(`/expenses/chapter/${chapter.id}?limit=50&offset=0`).catch(() => {});
+      apiFetch(`/chapters/${chapter.id}`).catch(() => { });
+      apiFetch(`/expenses/chapter/${chapter.id}?limit=50&offset=0`).catch(() => { });
     };
     card.addEventListener('mouseenter', prefetch, { passive: true });
     card.addEventListener('touchstart', prefetch, { passive: true });
@@ -122,13 +122,27 @@ const ChaptersGrid = (() => {
     div.style.gridColumn = '1 / -1';
     div.innerHTML = `
       <div class="empty-state">
-        <span class="empty-state__icon">📂</span>
-        <h3 class="empty-state__title">No chapters yet</h3>
-        <p class="empty-state__subtitle">Create a chapter to start tracking expenses with friends or family.</p>
+        <span class="empty-state__icon">📖</span>
+        <h3 class="empty-state__title">Welcome to Hisaab-Kitaab</h3>
+        <p class="empty-state__subtitle">
+          A <strong style="color:var(--text-on-dark)">chapter</strong> is a shared expense group —
+          for a trip, your flat, a birthday dinner, or any group expense you want to split fairly.
+        </p>
         <div class="empty-state__action">
           <button class="btn btn--brand" onclick="EventBus.emit(EVENTS.CHAPTER_MODAL_OPEN, {})">
-            + Create First Chapter
+            + Create your first chapter
           </button>
+        </div>
+        <div style="margin-top:var(--s-6);display:flex;flex-direction:column;gap:var(--s-2);max-width:320px;text-align:left;">
+          <div style="display:flex;align-items:center;gap:var(--s-3);font-size:var(--text-xs);color:var(--text-on-dark-2);">
+            <span style="font-size:1.2rem">👥</span> Add members — friends, flatmates, anyone
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--s-3);font-size:var(--text-xs);color:var(--text-on-dark-2);">
+            <span style="font-size:1.2rem">💸</span> Log expenses and who paid
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--s-3);font-size:var(--text-xs);color:var(--text-on-dark-2);">
+            <span style="font-size:1.2rem">🤝</span> Settle up with one tap — we do the math
+          </div>
         </div>
       </div>
     `;
@@ -208,8 +222,8 @@ const ChaptersGrid = (() => {
   // Wire up toolbar controls
   function initToolbar() {
     const searchInput = document.getElementById('chapter-search');
-    const sortSelect  = document.getElementById('chapter-sort');
-    const archiveBtn  = document.getElementById('btn-show-archived');
+    const sortSelect = document.getElementById('chapter-sort');
+    const archiveBtn = document.getElementById('btn-show-archived');
 
     searchInput?.addEventListener('input', debounce((e) => {
       _searchTerm = e.target.value.trim();
