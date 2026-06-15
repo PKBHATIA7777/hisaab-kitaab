@@ -5,10 +5,12 @@
 const _urlParams = new URLSearchParams(window.location.search);
 const _chapterId = _urlParams.get('id');
 window.chapterId = _chapterId; // for feature scripts
+const _SETTLE_EXPAND_KEY = `hk_settle_expand_${_chapterId}`;
 
 if (!_chapterId) window.location.href = 'dashboard.html';
 
-let _loadExpensesAbort = null; // Cancels in-flight expense loads on rapid tab switches
+let _loadExpensesAbort = null;   // Cancels in-flight expense loads on rapid tab switches
+let _settlementsAbort  = null;   // Cancels in-flight settlement loads on rapid tab switches
 let _state = {
   currentUser: null,
   chapter: null,
@@ -282,7 +284,20 @@ async function _loadExpenses(append = false) {
     if (err.name === 'AbortError') return; // Tab switched — silently ignore
     console.error('Expenses load failed:', err);
     const list = document.getElementById('expense-list');
-    if (list) list.innerHTML = `<div style="text-align:center;padding:32px;color:rgba(255,255,255,0.5);">Failed to load expenses</div>`;
+    if (list) list.innerHTML = `
+      <div class="empty-state" style="padding:48px 20px;">
+        <span class="empty-state__icon">⚠️</span>
+        <h3 class="empty-state__title">Failed to load expenses</h3>
+        <p class="empty-state__subtitle">Check your connection and try again.</p>
+        <div class="empty-state__action">
+          <button class="btn btn--ghost"
+            style="color:rgba(255,255,255,0.8);border-color:rgba(255,255,255,0.25);"
+            onclick="window.loadExpenses()">
+            Retry
+          </button>
+        </div>
+      </div>
+    `;
   }
 }
 
@@ -297,7 +312,15 @@ function _renderExpenses() {
   const empty = document.getElementById('chapter-empty-state');
 
   if (!_state.expenses.length) {
-    if (empty) empty.style.display = '';
+    if (empty) {
+      empty.style.display = '';
+      const subtitle = empty.querySelector('.empty-state__subtitle');
+      if (subtitle) {
+        subtitle.textContent = _state.currentEventId
+          ? 'No expenses in this event. Add a new expense or use Select mode to assign existing ones.'
+          : 'Tap the + button to add your first expense.';
+      }
+    }
     return;
   }
   if (empty) empty.style.display = 'none';
@@ -333,7 +356,7 @@ function _buildExpenseCard(ex) {
     </div>
     <div class="expense-right">
       <div class="expense-amount">${amount}</div>
-      ${ex.isTemp ? '' : '<div class="expense-edit-hint">Tap to edit</div>'}
+      ${ex.isTemp ? '' : '<div class="expense-edit-hint" aria-hidden="true">Tap to edit</div>'}
     </div>
   `;
 
@@ -374,12 +397,18 @@ function _renderLoadMore() {
    SETTLEMENT HERO
    ============================================= */
 async function _loadHeroSettlements(force = false) {
+  if (_settlementsAbort) { _settlementsAbort.abort(); }
+  _settlementsAbort = new AbortController();
   try {
     let url = `/expenses/chapter/${_chapterId}/settlements`;
     if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
-    const data = await apiFetch(url, force ? { _noCache: true } : {});
+    const data = await apiFetch(url, {
+      signal: _settlementsAbort.signal,
+      ...(force ? { _noCache: true } : {})
+    });
     _renderHeroSettlements(data.settlements || []);
   } catch (err) {
+    if (err.name === 'AbortError') return; // Silently ignore — superseded request
     console.warn('Settlement hero error:', err.message);
   }
 }
@@ -390,9 +419,11 @@ function _renderHeroSettlements(settlements) {
   const btn = document.getElementById('hero-expand-btn');
 
   if (!listEl) return;
+  listEl.setAttribute('role', 'list');
 
-  // Auto-expand if there are settlements
-  if (settlements.length > 0 && content) {
+  // Auto-expand if there are settlements, unless user explicitly closed it
+  const wasExplicitlyClosed = sessionStorage.getItem(_SETTLE_EXPAND_KEY) === '0';
+  if (settlements.length > 0 && !wasExplicitlyClosed && content) {
     content.classList.add('is-open');
     btn?.classList.add('is-open');
     document.getElementById('hero-settlement-header')?.classList.add('is-open');
@@ -442,6 +473,8 @@ document.getElementById('hero-settlement-header')?.addEventListener('click', (e)
   body?.classList.toggle('is-open');
   btn?.classList.toggle('is-open');
   header?.classList.toggle('is-open');
+  // Persist expand/collapse preference for this chapter
+  sessionStorage.setItem(_SETTLE_EXPAND_KEY, body?.classList.contains('is-open') ? '1' : '0');
 });
 
 // Refresh settlements button
@@ -765,6 +798,12 @@ function _renderSummary(overlay, data) {
     const used = parseFloat(item.total_used);
     const spPct = ((spent / maxVal) * 100).toFixed(1);
     const usPct = ((used / maxVal) * 100).toFixed(1);
+    const netDiff = spent - used;
+    const netLabel = netDiff > 0.01
+      ? `<span style="color:var(--positive);font-size:var(--text-xs);font-weight:600;">↑ Gets back ₹${netDiff.toFixed(2)}</span>`
+      : netDiff < -0.01
+        ? `<span style="color:var(--negative);font-size:var(--text-xs);font-weight:600;">↓ Owes ₹${Math.abs(netDiff).toFixed(2)}</span>`
+        : `<span style="color:var(--text-muted);font-size:var(--text-xs);">✓ Settled</span>`;
     return `
       <div class="summary-row">
         <div class="summary-row__header">
@@ -777,6 +816,7 @@ function _renderSummary(overlay, data) {
         <div class="summary-bar-track"><div class="summary-bar-fill" style="width:${spPct}%;background:var(--color-success)"></div></div>
         <div style="font-size:var(--text-xs);color:var(--color-text-muted);display:flex;justify-content:space-between;margin:6px 0 3px;"><span>Consumed</span><span>₹${used.toFixed(2)}</span></div>
         <div class="summary-bar-track"><div class="summary-bar-fill" style="width:${usPct}%;background:var(--color-brand)"></div></div>
+        <div style="margin-top:6px;">${netLabel}</div>
       </div>
     `;
   }).join('');

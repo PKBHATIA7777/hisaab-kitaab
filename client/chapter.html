@@ -38,6 +38,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Hisaab" />
+  <!-- iOS splash screens (portrait iPhone) -->
+  <link rel="apple-touch-startup-image"
+    media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
+    href="/icons/splash-390x844.png">
 </head>
 <body class="has-fab-gradient">
   <!-- ARIA live region must exist before any toast fires -->
@@ -54,7 +58,7 @@
     FAB is OUTSIDE .chapter-page so it's never trapped.
     All modals created by ModalManager are appended to <body>.
   -->
-  <div class="chapter-page chapter-page-wrapper" id="main-content">
+  <div class="chapter-page chapter-page-wrapper" id="main-content" tabindex="-1">
 
     <!-- Sticky Nav -->
     <nav class="chapter-nav" aria-label="Chapter navigation">

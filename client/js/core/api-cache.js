@@ -17,7 +17,8 @@
  *  /auth/me          — 120 s  (user profile rarely changes mid-session)
  *  /chapters         — 60 s   (dashboard list)
  *  /chapters/:id     — 30 s   (chapter detail + members)
- *  /expenses/...     — 30 s   (expense list, summary, settlements)
+ *  /settlements      —  5 s   (settlement data must be near-real-time)
+ *  /expenses/...     — 30 s   (expense list, summary)
  *  /friends          — 300 s  (address book, very rarely changes)
  *  /categories       — 600 s  (system + custom categories)
  *  everything else   — 20 s   (safe default)
@@ -32,6 +33,8 @@ const ApiCache = (() => {
     { pattern: /^\/auth\/me$/,                    ttl: 120_000 },
     { pattern: /^\/chapters$/,                    ttl:  60_000 },
     { pattern: /^\/chapters\/[^/]+$/,             ttl:  30_000 },
+    // Settlements must never be stale longer than 5 s — financial accuracy is critical
+    { pattern: /\/settlements/,                   ttl:   5_000 },
     { pattern: /^\/expenses\//,                   ttl:  30_000 },
     { pattern: /^\/friends/,                      ttl: 300_000 },
     { pattern: /^\/categories/,                   ttl: 600_000 },

@@ -1,5 +1,42 @@
 /* client/css/dashboard.css */
 
+:root {
+  /* Bridge dashboard spacing vars to global token scale */
+  --space-1: var(--s-1);
+  --space-2: var(--s-2);
+  --space-3: var(--s-3);
+  --space-4: var(--s-4);
+  --space-5: var(--s-5);
+  --space-6: var(--s-6);
+  --space-8: var(--s-8);
+  --space-10: var(--s-10);
+  /* Bridge color tokens */
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-light: var(--brand-light);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: rgba(255,255,255,0.08);
+  --color-border-light: rgba(0,0,0,0.06);
+  --color-success: var(--positive);
+  --color-error: var(--negative);
+  /* Layout */
+  --max-dashboard: 1200px;
+  --nav-height: 56px;
+  /* Transitions */
+  --transition-fast: var(--dur-fast) var(--ease);
+  /* Radius */
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  /* Shadows */
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-brand: var(--brand-glow);
+  --fab-size: 56px;
+}
+
 /* ─── NAVBAR ─────────────────────────────────────────────── */
 .app-navbar {
   position: sticky;
@@ -128,6 +165,9 @@
   .chapters-grid { grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
 }
 @media (min-width: 1024px) {
+  .chapters-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1440px) {
   .chapters-grid { grid-template-columns: repeat(4, 1fr); }
 }
 

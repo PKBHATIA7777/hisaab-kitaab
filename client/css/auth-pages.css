@@ -1,0 +1,31 @@
+/* Static pages: about, privacy */
+.content-wrapper {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 20px;
+  position: relative;
+}
+.glass-card {
+  background: rgba(255,255,255,0.95);
+  border-radius: var(--r-xl);
+  padding: var(--s-10);
+  box-shadow: var(--shadow-xl);
+  margin-bottom: var(--s-10);
+}
+.glass-card h1 { font-size: 2.2rem; color: #000; margin-bottom: var(--s-1); }
+.glass-card h2 { font-size: 1.3rem; color: var(--brand); margin: var(--s-8) 0 var(--s-3); }
+.glass-card p  { font-size: 1rem; line-height: 1.7; color: #444; margin-bottom: var(--s-3); }
+.feature-grid  {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--s-5);
+  margin-top: var(--s-8);
+}
+.feature-item {
+  background: #f9f9f9;
+  padding: var(--s-5);
+  border-radius: var(--r-md);
+  text-align: center;
+  border: 1px solid #eee;
+}
+.back-nav { margin-bottom: var(--s-5); display: inline-block; }

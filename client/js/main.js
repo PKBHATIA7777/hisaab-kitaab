@@ -832,6 +832,21 @@ function initPasswordValidation() {
     initializeApp();
     initGoogleAuth();
     initSessionMonitor();
+
+    // ── Idle session refresh on tab re-focus ──────────────────────
+    // If the user was away for > 30 minutes, silently refresh the
+    // session token so the next API call doesn't get a surprise 401.
+    let _lastVisibleAt = Date.now();
+    document.addEventListener('visibilitychange', async () => {
+      if (!document.hidden) {
+        const awayMs = Date.now() - _lastVisibleAt;
+        if (awayMs > 30 * 60 * 1000 && window.SessionManager) {
+          await window.SessionManager.attemptRefresh().catch(() => {});
+        }
+      } else {
+        _lastVisibleAt = Date.now();
+      }
+    });
     initMobileTweaks();
     initPasswordToggles();
     initPasswordValidation();
@@ -955,6 +970,13 @@ function initPasswordValidation() {
         }
       }, 1500);
     }
+
+    // ── Pause bubble animations when page is backgrounded ─────────
+    document.addEventListener('visibilitychange', () => {
+      const bubbles = document.querySelectorAll('.bubble, .mesh-orb');
+      const state = document.hidden ? 'paused' : 'running';
+      bubbles.forEach(el => { el.style.animationPlayState = state; });
+    });
   });
 
   /* ======================================

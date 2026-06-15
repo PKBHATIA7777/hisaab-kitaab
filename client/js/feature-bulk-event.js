@@ -3,6 +3,26 @@
 /* Refactored for Phase 6: Uses EventBus instead of monkey-patching and setTimeout polling */
 
 // ─────────────────────────────────────────────────────────────
+// CONFIRM HELPER (replaces native confirm())
+// ─────────────────────────────────────────────────────────────
+function _bulkConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = ModalManager.createOverlay(`
+      <div style="padding:24px 20px;">
+        <p style="font-size:var(--text-base);font-weight:600;color:var(--text-primary);
+                  margin:0 0 20px;">${escapeHTML(message)}</p>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn--primary" id="_bce-yes" style="flex:1;">Confirm</button>
+          <button class="btn btn--ghost" id="_bce-no" style="flex:1;">Cancel</button>
+        </div>
+      </div>
+    `, { maxWidth: '360px', closeOnBackdrop: false });
+    overlay.querySelector('#_bce-yes').onclick = () => { ModalManager.close(overlay); resolve(true); };
+    overlay.querySelector('#_bce-no').onclick  = () => { ModalManager.close(overlay); resolve(false); };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────
 let isSelectMode = false;
@@ -203,7 +223,8 @@ window.removeFromEvent = async function() {
   const ids = Array.from(selectedExpenseIds).map(Number);
   if (ids.length === 0) return;
 
-  if (!confirm(`Remove ${ids.length} expense(s) from their current event?`)) return;
+  const confirmed = await _bulkConfirm(`Remove ${ids.length} expense(s) from their current event?`);
+  if (!confirmed) return;
 
   try {
     await apiFetch('/expenses/bulk-assign-event', {
@@ -235,9 +256,8 @@ window.openEventAssignSheet = async function() {
     const selectedExpenses = window.expenses.filter(ex => selectedExpenseIds.has(String(ex.id)));
     const inOtherEvent = selectedExpenses.filter(ex => ex.event_id && ex.event_id !== window.currentEventId);
     if (inOtherEvent.length > 0) {
-      const confirmed = confirm(
-        `${inOtherEvent.length} of the selected expenses are already in another event.\n\n` +
-        `Moving them will remove them from their current event. Continue?`
+      const confirmed = await _bulkConfirm(
+        `${inOtherEvent.length} selected expense(s) are already in another event and will be moved. Continue?`
       );
       if (!confirmed) return;
     }
