@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 /* ================================================================
    HISAAB-KITAAB — tokens.css
    Single source of truth for the entire design system.
@@ -266,10 +268,235 @@
   --text-muted:     #A1A1AA;
 
   --brand:          #6D28D9;     /* richer violet for accessibility    */
+  --brand-dark:     #4C1D95;
+  --brand-hover:    #5B21B6;
   --brand-light:    rgba(109, 40, 217, 0.08);
   --brand-mid:      rgba(109, 40, 217, 0.18);
   --brand-glow:     0 8px 32px rgba(109, 40, 217, 0.20);
   --brand-glow-sm:  0 4px 16px rgba(109, 40, 217, 0.14);
+
+  --brand-glow-color: rgba(109, 40, 217, 0.06);
+
+  /* Typography */
+  --font:           'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Shadows - soft and light */
+  --shadow-sm:      0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md:      0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg:      0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  --shadow-xl:      0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  --shadow-2xl:     0 25px 50px -12px rgba(0, 0, 0, 0.08);
+}
+
+/* ── BEIGE MINIMAL THEME (Cozy and elegant) ───────────────────────── */
+[data-theme="beige"] {
+  --bg-app:         #F5F2EB;     /* warm linen / cream */
+  --bg-elevated:    #EFEBE0;     /* slightly darker warm beige */
+  --bg-elevated-2:  #E5DFC9;
+  --bg-overlay:     rgba(46, 38, 25, 0.45);
+  --bg-glass:       rgba(245, 242, 235, 0.9);
+  --bg-glass-border: rgba(120, 100, 75, 0.12);
+
+  --surface:              #FAF8F5;     /* off-white cream card surfaces */
+  --surface-alt:          #EFEBE0;     /* cream gray secondary items */
+  --surface-hover:        #E5DFC9;
+  --surface-border:       rgba(120, 100, 75, 0.1);
+  --surface-border-strong:rgba(120, 100, 75, 0.2);
+
+  --text-on-dark:   #3E2723;     /* deep dark brown text */
+  --text-on-dark-2: #5D4037;
+  --text-on-dark-3: #8D6E63;
+
+  --text-primary:   #3E2723;
+  --text-secondary: #5D4037;
+  --text-muted:     #8D6E63;
+
+  --brand:          #8D6E63;     /* warm earthy brown */
+  --brand-dark:     #5D4037;
+  --brand-hover:    #4E342E;
+  --brand-light:    rgba(141, 110, 99, 0.08);
+  --brand-mid:      rgba(141, 110, 99, 0.22);
+  --brand-glow:     0 8px 32px rgba(141, 110, 99, 0.15);
+  --brand-glow-sm:  0 4px 16px rgba(141, 110, 99, 0.1);
+
+  --brand-glow-color: rgba(141, 110, 99, 0.06);
+
+  /* Typography */
+  --font:           'Outfit', 'Poppins', -apple-system, sans-serif;
+
+  /* Border Radius - cozy, rounder */
+  --r-xs:           6px;
+  --r-sm:           10px;
+  --r-md:           16px;
+  --r-lg:           20px;
+  --r-xl:           24px;
+  --r-2xl:          32px;
+  --r-3xl:          40px;
+
+  /* Shadows - soft brown-tinted */
+  --shadow-sm:      0 1px 3px rgba(62, 39, 35, 0.03);
+  --shadow-md:      0 4px 12px rgba(62, 39, 35, 0.05);
+  --shadow-lg:      0 8px 24px rgba(62, 39, 35, 0.07);
+  --shadow-xl:      0 16px 40px rgba(62, 39, 35, 0.09);
+  --shadow-2xl:     0 24px 64px rgba(62, 39, 35, 0.12);
+
+  /* Animations - slow and soft transitions */
+  --dur-normal:     280ms;
+  --dur-slow:       420ms;
+}
+
+/* ── MATCHA GREEN THEME (Calm and productivity) ──────────────────── */
+[data-theme="matcha"] {
+  --bg-app:         #EBF0EC;     /* soft matcha wash */
+  --bg-elevated:    #DFE5E0;     /* slightly deeper sage */
+  --bg-elevated-2:  #D1DAD3;
+  --bg-overlay:     rgba(30, 45, 35, 0.45);
+  --bg-glass:       rgba(235, 240, 236, 0.9);
+  --bg-glass-border: rgba(47, 79, 56, 0.12);
+
+  --surface:              #F4F7F5;     /* matcha cream cards */
+  --surface-alt:          #DFE5E0;
+  --surface-hover:        #D1DAD3;
+  --surface-border:       rgba(47, 79, 56, 0.09);
+  --surface-border-strong:rgba(47, 79, 56, 0.18);
+
+  --text-on-dark:   #1A2F22;     /* deep pine green text */
+  --text-on-dark-2: #2E4C38;
+  --text-on-dark-3: #587F63;
+
+  --text-primary:   #1A2F22;
+  --text-secondary: #2E4C38;
+  --text-muted:     #587F63;
+
+  --brand:          #4F7F61;     /* classic sage green */
+  --brand-dark:     #2F4F38;
+  --brand-hover:    #243F2C;
+  --brand-light:    rgba(79, 127, 97, 0.08);
+  --brand-mid:      rgba(79, 127, 97, 0.22);
+  --brand-glow:     0 8px 32px rgba(79, 127, 97, 0.15);
+  --brand-glow-sm:  0 4px 16px rgba(79, 127, 97, 0.1);
+
+  --brand-glow-color: rgba(79, 127, 97, 0.06);
+
+  /* Typography */
+  --font:           'Plus Jakarta Sans', 'Poppins', -apple-system, sans-serif;
+
+  /* Shadows - soft green-tinted */
+  --shadow-sm:      0 1px 3px rgba(26, 47, 34, 0.03);
+  --shadow-md:      0 4px 12px rgba(26, 47, 34, 0.05);
+  --shadow-lg:      0 8px 24px rgba(26, 47, 34, 0.07);
+  --shadow-xl:      0 16px 40px rgba(26, 47, 34, 0.09);
+  --shadow-2xl:     0 24px 64px rgba(26, 47, 34, 0.12);
+}
+
+/* ── LAVENDER DREAM THEME (Modern Gen-Z aesthetic) ───────────────── */
+[data-theme="lavender"] {
+  --bg-app:         #F3F0F8;     /* pale lavender wash */
+  --bg-elevated:    #E9E3F3;
+  --bg-elevated-2:  #DDD2EE;
+  --bg-overlay:     rgba(45, 30, 65, 0.45);
+  --bg-glass:       rgba(243, 240, 248, 0.9);
+  --bg-glass-border: rgba(124, 58, 237, 0.12);
+
+  --surface:              #FAF9FC;     /* lilac white cards */
+  --surface-alt:          #E9E3F3;
+  --surface-hover:        #DDD2EE;
+  --surface-border:       rgba(124, 58, 237, 0.09);
+  --surface-border-strong:rgba(124, 58, 237, 0.18);
+
+  --text-on-dark:   #241838;     /* deep eggplant text */
+  --text-on-dark-2: #412F5E;
+  --text-on-dark-3: #78619E;
+
+  --text-primary:   #241838;
+  --text-secondary: #412F5E;
+  --text-muted:     #78619E;
+
+  --brand:          #8B5CF6;     /* lilac/purple */
+  --brand-dark:     #6D28D9;
+  --brand-hover:    #5B21B6;
+  --brand-light:    rgba(139, 92, 246, 0.08);
+  --brand-mid:      rgba(139, 92, 246, 0.22);
+  --brand-glow:     0 8px 32px rgba(139, 92, 246, 0.20);
+  --brand-glow-sm:  0 4px 16px rgba(139, 92, 246, 0.12);
+
+  --brand-glow-color: rgba(139, 92, 246, 0.06);
+
+  /* Typography */
+  --font:           'Outfit', 'Poppins', -apple-system, sans-serif;
+
+  /* Border Radius */
+  --r-xs:           6px;
+  --r-sm:           10px;
+  --r-md:           14px;
+  --r-lg:           18px;
+  --r-xl:           22px;
+
+  /* Shadows - soft purple-tinted */
+  --shadow-sm:      0 1px 3px rgba(36, 24, 56, 0.04);
+  --shadow-md:      0 4px 12px rgba(36, 24, 56, 0.06);
+  --shadow-lg:      0 8px 24px rgba(36, 24, 56, 0.08);
+  --shadow-xl:      0 16px 40px rgba(36, 24, 56, 0.10);
+  --shadow-2xl:     0 24px 64px rgba(36, 24, 56, 0.14);
+
+  /* Animations - snappy */
+  --dur-normal:     180ms;
+}
+
+/* ── MIDNIGHT NEON THEME (Futuristic tech style) ────────────────── */
+[data-theme="midnight-neon"] {
+  --bg-app:         #030712;     /* deep dark galaxy blue/black */
+  --bg-elevated:    #0B0F19;     /* slightly lighter navy */
+  --bg-elevated-2:  #182235;
+  --bg-overlay:     rgba(0, 0, 0, 0.9);
+  --bg-glass:       rgba(3, 7, 18, 0.85);
+  --bg-glass-border: rgba(59, 130, 246, 0.15);
+
+  --surface:              #0B0F19;
+  --surface-alt:          #182235;
+  --surface-hover:        #263550;
+  --surface-border:       rgba(59, 130, 246, 0.12);
+  --surface-border-strong:rgba(59, 130, 246, 0.25);
+
+  --text-on-dark:   #F3F4F6;     /* bright cyber white */
+  --text-on-dark-2: #9CA3AF;
+  --text-on-dark-3: #6B7280;
+
+  --text-primary:   #F3F4F6;
+  --text-secondary: #9CA3AF;
+  --text-muted:     #6B7280;
+
+  --brand:          #00D2FF;     /* electric neon blue cyan */
+  --brand-dark:     #0066FF;
+  --brand-hover:    #33E0FF;
+  --brand-light:    rgba(0, 210, 255, 0.12);
+  --brand-mid:      rgba(0, 210, 255, 0.3);
+  --brand-glow:     0 0 20px rgba(0, 210, 255, 0.6);
+  --brand-glow-sm:  0 0 10px rgba(0, 210, 255, 0.4);
+
+  --brand-glow-color: rgba(0, 210, 255, 0.12);
+
+  /* Typography */
+  --font:           'Space Grotesk', 'Poppins', -apple-system, sans-serif;
+  --font-mono:      'Space Grotesk', monospace;
+
+  /* Border Radius */
+  --r-xs:           2px;
+  --r-sm:           4px;
+  --r-md:           6px;
+  --r-lg:           8px;
+  --r-xl:           10px;
+
+  /* Shadows - neon glow */
+  --shadow-sm:      0 0 4px rgba(0, 210, 255, 0.15);
+  --shadow-md:      0 0 8px rgba(0, 210, 255, 0.25);
+  --shadow-lg:      0 0 16px rgba(0, 210, 255, 0.35);
+  --shadow-xl:      0 0 24px rgba(0, 210, 255, 0.45);
+  --shadow-2xl:     0 0 32px rgba(0, 210, 255, 0.55);
+
+  /* Animations - tech-snappy */
+  --dur-normal:     120ms;
+  --ease-spring:    cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 /* ── REDUCED MOTION ─────────────────────────────────────────────── */

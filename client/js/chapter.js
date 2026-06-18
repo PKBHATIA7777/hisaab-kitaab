@@ -693,7 +693,6 @@ async function _openExpenseModal(mode, expenseId) {
   const isEdit = mode === 'edit';
 
   const overlay = ModalManager.createOverlay(`
-    <div class="modal-handle"></div>
     <div class="modal-header">
       <h2 class="modal-title">${isEdit ? 'Edit Expense' : 'Add Expense'}</h2>
       <button class="modal-close" aria-label="Close">
@@ -759,7 +758,7 @@ async function _openExpenseModal(mode, expenseId) {
         `}
       </div>
     </form>
-  `, { type: 'bottom' });
+  `, { type: 'center' });
 
   overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
 

@@ -533,3 +533,155 @@ body.modal-open { overflow: hidden; }
   from { stroke-dashoffset: 100; }
   to   { stroke-dashoffset: 0; }
 }
+
+/* ================================================================
+   THEME SWITCHER SYSTEM
+   ================================================================ */
+
+/* Global transition lock helper */
+html.theme-transition,
+html.theme-transition * {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease !important;
+}
+
+/* Background glow theme adaptations */
+.dashboard-glow, .chapter-glow, .landing-glow::before {
+  background: radial-gradient(ellipse at center, var(--brand-glow-color, rgba(124, 58, 237, 0.08)) 0%, transparent 70%) !important;
+}
+
+/* Base override for hardcoded inline backgrounds on HTML/Body */
+html, body {
+  background-color: var(--bg-app) !important;
+}
+
+/* Theme Switcher Widget */
+.theme-switcher-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Floating version for pages without navbar */
+.theme-switcher-wrapper.floating {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: var(--z-sticky);
+}
+
+.theme-switcher-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  border: none;
+  transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast);
+  padding: 0;
+}
+
+.theme-switcher-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  transform: rotate(15deg);
+}
+
+.theme-switcher-wrapper.floating .theme-switcher-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--surface-border-strong);
+  box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+}
+
+.theme-switcher-wrapper.floating .theme-switcher-btn:hover {
+  background: var(--bg-elevated-2);
+}
+
+/* Dropdown popover */
+.theme-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 260px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--surface-border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xl);
+  z-index: var(--z-dropdown);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.95);
+  transition: opacity var(--dur-normal) var(--ease), transform var(--dur-normal) var(--ease), visibility var(--dur-normal) var(--ease);
+  overflow: hidden;
+}
+
+.theme-dropdown.active {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+/* Header inside dropdown */
+.theme-dropdown-header {
+  padding: var(--s-3) var(--s-4);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Option row button */
+.theme-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px var(--s-4);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.theme-option:hover {
+  background: var(--surface-hover);
+}
+
+.theme-option.is-selected {
+  background: var(--brand-light);
+  color: var(--brand);
+  font-weight: var(--weight-semibold);
+}
+
+/* Color swatch preview dots */
+.theme-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swatch-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* Swatch border adjustment in light themes to ensure visibility */
+[data-theme="light"] .swatch-dot,
+[data-theme="beige"] .swatch-dot,
+[data-theme="matcha"] .swatch-dot,
+[data-theme="lavender"] .swatch-dot {
+  border-color: rgba(0, 0, 0, 0.08);
+}

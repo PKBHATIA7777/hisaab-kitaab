@@ -905,6 +905,7 @@ function initPasswordValidation() {
     initMobileTweaks();
     initPasswordToggles();
     initPasswordValidation();
+    initThemeSwitcher();
 
     if (window.location.search.includes("expired=true")) {
       window.showToast("Session expired. Please log in again.", "error");
@@ -1284,6 +1285,146 @@ function initPasswordValidation() {
         }
       });
     }, 100);
+  }
+
+  function initThemeSwitcher() {
+    if (document.getElementById('hk-theme-switcher')) return;
+
+    const themes = [
+      { key: 'light', name: 'Light', icon: '☀️', swatches: ['#FAF9F6', '#FFFFFF', '#6D28D9'] },
+      { key: 'dark', name: 'Dark', icon: '🌙', swatches: ['#09090B', '#18181B', '#7C3AED'] },
+      { key: 'beige', name: 'Beige Minimal', icon: '🤎', swatches: ['#F5F2EB', '#FAF8F5', '#8D6E63'] },
+      { key: 'matcha', name: 'Matcha Green', icon: '🍵', swatches: ['#EBF0EC', '#F4F7F5', '#4F7F61'] },
+      { key: 'lavender', name: 'Lavender Dream', icon: '💜', swatches: ['#F3F0F8', '#FAF9FC', '#8B5CF6'] },
+      { key: 'midnight-neon', name: 'Midnight Neon', icon: '🌌', swatches: ['#030712', '#0B0F19', '#00D2FF'] },
+      { key: 'weekly', name: 'Weekly Surprise', icon: '🔄', swatches: ['#7C3AED', '#8D6E63', '#4F7F61'], isSpecial: true }
+    ];
+
+    let container = null;
+    let isFloating = false;
+
+    const navRight = document.querySelector('.nav-right');
+    if (navRight) {
+      container = navRight;
+    } else {
+      const navDropdown = document.querySelector('.nav-dropdown-wrapper');
+      if (navDropdown) {
+        container = navDropdown.parentElement;
+      }
+    }
+
+    if (!container) {
+      container = document.body;
+      isFloating = true;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'hk-theme-switcher';
+    wrapper.className = 'theme-switcher-wrapper' + (isFloating ? ' floating' : '');
+
+    const currentPreference = localStorage.getItem('hk_theme') || 'dark';
+
+    wrapper.innerHTML = `
+      <button type="button" class="theme-switcher-btn" aria-label="Switch Theme" title="Switch Theme">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 14.7255 3.09032 17.1962 4.85857 19C5.02705 19.1718 5.12215 19.4068 5.12215 19.6522V21.0435C5.12215 21.5718 5.55037 22 6.07865 22H12Z"/>
+          <circle cx="7.5" cy="10.5" r="1.5" fill="currentColor"/>
+          <circle cx="11.5" cy="7.5" r="1.5" fill="currentColor"/>
+          <circle cx="16.5" cy="9.5" r="1.5" fill="currentColor"/>
+          <circle cx="15.5" cy="14.5" r="1.5" fill="currentColor"/>
+        </svg>
+      </button>
+      <div class="theme-dropdown" role="menu" aria-hidden="true">
+        <div class="theme-dropdown-header">Select Theme</div>
+        <div class="theme-options-list">
+          ${themes.map(t => {
+            const isSelected = currentPreference === t.key;
+            const swatchHtml = t.isSpecial
+              ? `
+                <div class="theme-swatch">
+                  <span class="swatch-dot" style="background: linear-gradient(135deg, ${t.swatches.join(', ')})"></span>
+                </div>
+                `
+              : `
+                <div class="theme-swatch">
+                  <span class="swatch-dot" style="background: ${t.swatches[0]}"></span>
+                  <span class="swatch-dot" style="background: ${t.swatches[1]}"></span>
+                  <span class="swatch-dot" style="background: ${t.swatches[2]}"></span>
+                </div>
+                `;
+            return `
+              <button type="button" class="theme-option ${isSelected ? 'is-selected' : ''}" data-theme-key="${t.key}" role="menuitem">
+                <span>${t.icon} ${t.name}</span>
+                ${swatchHtml}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    if (isFloating) {
+      container.appendChild(wrapper);
+    } else if (container.classList.contains('nav-right')) {
+      container.insertBefore(wrapper, container.firstChild);
+    } else {
+      const targetSibling = container.querySelector('.nav-dropdown-wrapper');
+      if (targetSibling) {
+        container.insertBefore(wrapper, targetSibling);
+      } else {
+        container.appendChild(wrapper);
+      }
+    }
+
+    const triggerBtn = wrapper.querySelector('.theme-switcher-btn');
+    const dropdown = wrapper.querySelector('.theme-dropdown');
+
+    triggerBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isActive = dropdown.classList.toggle('active');
+      dropdown.setAttribute('aria-hidden', !isActive);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!wrapper.contains(e.target)) {
+        dropdown.classList.remove('active');
+        dropdown.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    wrapper.querySelectorAll('.theme-option').forEach(optionBtn => {
+      optionBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const themeKey = optionBtn.dataset.themeKey;
+
+        document.documentElement.classList.add('theme-transition');
+
+        localStorage.setItem('hk_theme', themeKey);
+
+        wrapper.querySelectorAll('.theme-option').forEach(o => o.classList.remove('is-selected'));
+        optionBtn.classList.add('is-selected');
+
+        let activeTheme = themeKey;
+        if (themeKey === 'weekly') {
+          const simpleThemes = ['light', 'dark', 'beige', 'matcha', 'lavender', 'midnight-neon'];
+          const msInWeek = 7 * 24 * 60 * 60 * 1000;
+          const weekIndex = Math.floor(Date.now() / msInWeek);
+          activeTheme = simpleThemes[weekIndex % simpleThemes.length];
+          document.documentElement.setAttribute('data-theme', activeTheme);
+          document.documentElement.setAttribute('data-theme-mode', 'weekly');
+        } else {
+          document.documentElement.setAttribute('data-theme', themeKey);
+          document.documentElement.removeAttribute('data-theme-mode');
+        }
+
+        dropdown.classList.remove('active');
+        dropdown.setAttribute('aria-hidden', 'true');
+
+        setTimeout(() => {
+          document.documentElement.classList.remove('theme-transition');
+        }, 300);
+      });
+    });
   }
 
   window.showIOSInstallGuide = showIOSInstallGuide;

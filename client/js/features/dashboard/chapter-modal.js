@@ -5,7 +5,6 @@ const ChapterModal = (() => {
   function _open(data = {}) {
     const isEdit = !!data.id;
     const overlay = ModalManager.createOverlay(`
-      <div class="modal-handle"></div>
       <div class="modal-header">
         <h2 class="modal-title">${isEdit ? 'Edit Chapter' : 'New Chapter'}</h2>
         <button class="modal-close" aria-label="Close">
@@ -33,7 +32,7 @@ const ChapterModal = (() => {
           <button type="submit" class="btn btn--primary" id="ch-submit">${isEdit ? 'Save Changes' : 'Create Chapter'}</button>
         </form>
       </div>
-    `, { type: 'bottom' });
+    `, { type: 'center' });
 
     overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
 

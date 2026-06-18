@@ -39,7 +39,6 @@ const ProfileModal = (() => {
     }
 
     const overlay = ModalManager.createOverlay(`
-      <div class="modal-handle"></div>
       <div class="modal-header">
         <h2 class="modal-title">My Profile & Friends</h2>
         <button class="modal-close" aria-label="Close">
@@ -142,7 +141,7 @@ const ProfileModal = (() => {
         <!-- SIGNOUT BUTTON -->
         <button type="button" class="btn btn--danger" id="pm-logout" style="width:100%; margin-top: var(--s-8); height: 44px;">Log out</button>
       </div>
-    `, { type: 'bottom' });
+    `, { type: 'center' });
 
     // Overlay Close Hook
     overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
