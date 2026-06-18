@@ -1,0 +1,490 @@
+/* ================================================================
+   HISAAB-KITAAB — css/pages/landing.css
+   Landing page ONLY (index.html).
+   Requires: tokens.css, reset.css, global.css, auth-pages.css
+   ================================================================ */
+
+/* ── PAGE SHELL ──────────────────────────────────────────────────── */
+body.landing-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--bg-app);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── AMBIENT GLOW (CSS-only — no JS) ─────────────────────────────── */
+.landing-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.landing-glow::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -15%;
+  width: 65%;
+  height: 65%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(124, 58, 237, 0.14) 0%,
+    transparent 65%
+  );
+  animation: glow-a 20s ease-in-out infinite alternate;
+}
+
+.landing-glow::after {
+  content: '';
+  position: absolute;
+  bottom: -15%;
+  right: -10%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(99, 102, 241, 0.09) 0%,
+    transparent 65%
+  );
+  animation: glow-b 25s ease-in-out infinite alternate;
+}
+
+@keyframes glow-a {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(6%, 10%) scale(1.10); }
+}
+
+@keyframes glow-b {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-7%, -6%) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-glow::before,
+  .landing-glow::after { animation: none; }
+}
+
+/* ── SPLIT LAYOUT ─────────────────────────────────────────────────── */
+.landing-main {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   LEFT PANEL — Brand / Value Prop (desktop ≥ 900px only)
+───────────────────────────────────────────────────────────────── */
+.landing-brand-panel {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .landing-brand-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+    padding: var(--s-16) var(--s-12) var(--s-16) var(--s-10);
+    min-height: 100%;
+    position: relative;
+  }
+}
+
+/* Logo mark — ₹ symbol in a rounded square box */
+.landing-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  background: var(--brand-light);
+  border: 1.5px solid var(--brand-mid);
+  border-radius: 16px;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
+  color: var(--brand);
+  margin-bottom: var(--s-6);
+  flex-shrink: 0;
+  letter-spacing: -1px;
+  animation: pop-in var(--dur-normal) var(--ease-spring) 0.15s both;
+}
+
+/* Wordmark */
+.landing-wordmark {
+  font-size: clamp(var(--text-3xl), 3vw, var(--text-4xl));
+  font-weight: var(--weight-bold);
+  color: var(--text-on-dark);
+  letter-spacing: -1.2px;
+  line-height: var(--leading-tight);
+  margin: 0 0 var(--s-4);
+  animation: fadeInDown var(--dur-normal) var(--ease-out) 0.2s both;
+}
+
+/* Tagline */
+.landing-tagline {
+  font-size: var(--text-lg);
+  color: var(--text-on-dark-2);
+  line-height: var(--leading-relaxed);
+  max-width: 340px;
+  margin: 0 0 var(--s-10);
+  animation: fadeInDown var(--dur-normal) var(--ease-out) 0.28s both;
+}
+
+.landing-tagline strong {
+  color: var(--text-on-dark);
+  font-weight: var(--weight-semibold);
+}
+
+/* Feature highlights list */
+.landing-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  animation: fadeInUp var(--dur-slow) var(--ease-out) 0.35s both;
+}
+
+.landing-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+}
+
+.landing-feature-icon {
+  width: 38px;
+  height: 38px;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--bg-glass-border);
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.landing-feature-text h4 {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-on-dark);
+  margin: 0 0 3px;
+  line-height: var(--leading-snug);
+}
+
+.landing-feature-text p {
+  font-size: var(--text-xs);
+  color: var(--text-on-dark-3);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+
+/* Panel separator */
+.landing-panel-divider {
+  display: none;
+  width: 1px;
+  background: var(--bg-glass-border);
+  margin: var(--s-16) 0;
+  flex-shrink: 0;
+}
+
+@media (min-width: 900px) {
+  .landing-panel-divider { display: block; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   RIGHT PANEL — Auth Card
+───────────────────────────────────────────────────────────────── */
+.landing-auth-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-8) var(--s-5) var(--s-10);
+  width: 100%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 900px) {
+  .landing-auth-panel {
+    width: 440px;
+    padding: var(--s-12) var(--s-8);
+    justify-content: center;
+  }
+}
+
+/* Card container */
+.landing-card {
+  width: 100%;
+  max-width: 390px;
+  background: var(--surface);
+  border-radius: var(--r-2xl);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.08),
+    0 8px 32px rgba(0,0,0,0.22),
+    0 24px 64px rgba(0,0,0,0.18);
+  overflow: hidden;
+  animation: card-in var(--dur-slow) var(--ease-out) 0.08s both;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ── Card Header ── */
+.landing-card-header {
+  padding: var(--s-8) var(--s-7) var(--s-5);
+  background: linear-gradient(160deg, var(--surface) 0%, var(--surface-alt) 100%);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+/* Mobile brand — visible only when left panel is hidden */
+.landing-card-mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+}
+
+@media (min-width: 900px) {
+  .landing-card-mobile-brand { display: none; }
+}
+
+.landing-card-mobile-logo {
+  width: 36px;
+  height: 36px;
+  background: var(--brand-light);
+  border: 1px solid var(--brand-mid);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-base);
+  font-weight: var(--weight-extrabold);
+  color: var(--brand);
+  flex-shrink: 0;
+  letter-spacing: -0.5px;
+}
+
+.landing-card-mobile-name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+}
+
+.landing-card-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.6px;
+  line-height: var(--leading-tight);
+  margin: 0 0 var(--s-1);
+}
+
+.landing-card-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+/* ── Card Body ── */
+.landing-card-body {
+  padding: var(--s-6) var(--s-7) var(--s-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+/* ── CTA Buttons ── */
+/* Override .btn-primary/.btn-secondary for the landing card context */
+.landing-card .btn-primary {
+  height: 50px;
+  font-size: var(--text-base);
+  margin-bottom: 0;
+}
+
+.landing-card .btn-secondary {
+  height: 50px;
+  font-size: var(--text-base);
+  margin-top: 0;
+}
+
+/* ── Or divider ── */
+.landing-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.5px;
+}
+.landing-or::before, .landing-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--surface-border-strong);
+}
+
+/* ── Google Sign-In ── */
+.landing-google-wrap {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+.landing-google-wrap .g_id_signin {
+  width: 100% !important;
+}
+
+/* ── Fine print ── */
+.landing-fine-print {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+.landing-fine-print a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.landing-fine-print a:hover { color: var(--text-primary); opacity: 1; }
+
+/* ── PWA INSTALL PROMPT ───────────────────────────────────────────── */
+.pwa-popup {
+  position: fixed;
+  bottom: var(--s-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  width: calc(100% - var(--s-8));
+  max-width: 420px;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--surface-border);
+  animation: fadeInUp var(--dur-normal) var(--ease-out);
+  transition:
+    opacity    var(--dur-normal) var(--ease),
+    transform  var(--dur-normal) var(--ease),
+    visibility var(--dur-normal) var(--ease);
+}
+
+.pwa-popup.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.pwa-popup-content {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+}
+
+.pwa-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--brand-light);
+  border: 1px solid var(--brand-mid);
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  flex-shrink: 0;
+}
+
+.pwa-text { flex: 1; min-width: 0; }
+.pwa-text h4 {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  margin: 0 0 2px;
+  line-height: var(--leading-snug);
+}
+.pwa-text p {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-snug);
+  margin: 0;
+}
+
+.pwa-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  flex-shrink: 0;
+}
+
+.pwa-btn-primary {
+  padding: var(--s-2) var(--s-4);
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-sm);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter var(--dur-fast) var(--ease);
+}
+.pwa-btn-primary:hover { filter: brightness(1.1); }
+
+.pwa-btn-secondary {
+  padding: var(--s-2) var(--s-4);
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--r-sm);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease);
+}
+.pwa-btn-secondary:hover { color: var(--text-secondary); }
+
+/* ── FOOTER TWEAK (landing context) ──────────────────────────────── */
+.landing-page .app-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── MOBILE TWEAKS ────────────────────────────────────────────────── */
+@media (max-width: 899px) {
+  .landing-auth-panel {
+    padding-top: var(--s-6);
+    justify-content: flex-start;
+  }
+  .landing-card {
+    max-width: 440px;
+    margin: 0 auto;
+  }
+  .landing-card-header {
+    padding: var(--s-6) var(--s-6) var(--s-5);
+  }
+  .landing-card-body {
+    padding: var(--s-5) var(--s-6) var(--s-8);
+  }
+}
+
+@media (max-width: 480px) {
+  .landing-card {
+    border-radius: var(--r-xl);
+  }
+}

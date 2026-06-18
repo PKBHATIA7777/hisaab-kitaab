@@ -4,28 +4,88 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Offline — Hisaab-Kitaab</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%237C3AED' font-family='Arial, sans-serif'>₹</text></svg>">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components/button.css">
+  <link rel="stylesheet" href="css/pages/landing.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  </noscript>
   <style>
     body {
-      margin: 0; min-height: 100vh; font-family: 'Poppins', sans-serif;
-      background: linear-gradient(180deg, #000 0%, #1a0029 100%);
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; color: #fff; text-align: center; padding: 20px;
+      background-color: var(--bg-app);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      margin: 0;
+      padding: var(--s-5);
     }
-    .icon { font-size: 4rem; margin-bottom: 20px; }
-    h1 { font-size: 1.8rem; margin: 0 0 12px; }
-    p { color: rgba(255,255,255,0.7); font-size: 1rem; max-width: 320px; line-height: 1.6; }
-    button {
-      margin-top: 24px; padding: 14px 32px;
-      background: linear-gradient(135deg, #d000ff, #8a2be2);
-      border: none; border-radius: 12px; color: #fff;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
+    .offline-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--r-xl);
+      padding: var(--s-8) var(--s-6);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: var(--shadow-xl);
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .offline-icon {
+      color: var(--brand);
+      filter: drop-shadow(var(--brand-glow-sm));
+      margin-bottom: var(--s-6);
+    }
+    .offline-title {
+      font-size: var(--text-xl);
+      font-weight: var(--weight-bold);
+      color: var(--text-primary);
+      margin: 0 0 var(--s-2);
+      letter-spacing: -0.5px;
+    }
+    .offline-text {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      line-height: var(--leading-relaxed);
+      margin: 0 0 var(--s-8);
+    }
+    .offline-btn {
+      width: 100%;
+      max-width: 200px;
     }
   </style>
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
 <body>
-  <div class="icon">📡</div>
-  <h1>You're Offline</h1>
-  <p>Hisaab-Kitaab needs a connection to sync your expenses. Please check your internet connection.</p>
-  <button onclick="window.location.reload()">Try Again</button>
+
+  <!-- Ambient glow backdrop matching the landing page -->
+  <div class="landing-glow" aria-hidden="true"></div>
+
+  <div class="offline-card" id="main-content">
+    <svg class="offline-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
+      <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
+      <path d="M7.34 16.7a6 6 0 0 1 9.32 0"></path>
+      <line x1="12" y1="20" x2="12.01" y2="20"></line>
+    </svg>
+    <h1 class="offline-title">You're Offline</h1>
+    <p class="offline-text">Hisaab-Kitaab needs an active internet connection to sync your expenses. Check your network status and try again.</p>
+    <button class="btn-primary offline-btn" onclick="window.location.reload()">Try Again</button>
+  </div>
+
 </body>
 </html>

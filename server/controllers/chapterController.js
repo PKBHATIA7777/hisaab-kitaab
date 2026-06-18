@@ -222,9 +222,20 @@ async function getMemberDeletability(req, res) {
 async function getMyChapters(req, res) {
   try {
     const showArchived = req.query.archived === "true";
-    // ✅ PATCH C APPLIED: Added c.is_personal to SELECT clause
     const { rows } = await db.query(
-      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, c.is_personal, COUNT(cm.id) as member_count
+      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, c.is_personal, COUNT(cm.id) as member_count,
+         COALESCE((
+           SELECT SUM(e.amount)
+           FROM chapter_members ucm
+           JOIN expenses e ON e.payer_member_id = ucm.id
+           WHERE ucm.chapter_id = c.id AND ucm.user_id = $1
+         ), 0) - COALESCE((
+           SELECT SUM(es.amount_owed)
+           FROM chapter_members ucm
+           JOIN expense_splits es ON es.member_id = ucm.id
+           JOIN expenses e ON es.expense_id = e.id
+           WHERE ucm.chapter_id = c.id AND ucm.user_id = $1 AND e.chapter_id = c.id
+         ), 0) as user_net_balance
        FROM chapters c LEFT JOIN chapter_members cm ON c.id = cm.chapter_id
        WHERE c.created_by = $1
          AND ($2 OR c.is_archived = FALSE)

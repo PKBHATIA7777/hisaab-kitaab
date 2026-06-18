@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <title>Privacy Policy - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff' font-family='Arial, sans-serif'>₹</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%237C3AED' font-family='Arial, sans-serif'>₹</text></svg>">
   <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/reset.css">
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/layout/footer.css">
   <link rel="stylesheet" href="css/auth-pages.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="css/pages/landing.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload"
@@ -21,43 +22,49 @@
   </noscript>
   
   <style>
-    .content-wrapper {
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 20px;
-      z-index: 1;
-      position: relative;
+    .glass-card h3 {
+      font-size: var(--text-md);
+      font-weight: var(--weight-bold);
+      color: var(--text-primary);
+      margin-top: var(--s-6);
+      margin-bottom: var(--s-2);
+      border-left: 3px solid var(--brand);
+      padding-left: var(--s-3);
     }
-    
-    .glass-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 30px;
-      padding: 40px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    .glass-card ul {
+      margin-bottom: var(--s-4);
+      padding-left: var(--s-5);
+      color: var(--text-secondary);
     }
-
-    h1 { font-size: 2.2rem; color: #000; margin-bottom: 5px; }
-    .last-updated { font-size: 0.9rem; color: #777; margin-bottom: 30px; display: block; }
-    
-    h3 { color: #333; font-size: 1.2rem; margin-top: 25px; margin-bottom: 10px; border-left: 4px solid #d000ff; padding-left: 10px; }
-    p { font-size: 0.95rem; line-height: 1.6; color: #555; margin-bottom: 15px; }
-    ul { margin-bottom: 15px; padding-left: 20px; color: #555; }
-    li { margin-bottom: 5px; }
+    .glass-card li {
+      margin-bottom: var(--s-2);
+      font-size: var(--text-sm);
+      line-height: var(--leading-relaxed);
+    }
+    .last-updated {
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      margin-bottom: var(--s-6);
+      display: block;
+    }
   </style>
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
 <body>
 
-  <div class="bubble-container">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-  </div>
+  <!-- Ambient glow backdrop matching the landing page -->
+  <div class="landing-glow" aria-hidden="true"></div>
 
-  <div class="content-wrapper">
-    <a href="index.html" class="back-link" style="margin-bottom: 20px; display:inline-block;">← Back to Home</a>
+  <div class="content-wrapper" id="main-content">
+    <a href="index.html" class="back-link back-nav" style="display: inline-flex; align-items: center; gap: var(--s-2); font-weight: var(--weight-medium); color: var(--text-secondary); text-decoration: none;">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle;"><use href="icons/sprite.svg#arrow-left"></use></svg>
+      Back to Home
+    </a>
 
     <div class="glass-card">
       <h1>Privacy Policy</h1>
-      <span class="last-updated">Last Updated: January 2025</span>
+      <span class="last-updated">Last Updated: June 2026</span>
 
       <p>
         At <strong>Hisaab-Kitaab</strong>, we take your privacy seriously. This Privacy Policy explains how we collect, use, and protect your information when you use our website and services.
@@ -90,43 +97,15 @@
       </p>
       <p>
         <strong>A PLUS TECHNOLOGIES</strong><br>
-        Email: baad me daal doonga yaad se <br>
+        Email: contact@aplustech.co<br>
         Phone: +91 9868097145
       </p>
     </div>
   </div>
 
-  <footer class="app-footer">
-    <div class="footer-content">
-      <div class="footer-col">
-        <h4>Hisaab-Kitaab</h4>
-        <p>The smartest way to track expenses and settle debts with friends and family.</p>
-      </div>
-      
-      <div class="footer-col">
-        <h4>Quick Links</h4>
-        <div class="footer-links">
-          <a href="index.html">Home</a>
-          <a href="about.html">About Us</a>
-          <a href="privacy.html">Privacy Policy</a>
-        </div>
-      </div>
+  <footer id="app-footer" class="app-footer"></footer>
 
-      <div class="footer-col">
-        <h4>Developer</h4>
-        <div class="dev-branding">
-            Developed and Managed by
-          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">
-            A PLUS TECHNOLOGIES
-          </a>
-        </div>
-      </div>
-    </div>
-    
-    <div class="footer-bottom">
-      &copy; 2025 Hisaab-Kitaab. All rights reserved.
-    </div>
-  </footer>
-
+  <script src="js/shared/footer.js" defer></script>
+  <script src="js/main.js" defer></script>
 </body>
 </html>

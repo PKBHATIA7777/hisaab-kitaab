@@ -6,7 +6,7 @@ const db = require("../config/db");
 const { z } = require("zod");
 const xss = require("xss");
 
-// --- VALIDATION SCHEMA (Updated: added categoryId) ---
+// --- VALIDATION SCHEMA (Updated: added categoryId, expenseDate) ---
 const addExpenseSchema = z.object({
   chapterId: z.string().or(z.number()),
   eventId: z.string().or(z.number()).nullish(),
@@ -14,6 +14,7 @@ const addExpenseSchema = z.object({
   description: z.string().max(100, "Description too long").optional(),
   payerMemberId: z.string().or(z.number()),
   categoryId: z.number().int().nullish(), // ✅ NEW: Feature 4
+  expenseDate: z.string().nullish(), // ✅ NEW: Step 5 Date Picker
   involvedMemberIds: z.array(z.string().or(z.number())).optional(),
   customSplits: z.array(z.object({
     memberId: z.string().or(z.number()),
@@ -33,7 +34,7 @@ async function addExpense(req, res) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
 
-    const { chapterId, eventId, amount, payerMemberId, involvedMemberIds, customSplits, categoryId } = result.data;
+    const { chapterId, eventId, amount, payerMemberId, involvedMemberIds, customSplits, categoryId, expenseDate } = result.data;
     const description = xss(result.data.description || "");
     const userId = req.user.userId;
 
@@ -98,12 +99,12 @@ splits.forEach(s => finalSplits.push(s));
     await client.query("BEGIN");
 
     try {
-      // ✅ MODIFIED: Added category_id to INSERT
+      // ✅ MODIFIED: Added category_id and expenseDate to INSERT
       const { rows: expenseRows } = await client.query(
         `INSERT INTO expenses (chapter_id, event_id, payer_member_id, amount, description, expense_date, category_id)
-         VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+         VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamp, NOW()), $7)
          RETURNING id, created_at`,
-        [chapterId, eventId || null, payerMemberId, amount, description, categoryId || null]
+        [chapterId, eventId || null, payerMemberId, amount, description, expenseDate || null, categoryId || null]
       );
       const expenseId = expenseRows[0].id;
 
@@ -311,7 +312,7 @@ async function updateExpense(req, res) {
       return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     }
 
-    const { chapterId, eventId, amount, payerMemberId, involvedMemberIds, customSplits, categoryId } = result.data;
+    const { chapterId, eventId, amount, payerMemberId, involvedMemberIds, customSplits, categoryId, expenseDate } = result.data;
     const description = xss(result.data.description || "");
     const userId = req.user.userId;
 
@@ -376,14 +377,15 @@ splits.forEach(s => finalSplits.push(s));
     await client.query("BEGIN");
 
     try {
-      // ✅ MODIFIED: Added category_id to UPDATE
+      // ✅ MODIFIED: Added category_id and expense_date to UPDATE
       await client.query(
         `UPDATE expenses
          SET amount = $1, description = $2, payer_member_id = $3,
              chapter_id = $4, event_id = $5, category_id = $6,
+             expense_date = COALESCE($7::timestamp, expense_date),
              sync_dismissed = FALSE
-         WHERE id = $7`,
-        [amount, description, payerMemberId, chapterId, eventId || null, categoryId || null, id]
+         WHERE id = $8`,
+        [amount, description, payerMemberId, chapterId, eventId || null, categoryId || null, expenseDate || null, id]
       );
 
       await client.query("DELETE FROM expense_splits WHERE expense_id = $1", [id]);

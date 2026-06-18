@@ -2,36 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Reset password - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
-
+  <title>Reset Password - Hisaab-Kitaab</title>
+  <meta name="description" content="Reset your Hisaab-Kitaab account password.">
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%237C3AED' font-family='Arial,sans-serif'>&#8377;</text></svg>">
+  
+  <!-- Design System — load order matters -->
   <link rel="stylesheet" href="css/tokens.css">
-<link rel="stylesheet" href="css/reset.css">
-<link rel="stylesheet" href="css/global.css">
-<link rel="stylesheet" href="css/components/button.css">
-<link rel="stylesheet" href="css/components/form.css">
-<link rel="stylesheet" href="css/components/toast.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/auth-pages.css">
+  <link rel="stylesheet" href="css/layout/footer.css">
+  <link rel="stylesheet" href="css/pages/landing.css">
+  <link rel="stylesheet" href="css/pages/auth-flow.css">
+
+  <!-- Viewport -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Prevent FOUC on cold PWA launch -->
+  <style>
+    html, body { background-color: #09090B; -webkit-tap-highlight-color: transparent; }
+  </style>
+
+  <!-- Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
         as="style"
         onload="this.onload=null;this.rel='stylesheet'">
   <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   </noscript>
 
-  <!-- ── AUTH REDIRECT GUARD ──────────────────────────────────────
-       Synchronous check before first paint. Logged-in users are
-       redirected to dashboard without ever seeing the forgot page.
-  ──────────────────────────────────────────────────────────────── -->
+  <!-- AUTH REDIRECT GUARD -->
   <script>
     (function() {
       try {
@@ -48,82 +52,265 @@
       } catch(e) {}
     })();
   </script>
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
-<body>
+<body class="landing-page">
+
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  <div class="bubble-container">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  <!-- Ambient glow -->
+  <div class="landing-glow" aria-hidden="true"></div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- App loader -->
+  <div id="app-loader" role="status" aria-label="Loading Hisaab-Kitaab">
+    <div class="loader-logo" aria-hidden="true">₹</div>
+    <div class="loader-spinner" aria-hidden="true"></div>
   </div>
 
-  <div class="brand-header">
-    <h1>Hisaab-Kitaab</h1>
-    <p>Your way of handling expenses</p>
-  </div>
-
-  <main id="main-content">
-    <div class="auth-wrapper">
-      <section class="auth-card">
-        <h1 class="auth-title">Reset Password</h1>
-        <p class="auth-subtitle">Enter your email to receive a reset code</p>
-
-        <form id="forgot-form">
-          <label>
-            Email
-            <input type="email" name="email" required autocomplete="email" placeholder="john@example.com">
-          </label>
-
-          <button type="submit" class="btn-primary">
-            Send Reset OTP
-          </button>
-        </form>
-
-        <div id="reset-step" hidden>
-          <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-          <p style="margin-bottom: 15px; color: #666; font-size: 0.9rem;">OTP sent! Check your inbox.</p>
+  <main id="main-content" class="landing-main" style="justify-content: center; align-items: center; padding: var(--s-6) 0;">
+    <section class="landing-auth-panel" aria-labelledby="auth-card-title" style="width: 100%; max-width: 440px; margin: 0 auto;">
+      
+      <div class="landing-card auth-card">
+        <div class="landing-card-header">
+          <!-- Mini brand -->
+          <div class="landing-card-mobile-brand" aria-hidden="true">
+            <div class="landing-card-mobile-logo">₹</div>
+            <span class="landing-card-mobile-name">Hisaab-Kitaab</span>
+          </div>
           
-          <form id="reset-form">
-            <label>
-              OTP
-              <input type="text" name="otp" required placeholder="123456" inputmode="numeric" pattern="[0-9]*">
-            </label>
-
-            <label>
-              New password
-              <div class="password-wrapper">
-                <input type="password" name="newPassword" required autocomplete="new-password" placeholder="••••••••">
-                <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">👁️</button>
-              </div>
-              <small class="password-hint">Password must be at least 8 characters</small>
-            </label>
-
-            <button type="submit" class="btn-primary">
-              Reset Password
-            </button>
-          </form>
+          <h2 id="auth-card-title" class="landing-card-title" style="font-size: var(--text-xl); margin: 0;">Reset Password</h2>
         </div>
 
-        <p style="margin-top: 20px; font-size: 0.9rem; color: #666;">
-          Remembered it? <a href="login.html">Back to login</a>
-        </p>
-      </section>
-    </div>
+        <div class="landing-card-body">
+          
+          <!-- Step 1: Send Reset OTP -->
+          <form id="forgot-form">
+            <p class="auth-subtitle">Enter your email address to receive a secure password reset verification code.</p>
+
+            <label>
+              Email Address
+              <input type="email" name="email" required autocomplete="email" placeholder="john@example.com">
+            </label>
+
+            <button type="submit" class="btn-primary" style="margin-top: var(--s-3);">
+              <span>Send Reset OTP</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+
+            <p class="auth-fine-print">
+              Remembered your password? <a href="login.html">Back to login</a>
+            </p>
+          </form>
+
+          <!-- Step 2: Verification and Reset password (initially hidden) -->
+          <div id="reset-step" hidden>
+            <p class="auth-subtitle" style="color: var(--positive); font-weight: var(--weight-medium); display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              Verification code sent to your email.
+            </p>
+            
+            <form id="reset-form">
+              <label style="margin-bottom: 0;">
+                Enter 6-digit Code
+                <!-- Real hidden input used by standard JS -->
+                <input type="text"
+                  name="otp"
+                  id="input-otp"
+                  class="hidden-otp-val"
+                  inputmode="numeric"
+                  pattern="[0-9]{6}"
+                  autocomplete="one-time-code"
+                  maxlength="6">
+                
+                <!-- Visual 6-cell grid -->
+                <div class="otp-cells-container">
+                  <input type="text" class="otp-cell" maxlength="1" inputmode="numeric" pattern="[0-9]*" aria-label="Digit 1">
+                  <input type="text" class="otp-cell" maxlength="1" inputmode="numeric" pattern="[0-9]*" aria-label="Digit 2">
+                  <input type="text" class="otp-cell" maxlength="1" inputmode="numeric" pattern="[0-9]*" aria-label="Digit 3">
+                  <input type="text" class="otp-cell" maxlength="1" inputmode="numeric" pattern="[0-9]*" aria-label="Digit 4">
+                  <input type="text" class="otp-cell" maxlength="1" inputmode="numeric" pattern="[0-9]*" aria-label="Digit 5">
+                  <input type="text" class="otp-cell" maxlength="1" inputmode="numeric" pattern="[0-9]*" aria-label="Digit 6">
+                </div>
+              </label>
+
+              <label style="margin-bottom: var(--s-3);">
+                New Password
+                <div class="password-wrapper">
+                  <input type="password" name="newPassword" required autocomplete="new-password" placeholder="••••••••">
+                  <button type="button" class="btn-toggle-pass" tabindex="-1" aria-label="Toggle password visibility">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
+                </div>
+              </label>
+
+              <!-- Real-time Password Strength Meter -->
+              <div class="pwd-strength-container">
+                <div class="pwd-strength-bar-track">
+                  <div class="pwd-strength-bar-fill"></div>
+                </div>
+                <span class="pwd-strength-label"></span>
+              </div>
+
+              <p class="password-hint" style="font-size: var(--text-xs); color: var(--text-muted); margin-bottom: var(--s-5);">Must be at least 8 characters</p>
+
+              <button type="submit" class="btn-primary">Reset Password</button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
   </main>
 
-
-
-  <!-- ADD THIS as the first script in every HTML file, before any other scripts -->
-<script src="js/core/storage.js"></script>
-<script src="js/core/sanitize.js"></script>
+  <!-- Shared core scripts -->
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/sanitize.js"></script>
   <script src="js/core/csrf.js"></script>
   <script src="js/core/session.js"></script>
-
   <script src="js/main.js"></script>
-  <!-- In login.html, REPLACE the large inline <script> block with: -->
-<script src="js/pages/forgot-page.js"></script>
+  <script src="js/pages/forgot-page.js"></script>
 
- 
+  <!-- Shared Auth Helper Script for 6-cell OTP grid & strength meter -->
+  <script>
+    // Real-time password strength meter script
+    document.addEventListener('input', (e) => {
+      if (e.target.type === 'password' && e.target.name === 'newPassword') {
+        const pwd = e.target.value;
+        const bar = document.querySelector('.pwd-strength-bar-fill');
+        const label = document.querySelector('.pwd-strength-label');
+        if (!bar || !label) return;
 
+        if (!pwd) {
+          bar.className = 'pwd-strength-bar-fill';
+          label.textContent = '';
+          return;
+        }
+
+        let score = 0;
+        if (pwd.length >= 8) score++;
+        if (/[A-Z]/.test(pwd)) score++;
+        if (/[0-9]/.test(pwd)) score++;
+        if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+        if (pwd.length < 8) {
+          bar.className = 'pwd-strength-bar-fill weak';
+          label.textContent = 'Too short';
+          label.style.color = 'var(--negative)';
+        } else if (score < 3) {
+          bar.className = 'pwd-strength-bar-fill medium';
+          label.textContent = 'Medium strength';
+          label.style.color = 'var(--warning)';
+        } else {
+          bar.className = 'pwd-strength-bar-fill strong';
+          label.textContent = 'Strong password';
+          label.style.color = 'var(--positive)';
+        }
+      }
+    });
+
+    // Delegated OTP Cell Grid Inputs Sync
+    document.addEventListener('input', (e) => {
+      if (e.target.classList.contains('otp-cell')) {
+        const container = e.target.closest('.otp-cells-container');
+        if (!container) return;
+        const cells = Array.from(container.querySelectorAll('.otp-cell'));
+        const idx = cells.indexOf(e.target);
+        
+        e.target.value = e.target.value.replace(/\D/g, '');
+        
+        let val = '';
+        cells.forEach(c => val += c.value);
+        
+        const hiddenInput = document.getElementById('input-otp');
+        if (hiddenInput) {
+          hiddenInput.value = val;
+          hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        if (e.target.value && idx < cells.length - 1) {
+          cells[idx + 1].focus();
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.classList.contains('otp-cell')) {
+        if (e.key === 'Backspace' && !e.target.value) {
+          const container = e.target.closest('.otp-cells-container');
+          if (!container) return;
+          const cells = Array.from(container.querySelectorAll('.otp-cell'));
+          const idx = cells.indexOf(e.target);
+          if (idx > 0) {
+            cells[idx - 1].focus();
+            cells[idx - 1].value = '';
+            
+            let val = '';
+            cells.forEach(c => val += c.value);
+            const hiddenInput = document.getElementById('input-otp');
+            if (hiddenInput) {
+              hiddenInput.value = val;
+              hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        }
+      }
+    });
+
+    document.addEventListener('paste', (e) => {
+      if (e.target.classList.contains('otp-cell')) {
+        const container = e.target.closest('.otp-cells-container');
+        if (!container) return;
+        const cells = Array.from(container.querySelectorAll('.otp-cell'));
+        
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+        if (text) {
+          for (let i = 0; i < cells.length; i++) {
+            cells[i].value = text[i] || '';
+          }
+          const hiddenInput = document.getElementById('input-otp');
+          if (hiddenInput) {
+            hiddenInput.value = text;
+            hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          const focusIdx = Math.min(text.length, cells.length - 1);
+          cells[focusIdx].focus();
+        }
+      }
+    });
+
+    document.addEventListener('focusin', (e) => {
+      if (e.target.id === 'input-otp') {
+        const container = document.querySelector('.otp-cells-container');
+        if (container) {
+          const cells = container.querySelectorAll('.otp-cell');
+          let focused = false;
+          for (let i = 0; i < cells.length; i++) {
+            if (!cells[i].value) {
+              cells[i].focus();
+              focused = true;
+              break;
+            }
+          }
+          if (!focused && cells.length > 0) {
+            cells[cells.length - 1].focus();
+          }
+        }
+      }
+    });
+  </script>
 </body>
 </html>

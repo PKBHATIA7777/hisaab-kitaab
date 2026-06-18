@@ -1,0 +1,193 @@
+/* ================================================================
+   HISAAB-KITAAB — css/components/command-palette.css
+   Command Palette (Cmd+K / Ctrl+K) modal UI styles.
+   ================================================================ */
+
+.cmd-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay, rgba(0, 0, 0, 0.7));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: var(--z-modal, 300);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px var(--s-4) var(--s-4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast, 0.15s) var(--ease);
+}
+
+.cmd-palette-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cmd-palette {
+  width: 100%;
+  max-width: 540px;
+  background: var(--bg-elevated, #18181B);
+  border: 1px solid var(--bg-glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-2xl);
+  overflow: hidden;
+  transform: translateY(-20px) scale(0.98);
+  transition: transform var(--dur-normal, 0.25s) var(--ease);
+}
+
+.cmd-palette-overlay.is-open .cmd-palette {
+  transform: translateY(0) scale(1);
+}
+
+/* Input Search bar */
+.cmd-palette-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--bg-glass-border);
+}
+
+.cmd-palette-search svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-on-dark-3);
+  flex-shrink: 0;
+}
+
+.cmd-palette-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  font-size: var(--text-base);
+  color: var(--text-on-dark);
+}
+
+.cmd-palette-input::placeholder {
+  color: var(--text-on-dark-3);
+}
+
+/* List Results */
+.cmd-palette-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--s-2) 0;
+}
+
+.cmd-palette-group-title {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-on-dark-3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: var(--s-3) var(--s-5) var(--s-1);
+}
+
+.cmd-palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) var(--s-5);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  color: var(--text-on-dark-2);
+  transition: all var(--dur-fast) var(--ease);
+  gap: var(--s-3);
+}
+
+.cmd-palette-item.is-selected,
+.cmd-palette-item:hover {
+  background: var(--bg-elevated-2, #27272A);
+  color: var(--text-on-dark);
+}
+
+.cmd-palette-item-left {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.cmd-palette-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-on-dark-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cmd-palette-item.is-selected .cmd-palette-item-icon {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.cmd-palette-item-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.5;
+}
+
+.cmd-palette-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Shortcut badge hint */
+.cmd-palette-shortcut {
+  font-size: var(--text-2xs);
+  color: var(--text-on-dark-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--s-0h) var(--s-1h);
+  border-radius: var(--r-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Empty state */
+.cmd-palette-empty {
+  padding: var(--s-6) var(--s-5);
+  text-align: center;
+  color: var(--text-on-dark-3);
+  font-size: var(--text-sm);
+}
+
+/* Footer / Tips */
+.cmd-palette-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--bg-glass-border);
+  font-size: var(--text-2xs);
+  color: var(--text-on-dark-3);
+}
+
+.cmd-palette-tip-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.cmd-palette-kbd {
+  font-family: inherit;
+  font-size: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 1px 3px;
+  border-radius: 3px;
+}

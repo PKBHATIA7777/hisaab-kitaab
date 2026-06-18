@@ -1,31 +1,459 @@
-/* Static pages: about, privacy */
+/* ================================================================
+   HISAAB-KITAAB — auth-pages.css
+   Shared styles for ALL auth pages:
+     index.html, login.html, signup.html,
+     forgot.html, set-password.html, success.html
+   Also covers: about.html, privacy.html (static pages).
+
+   This file is ONLY loaded on auth/static pages.
+   It does NOT apply to dashboard.html or chapter.html.
+   ================================================================ */
+
+/* ── PAGE BASE ────────────────────────────────────────────────────── */
+/* Auth pages sit on a dark background with white floating cards */
+html, body {
+  background-color: var(--bg-app);
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── BUBBLE CONTAINER (removed — replaced by landing.css glow) ────── */
+/* Kept as an empty rule for backward compat; new pages use landing.css */
+.bubble-container { display: none; }
+.bubble           { display: none; }
+
+/* ── BRAND HEADER (top of auth pages, mobile) ─────────────────────── */
+/* Only shown on pages that still use it (login, signup, forgot, etc.) */
+.brand-header {
+  text-align: center;
+  padding: var(--s-12) var(--s-5) var(--s-5);
+  position: relative;
+  z-index: 1;
+}
+.brand-header h1 {
+  font-size: clamp(var(--text-2xl), 5vw, var(--text-3xl));
+  font-weight: var(--weight-bold);
+  color: var(--text-on-dark);
+  margin: 0 0 var(--s-1);
+  letter-spacing: -0.6px;
+  line-height: var(--leading-tight);
+}
+.brand-header p {
+  font-size: var(--text-sm);
+  color: var(--text-on-dark-2);
+  margin: 0;
+}
+
+/* ── AUTH LAYOUT ──────────────────────────────────────────────────── */
+.auth-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--s-4) var(--s-10);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-card {
+  background: var(--surface);
+  border-radius: var(--r-2xl);
+  padding: var(--s-8) var(--s-7);
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow-2xl);
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: var(--s-6) var(--s-5);
+    border-radius: var(--r-xl);
+  }
+}
+
+/* ── AUTH TYPOGRAPHY ──────────────────────────────────────────────── */
+.auth-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--s-1);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.5px;
+}
+
+.auth-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--s-6);
+  line-height: var(--leading-normal);
+}
+
+/* ── FORM: Labels & Inputs ────────────────────────────────────────── */
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  margin-bottom: var(--s-4);
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.auth-card label input[type="email"],
+.auth-card label input[type="password"],
+.auth-card label input[type="text"],
+.auth-card label input[type="tel"] {
+  width: 100%;
+  height: var(--input-height);
+  padding: 0 var(--s-4);
+  border: var(--input-border);
+  border-radius: var(--input-radius);
+  font-size: var(--text-base);   /* 16px — prevents iOS auto-zoom */
+  font-family: var(--font);
+  font-weight: var(--weight-normal);
+  color: var(--text-primary);
+  background: var(--input-bg);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow   var(--dur-fast) var(--ease),
+    background   var(--dur-fast) var(--ease);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.auth-card label input:focus {
+  border: var(--input-border-focus);
+  background: var(--input-bg-focus);
+  box-shadow: var(--input-shadow-focus);
+}
+
+.auth-card label input::placeholder {
+  color: var(--text-muted);
+  font-weight: var(--weight-normal);
+}
+
+/* Error state */
+.auth-card label input.input-invalid {
+  border-color: var(--negative) !important;
+  box-shadow: 0 0 0 3px var(--negative-bg) !important;
+}
+
+/* ── PASSWORD WRAPPER ─────────────────────────────────────────────── */
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper input {
+  padding-right: 50px !important;
+}
+
+.btn-toggle-pass {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 48px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease);
+  border-radius: 0 var(--input-radius) var(--input-radius) 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-toggle-pass:hover { color: var(--text-secondary); }
+
+/* SVG eye icon inside toggle button */
+.btn-toggle-pass svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* ── BUTTONS ──────────────────────────────────────────────────────── */
+/* These are the auth-page button variants.
+   Class names kept exactly the same for HTML compatibility. */
+
+/* Primary: full-width brand CTA */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  width: 100%;
+  height: 50px;
+  padding: 0 var(--s-5);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+  color: #fff;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  font-family: var(--font);
+  border: none;
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  letter-spacing: -0.2px;
+  box-shadow: var(--brand-glow-sm);
+  margin-bottom: var(--s-1);
+  transition:
+    filter       var(--dur-fast) var(--ease),
+    transform    var(--dur-fast) var(--ease),
+    box-shadow   var(--dur-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: var(--brand-glow);
+  opacity: 1;
+}
+.btn-primary:active  { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.50; cursor: not-allowed; pointer-events: none; }
+
+/* Primary loading state */
+.btn-primary.is-loading {
+  color: transparent;
+  pointer-events: none;
+  position: relative;
+}
+.btn-primary.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px; height: 20px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Secondary: outlined */
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--s-5);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-family: var(--font);
+  border: 1.5px solid var(--surface-border-strong);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  margin-top: var(--s-2);
+  transition:
+    background     var(--dur-fast) var(--ease),
+    border-color   var(--dur-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
+}
+.btn-secondary:hover { background: var(--surface-alt); border-color: var(--text-muted); opacity: 1; }
+.btn-secondary:active { transform: scale(0.98); }
+
+/* Outline: same as secondary (legacy compat) */
+.btn-outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--s-5);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-family: var(--font);
+  border: 1.5px solid var(--surface-border-strong);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  margin-top: var(--s-2);
+  transition: background var(--dur-fast) var(--ease);
+}
+.btn-outline:hover { background: var(--surface-alt); }
+
+/* Back ghost: small back button in card header */
+.btn-back-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-family: var(--font);
+  cursor: pointer;
+  padding: var(--s-1) 0;
+  margin-bottom: var(--s-3);
+  transition: color var(--dur-fast) var(--ease);
+}
+.btn-back-ghost:hover { color: var(--text-primary); }
+
+/* Text / link style button */
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-family: var(--font);
+  cursor: pointer;
+  padding: var(--s-1) 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.btn-text:hover { opacity: 0.75; }
+
+/* Link-purple: inline link button (legacy class name) */
+.btn-link-purple {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-family: var(--font);
+  cursor: pointer;
+  padding: var(--s-1) 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.btn-link-purple:hover { opacity: 0.75; }
+
+/* ── DIVIDER (inside auth cards) ──────────────────────────────────── */
+/* Override global .divider for light card context */
+.auth-card .divider {
+  margin: var(--s-5) 0;
+  color: var(--text-muted);
+}
+.auth-card .divider::before,
+.auth-card .divider::after {
+  background: var(--surface-border-strong);
+}
+
+/* ── GOOGLE SIGN-IN WRAPPER ───────────────────────────────────────── */
+.g-signin-wrap {
+  display: flex;
+  justify-content: center;
+  margin: var(--s-4) 0;
+  min-height: 44px;
+}
+.g_id_signin {
+  width: 100%;
+}
+
+/* ── FINE PRINT ───────────────────────────────────────────────────── */
+.auth-fine-print,
+.auth-card > p:last-child {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: var(--s-4);
+  line-height: var(--leading-relaxed);
+}
+.auth-fine-print a,
+.auth-card > p:last-child a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.auth-fine-print a:hover,
+.auth-card > p:last-child a:hover {
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+/* ── STATIC PAGES (about.html, privacy.html) ──────────────────────── */
 .content-wrapper {
-  max-width: 900px;
-  margin: 40px auto;
-  padding: 0 20px;
+  max-width: 860px;
+  margin: var(--s-10) auto;
+  padding: 0 var(--s-5);
   position: relative;
 }
 .glass-card {
-  background: rgba(255,255,255,0.95);
+  background: var(--surface);
   border-radius: var(--r-xl);
   padding: var(--s-10);
   box-shadow: var(--shadow-xl);
   margin-bottom: var(--s-10);
+  border: 1px solid var(--surface-border);
 }
-.glass-card h1 { font-size: 2.2rem; color: #000; margin-bottom: var(--s-1); }
-.glass-card h2 { font-size: 1.3rem; color: var(--brand); margin: var(--s-8) 0 var(--s-3); }
-.glass-card p  { font-size: 1rem; line-height: 1.7; color: #444; margin-bottom: var(--s-3); }
-.feature-grid  {
+.glass-card h1 {
+  font-size: var(--text-3xl);
+  color: var(--text-primary);
+  margin-bottom: var(--s-1);
+  letter-spacing: -0.6px;
+  font-weight: var(--weight-bold);
+}
+.glass-card h2 {
+  font-size: var(--text-xl);
+  color: var(--brand);
+  margin: var(--s-8) 0 var(--s-3);
+  font-weight: var(--weight-semibold);
+}
+.glass-card p {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+  margin-bottom: var(--s-3);
+}
+.feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--s-5);
   margin-top: var(--s-8);
 }
 .feature-item {
-  background: #f9f9f9;
+  background: var(--surface-alt);
   padding: var(--s-5);
   border-radius: var(--r-md);
   text-align: center;
-  border: 1px solid #eee;
+  border: 1px solid var(--surface-border);
 }
-.back-nav { margin-bottom: var(--s-5); display: inline-block; }
+.back-nav {
+  margin-bottom: var(--s-5);
+  display: inline-block;
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  background: var(--brand-light);
+  color: var(--brand);
+  margin-bottom: var(--s-4);
+}
+.feature-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.5;
+  stroke: currentColor;
+}
+.feature-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--s-2);
+  display: block;
+}
+.feature-item p {
+  font-size: var(--text-sm) !important;
+  color: var(--text-secondary);
+  margin-bottom: 0 !important;
+  line-height: var(--leading-relaxed);
+}

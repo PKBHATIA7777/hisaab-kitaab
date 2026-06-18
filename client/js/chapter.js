@@ -21,6 +21,7 @@ let _state = {
   offset: 0,
   total: 0,
   hasMore: false,
+  isLoadingMore: false,
 };
 
 const PAGE_SIZE = 50;
@@ -77,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.currentMembers = chapterData.members;
 
     _renderChapterInfo();
+    _initInfiniteScroll();
 
     // Parallel secondary data
     await Promise.all([
@@ -304,6 +306,32 @@ async function _loadExpenses(append = false) {
 // Expose for feature scripts
 window.loadExpenses = (append) => _loadExpenses(append);
 
+function _getRelativeDateLabel(dateStr) {
+  if (!dateStr) return 'Unknown Date';
+  const d = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const yestDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+  if (dDate.getTime() === todayDate.getTime()) {
+    return 'Today';
+  }
+  if (dDate.getTime() === yestDate.getTime()) {
+    return 'Yesterday';
+  }
+
+  const diffDays = Math.round((todayDate.getTime() - dDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays > 0 && diffDays < 7) {
+    return 'This Week';
+  }
+
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 function _renderExpenses() {
   const list = document.getElementById('expense-list');
   if (!list) return;
@@ -325,7 +353,17 @@ function _renderExpenses() {
   }
   if (empty) empty.style.display = 'none';
 
+  let lastGroupLabel = null;
+
   for (const ex of _state.expenses) {
+    const groupLabel = _getRelativeDateLabel(ex.expense_date);
+    if (groupLabel !== lastGroupLabel) {
+      const header = document.createElement('div');
+      header.className = 'expense-group-header';
+      header.textContent = groupLabel;
+      list.appendChild(header);
+      lastGroupLabel = groupLabel;
+    }
     list.appendChild(_buildExpenseCard(ex));
   }
 }
@@ -333,12 +371,123 @@ function _renderExpenses() {
 // Expose for feature scripts (feature-categories patches this)
 window.renderExpenses = _renderExpenses;
 
+function _openContextMenu(e, ex) {
+  // Remove any existing context menus
+  document.querySelectorAll('.context-menu-overlay').forEach(el => el.remove());
+
+  const x = e.clientX || (e.touches && e.touches[0]?.clientX) || (e.changedTouches && e.changedTouches[0]?.clientX) || 100;
+  const y = e.clientY || (e.touches && e.touches[0]?.clientY) || (e.changedTouches && e.changedTouches[0]?.clientY) || 100;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'context-menu-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-dropdown);
+    background: transparent;
+  `;
+
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  menu.style.cssText = `
+    position: absolute;
+    left: ${Math.min(x, window.innerWidth - 180)}px;
+    top: ${Math.min(y, window.innerHeight - 150)}px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--bg-glass-border);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 160px;
+    overflow: hidden;
+    animation: contextMenuIn 0.15s ease-out;
+  `;
+
+  menu.innerHTML = `
+    <button class="context-menu-item" id="ctx-edit" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-on-dark-2);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
+      <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;"><use href="icons/sprite.svg#edit-2"></use></svg>
+      Edit Details
+    </button>
+    <button class="context-menu-item" id="ctx-duplicate" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-on-dark-2);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
+      <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;"><use href="icons/sprite.svg#copy"></use></svg>
+      Duplicate
+    </button>
+    <div style="height:1px;background:var(--bg-glass-border);margin:2px 0;"></div>
+    <button class="context-menu-item" id="ctx-delete" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--negative);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
+      <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;"><use href="icons/sprite.svg#trash-2"></use></svg>
+      Delete
+    </button>
+  `;
+
+  overlay.appendChild(menu);
+  document.body.appendChild(overlay);
+
+  if (!document.getElementById('ctx-menu-style')) {
+    const style = document.createElement('style');
+    style.id = 'ctx-menu-style';
+    style.textContent = `
+      .context-menu-item:hover {
+        background: var(--bg-elevated-2) !important;
+        color: var(--text-on-dark) !important;
+      }
+      @keyframes contextMenuIn {
+        from { opacity: 0; transform: scale(0.95) translateY(-5px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  overlay.addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    overlay.remove();
+  });
+
+  menu.querySelector('#ctx-edit').addEventListener('click', () => {
+    _openExpenseModal('edit', ex.id);
+  });
+
+  menu.querySelector('#ctx-duplicate').addEventListener('click', async () => {
+    try {
+      const payload = {
+        chapterId: _chapterId,
+        eventId: ex.event_id || null,
+        amount: parseFloat(ex.amount),
+        description: `${ex.description} (Copy)`,
+        payerMemberId: ex.payer_member_id || _state.members[0]?.id,
+        involvedMemberIds: _state.members.map(m => m.id),
+        categoryId: ex.category_id || null,
+      };
+      await apiFetch('/expenses', { method: 'POST', body: payload });
+      showToast('Expense duplicated!', 'success');
+      await _loadExpenses();
+    } catch (err) {
+      showToast('Failed to duplicate expense', 'error');
+    }
+  });
+
+  menu.querySelector('#ctx-delete').addEventListener('click', async () => {
+    const confirmed = await _confirmDialog('Delete this expense?', 'This cannot be undone.');
+    if (!confirmed) return;
+    try {
+      await apiFetch(`/expenses/${ex.id}`, { method: 'DELETE' });
+      showToast('Expense deleted', 'success');
+      await _loadExpenses();
+    } catch (err) {
+      showToast('Failed to delete expense', 'error');
+    }
+  });
+}
+
 function _buildExpenseCard(ex) {
   const card = document.createElement('div');
   card.className = 'expense-card' + (ex.isTemp ? ' expense-card--temp' : '');
   card.dataset.expenseId = ex.id;
 
-  const icon = ex.category_icon || '💰';
+  const categoryColor = ex.category_color || '#C9C9C9';
+  const categoryName = ex.category_name || 'Other';
+  const svgHtml = window.getCategoryIconSvg ? window.getCategoryIconSvg(categoryName) : '💰';
+
   const name = escapeHTML(ex.description || 'Untitled');
   const payer = escapeHTML(ex.payer_name || 'Unknown');
   const amount = `₹${parseFloat(ex.amount).toLocaleString('en-IN')}`;
@@ -349,26 +498,61 @@ function _buildExpenseCard(ex) {
   card.setAttribute('aria-label', `${name}, paid by ${payer}, ${amount}`);
 
   card.innerHTML = `
-    <div class="expense-icon">${icon}</div>
+    <div class="expense-icon" style="background: ${categoryColor}1a; color: ${categoryColor};">${svgHtml}</div>
     <div class="expense-info">
       <div class="expense-info__name">${name}</div>
       <div class="expense-info__meta"><strong>${payer}</strong> · ${when}</div>
     </div>
     <div class="expense-right">
       <div class="expense-amount">${amount}</div>
-      ${ex.isTemp ? '' : '<div class="expense-edit-hint" aria-hidden="true">Tap to edit</div>'}
     </div>
   `;
 
   if (!ex.isTemp) {
     card.setAttribute('tabindex', '0');
     card.setAttribute('role', 'button');
-    card.addEventListener('click', () => _openExpenseModal('edit', ex.id));
+    
+    // Normal tap triggers edit modal
+    card.addEventListener('click', () => {
+      if (card.dataset.preventClick === 'true') {
+        card.removeAttribute('data-prevent-click');
+        return;
+      }
+      _openExpenseModal('edit', ex.id);
+    });
+
     card.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         _openExpenseModal('edit', ex.id);
       }
+    });
+
+    // Touch Long-press on Mobile
+    let touchTimer = null;
+    let didLongPress = false;
+
+    card.addEventListener('touchstart', (e) => {
+      didLongPress = false;
+      touchTimer = setTimeout(() => {
+        didLongPress = true;
+        card.dataset.preventClick = 'true';
+        _openContextMenu(e, ex);
+      }, 700);
+    }, { passive: true });
+
+    card.addEventListener('touchend', () => {
+      clearTimeout(touchTimer);
+    });
+
+    card.addEventListener('touchmove', () => {
+      clearTimeout(touchTimer);
+    });
+
+    // Right-click desktop context menu
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      _openContextMenu(e, ex);
     });
   }
 
@@ -376,21 +560,51 @@ function _buildExpenseCard(ex) {
 }
 
 function _renderLoadMore() {
+  const sentinel = document.getElementById('infinite-scroll-sentinel');
+  if (!sentinel) return;
+  if (_state.hasMore) {
+    sentinel.style.display = 'flex';
+  } else {
+    sentinel.style.display = 'none';
+  }
+}
+
+let _infiniteScrollObserver = null;
+function _initInfiniteScroll() {
   const container = document.getElementById('load-more-container');
   if (!container) return;
-  container.innerHTML = '';
-  if (!_state.hasMore) return;
+  
+  container.innerHTML = `
+    <div id="infinite-scroll-sentinel" style="height: 50px; display: none; align-items: center; justify-content: center; font-size: var(--text-xs); color: var(--text-on-dark-3); gap: 8px; margin-top: 16px;">
+      <div class="spinner spinner--dark" style="width: 14px; height: 14px;"></div>
+      <span>Loading more expenses...</span>
+    </div>
+  `;
+  
+  const sentinel = container.querySelector('#infinite-scroll-sentinel');
+  if (!sentinel) return;
 
-  const btn = document.createElement('button');
-  btn.className = 'btn-load-more';
-  btn.textContent = 'Load more expenses';
-  btn.addEventListener('click', async () => {
-    btn.disabled = true;
-    btn.textContent = 'Loading…';
-    _state.offset += PAGE_SIZE;
-    await _loadExpenses(true);
-  });
-  container.appendChild(btn);
+  if (_infiniteScrollObserver) {
+    _infiniteScrollObserver.disconnect();
+  }
+
+  _infiniteScrollObserver = new IntersectionObserver(async (entries) => {
+    const entry = entries[0];
+    if (entry.isIntersecting && _state.hasMore && !_state.isLoadingMore) {
+      _state.isLoadingMore = true;
+      sentinel.style.display = 'flex';
+      _state.offset += PAGE_SIZE;
+      try {
+        await _loadExpenses(true);
+      } catch (err) {
+        console.error('Failed to load more expenses via infinite scroll:', err);
+      } finally {
+        _state.isLoadingMore = false;
+      }
+    }
+  }, { rootMargin: '200px' });
+
+  _infiniteScrollObserver.observe(sentinel);
 }
 
 /* =============================================
@@ -415,19 +629,9 @@ async function _loadHeroSettlements(force = false) {
 
 function _renderHeroSettlements(settlements) {
   const listEl = document.getElementById('hero-settlement-list');
-  const content = document.getElementById('hero-settlement-body');
-  const btn = document.getElementById('hero-expand-btn');
 
   if (!listEl) return;
   listEl.setAttribute('role', 'list');
-
-  // Auto-expand if there are settlements, unless user explicitly closed it
-  const wasExplicitlyClosed = sessionStorage.getItem(_SETTLE_EXPAND_KEY) === '0';
-  if (settlements.length > 0 && !wasExplicitlyClosed && content) {
-    content.classList.add('is-open');
-    btn?.classList.add('is-open');
-    document.getElementById('hero-settlement-header')?.classList.add('is-open');
-  }
 
   if (!settlements.length) {
     listEl.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.5);font-size:var(--text-sm);">🎉 All settled up!</div>';
@@ -463,19 +667,6 @@ function _renderHeroSettlements(settlements) {
 // Expose for feature scripts
 window.loadHeroSettlements = (force) => _loadHeroSettlements(force);
 window.renderHeroSettlements = _renderHeroSettlements;
-
-// Toggle collapse
-document.getElementById('hero-settlement-header')?.addEventListener('click', (e) => {
-  if (e.target.closest('.icon-btn-sm') && !e.target.closest('#hero-expand-btn')) return;
-  const body = document.getElementById('hero-settlement-body');
-  const btn = document.getElementById('hero-expand-btn');
-  const header = document.getElementById('hero-settlement-header');
-  body?.classList.toggle('is-open');
-  btn?.classList.toggle('is-open');
-  header?.classList.toggle('is-open');
-  // Persist expand/collapse preference for this chapter
-  sessionStorage.setItem(_SETTLE_EXPAND_KEY, body?.classList.contains('is-open') ? '1' : '0');
-});
 
 // Refresh settlements button
 window.refreshSettlements = debounce(async () => { await _loadHeroSettlements(true); showToast('Refreshed', 'info'); }, 1000);
@@ -532,6 +723,13 @@ async function _openExpenseModal(mode, expenseId) {
           value="${isEdit ? escapeHTML(existingExpense?.description || '') : ''}">
       </div>
 
+      <!-- Date Picker -->
+      <div class="form-group" style="margin:0">
+        <label class="form-label" for="exp-date">Date</label>
+        <input type="date" id="exp-date" name="expenseDate" class="form-input" required
+          value="${isEdit ? (existingExpense?.expense_date ? new Date(existingExpense.expense_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0]}">
+      </div>
+
       <!-- Category row injected by feature-categories.js -->
       <div id="expense-category-inject"></div>
 
@@ -552,8 +750,13 @@ async function _openExpenseModal(mode, expenseId) {
 
       <!-- Actions -->
       <div class="sheet-actions">
-        <button type="submit" class="btn-save-expense" id="exp-save">${isEdit ? 'Update Expense' : 'Save Expense'}</button>
-        ${isEdit ? '<button type="button" class="btn-delete-expense" id="exp-delete">Delete</button>' : ''}
+        ${isEdit ? `
+          <button type="submit" class="btn-save-expense" id="exp-save">Update Expense</button>
+          <button type="button" class="btn-delete-expense" id="exp-delete">Delete</button>
+        ` : `
+          <button type="submit" class="btn-save-expense" id="exp-save-close">Save & Close</button>
+          <button type="button" class="btn btn--secondary" id="exp-save-another" style="background: var(--surface-alt); color: var(--text-primary); border: 1px solid var(--surface-border);">Save & Add Another</button>
+        `}
       </div>
     </form>
   `, { type: 'bottom' });
@@ -587,12 +790,23 @@ async function _openExpenseModal(mode, expenseId) {
     });
   }
 
+  // Hook save & add another trigger
+  if (!isEdit) {
+    overlay.querySelector('#exp-save-another')?.addEventListener('click', () => {
+      window._addAnother = true;
+      overlay.querySelector('#expense-form').requestSubmit();
+    });
+  }
+
   // Emit for feature scripts to inject category selector
   EventBus.emit('expense:modal:open', { mode, expense: existingExpense });
 
   // Submit
   overlay.querySelector('#expense-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const addAnother = window._addAnother || false;
+    window._addAnother = false; // Reset immediately
 
     const rawAmount = overlay.querySelector('#exp-amount').value;
     const amount = parseFloat(String(rawAmount).replace(/,/g, '').trim());
@@ -602,6 +816,8 @@ async function _openExpenseModal(mode, expenseId) {
     }
 
     const description = overlay.querySelector('#exp-desc').value.trim();
+    const expenseDateVal = overlay.querySelector('#exp-date').value;
+    const expenseDate = expenseDateVal ? new Date(expenseDateVal).toISOString() : null;
     const payerInput = overlay.querySelector('input[name="payerMemberId"]:checked');
     const payerId = payerInput ? parseInt(payerInput.value) : _state.members[0]?.id;
     const splitIds = [...overlay.querySelectorAll('.split-row.is-selected')].map(r => parseInt(r.dataset.memberId));
@@ -611,7 +827,7 @@ async function _openExpenseModal(mode, expenseId) {
     const categoryId = window._pendingCategoryId ?? null;
     window._pendingCategoryId = undefined;
 
-    const btn = overlay.querySelector('#exp-save');
+    const btn = isEdit ? overlay.querySelector('#exp-save') : overlay.querySelector('#exp-save-close');
     btn.classList.add('btn--loading'); btn.disabled = true;
 
     const payload = {
@@ -622,12 +838,14 @@ async function _openExpenseModal(mode, expenseId) {
       payerMemberId: payerId,
       involvedMemberIds: splitIds,
       categoryId,
+      expenseDate,
     };
 
     // Snapshot form state before any optimistic changes (used to restore on failure)
     const formSnapshot = {
       amount,
       description,
+      expenseDateVal,
       payerId,
       splitIds: [...splitIds],
       categoryId,
@@ -636,11 +854,13 @@ async function _openExpenseModal(mode, expenseId) {
     // Optimistic UI for add
     if (!isEdit) {
       const payer = _state.members.find(m => m.id === payerId);
-      const temp = { id: `temp-${Date.now()}`, amount, description, expense_date: new Date().toISOString(), payer_name: payer?.member_name, isTemp: true };
+      const temp = { id: `temp-${Date.now()}`, amount, description, expense_date: new Date(expenseDate || new Date()).toISOString(), payer_name: payer?.member_name, isTemp: true };
       _state.expenses.unshift(temp);
       window.expenses = _state.expenses;
       _renderExpenses();
-      ModalManager.close(overlay);
+      if (!addAnother) {
+        ModalManager.close(overlay);
+      }
     }
 
     try {
@@ -650,9 +870,22 @@ async function _openExpenseModal(mode, expenseId) {
         ModalManager.close(overlay);
       } else {
         await apiFetch('/expenses', { method: 'POST', body: payload });
+        showToast('Expense added!', 'success');
       }
       await _loadExpenses();
       EventBus.emit('expense:saved', { mode });
+
+      if (!isEdit && addAnother) {
+        // Reset form inputs for another save
+        const amountInput = overlay.querySelector('#exp-amount');
+        const descInput = overlay.querySelector('#exp-desc');
+        if (amountInput) amountInput.value = '';
+        if (descInput) descInput.value = '';
+        window._pendingCategoryId = null;
+        EventBus.emit('expense:modal:open', { mode: 'add', expense: null });
+        btn.classList.remove('btn--loading'); btn.disabled = false;
+        setTimeout(() => amountInput?.focus(), 50);
+      }
 
     } catch (err) {
       if (!isEdit) {
@@ -661,33 +894,37 @@ async function _openExpenseModal(mode, expenseId) {
         window.expenses = _state.expenses;
         _renderExpenses();
 
-        // Reopen modal and restore all form values from snapshot
-        ModalManager.open(overlay);
-        setTimeout(() => {
-          const amountInput = overlay.querySelector('#exp-amount');
-          const descInput = overlay.querySelector('#exp-desc');
-          if (amountInput) amountInput.value = formSnapshot.amount;
-          if (descInput) descInput.value = formSnapshot.description;
+        if (!addAnother) {
+          // Reopen modal and restore all form values from snapshot
+          ModalManager.open(overlay);
+          setTimeout(() => {
+            const amountInput = overlay.querySelector('#exp-amount');
+            const descInput = overlay.querySelector('#exp-desc');
+            const dateInput = overlay.querySelector('#exp-date');
+            if (amountInput) amountInput.value = formSnapshot.amount;
+            if (descInput) descInput.value = formSnapshot.description;
+            if (dateInput) dateInput.value = formSnapshot.expenseDateVal;
 
-          // Restore payer selection
-          overlay.querySelectorAll('.payer-chip').forEach(chip => {
-            const radio = chip.querySelector('input[type="radio"]');
-            const isSelected = radio && parseInt(radio.value) === formSnapshot.payerId;
-            chip.classList.toggle('is-selected', isSelected);
-            if (isSelected && radio) radio.checked = true;
-          });
+            // Restore payer selection
+            overlay.querySelectorAll('.payer-chip').forEach(chip => {
+              const radio = chip.querySelector('input[type="radio"]');
+              const isSelected = radio && parseInt(radio.value) === formSnapshot.payerId;
+              chip.classList.toggle('is-selected', isSelected);
+              if (isSelected && radio) radio.checked = true;
+            });
 
-          // Restore split selections
-          overlay.querySelectorAll('.split-row').forEach(row => {
-            const id = parseInt(row.dataset.memberId);
-            row.classList.toggle('is-selected', formSnapshot.splitIds.includes(id));
-          });
+            // Restore split selections
+            overlay.querySelectorAll('.split-row').forEach(row => {
+              const id = parseInt(row.dataset.memberId);
+              row.classList.toggle('is-selected', formSnapshot.splitIds.includes(id));
+            });
 
-          // Restore category
-          if (formSnapshot.categoryId) {
-            window._pendingCategoryId = formSnapshot.categoryId;
-          }
-        }, 50);
+            // Restore category
+            if (formSnapshot.categoryId) {
+              window._pendingCategoryId = formSnapshot.categoryId;
+            }
+          }, 50);
+        }
       }
       btn.classList.remove('btn--loading'); btn.disabled = false;
       showToast(err.message || 'Failed to save. Please try again.', 'error');

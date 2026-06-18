@@ -3,56 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <title>Welcome - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
+  <meta name="description" content="Welcome to Hisaab-Kitaab. Account successfully logged in.">
 
-  <link rel="stylesheet" href="css/base.css">
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%237C3AED' font-family='Arial,sans-serif'>&#8377;</text></svg>">
+
+  <!-- Design System — load order matters -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/auth-pages.css">
+  <link rel="stylesheet" href="css/layout/footer.css">
+  <link rel="stylesheet" href="css/pages/landing.css">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- Prevent FOUC on cold PWA launch -->
+  <style>
+    html, body { background-color: #09090B; -webkit-tap-highlight-color: transparent; }
+  </style>
+
+  <!-- Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
         as="style"
         onload="this.onload=null;this.rel='stylesheet'">
   <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   </noscript>
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
-<body>
+<body class="landing-page">
+
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  <div class="bubble-container">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-  </div>
+  <!-- Ambient glow -->
+  <div class="landing-glow" aria-hidden="true"></div>
 
-  <div class="brand-header">
-    <h1>Hisaab-Kitaab</h1>
-    <p>Your way of handling expenses</p>
-  </div>
+  <!-- Toast container -->
+  <div id="toast-container" role="region" aria-label="Notifications" aria-live="polite"></div>
 
-  <main id="main-content">
-    <div class="auth-wrapper">
-      <section class="auth-card">
-        <h1 class="auth-title" id="success-title">You are signed in</h1>
-        <p class="auth-subtitle" id="success-subtitle">
-          Welcome to Hisaab-Kitaab.
-        </p>
-
-        <div style="background: #f5f5f7; border-radius: 12px; padding: 20px; margin: 25px 0; color: #555; font-size: 0.9rem; line-height: 1.5;">
-          <strong>Note:</strong> Wait for a week time — development is currently in progress.
+  <main id="main-content" class="landing-main" style="justify-content: center; align-items: center; padding: var(--s-6) 0;">
+    <section class="landing-auth-panel" aria-labelledby="success-title" style="width: 100%; max-width: 440px; margin: 0 auto;">
+      
+      <div class="landing-card auth-card">
+        <div class="landing-card-header">
+          <!-- Mini brand -->
+          <div class="landing-card-mobile-brand" aria-hidden="true">
+            <div class="landing-card-mobile-logo">₹</div>
+            <span class="landing-card-mobile-name">Hisaab-Kitaab</span>
+          </div>
+          
+          <h2 class="landing-card-title" id="success-title" style="font-size: var(--text-xl); margin: 0;">You are signed in</h2>
         </div>
 
-        <button type="button" class="btn-secondary" id="logout-btn">
-          Log out
-        </button>
-      </section>
-    </div>
+        <div class="landing-card-body">
+          <p class="auth-subtitle" id="success-subtitle">
+            Welcome to Hisaab-Kitaab.
+          </p>
+
+          <div style="background: var(--surface-alt); border-radius: var(--r-md); padding: var(--s-4) var(--s-5); margin: var(--s-2) 0 var(--s-5); color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-relaxed); border: 1px solid var(--surface-border); display: flex; gap: var(--s-3); align-items: flex-start;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand); flex-shrink: 0; margin-top: 2px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <div>
+              <strong style="color: var(--text-primary); font-weight: var(--weight-semibold);">Development Note:</strong> Group splitting and ledger entries are actively in progress.
+            </div>
+          </div>
+
+          <!-- Go to Dashboard link button with absolute centering -->
+          <a href="dashboard.html" class="btn-primary" style="display: flex; align-items: center; justify-content: center; height: 50px; line-height: 1; margin-bottom: var(--s-3); text-decoration: none;">
+            Go to Dashboard
+          </a>
+
+          <button type="button" class="btn-secondary" id="logout-btn" style="height: 50px; display: flex; align-items: center; justify-content: center; line-height: 1;">
+            Log out
+          </button>
+        </div>
+      </div>
+
+    </section>
   </main>
 
   <script src="js/core/sanitize.js"></script>
@@ -72,7 +107,6 @@
         subtitle.textContent =
           "Hello " + user.realName + " (" + user.username + "), glad to see you here.";
       } catch (e) {
-        // If not logged in, redirect to login
         window.location.href = "login.html";
       }
     })();

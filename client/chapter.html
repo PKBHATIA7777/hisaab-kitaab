@@ -21,7 +21,8 @@
 <link rel="stylesheet" href="css/components/avatar.css" />
 <link rel="stylesheet" href="css/components/empty-state.css" />
 <link rel="stylesheet" href="css/components/badge.css" />
-<link rel="stylesheet" href="css/chapter-page.css" />
+<link rel="stylesheet" href="css/components/command-palette.css" />
+<link rel="stylesheet" href="css/pages/chapter.css" />
 <link rel="stylesheet" href="css/features.css" />
   
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -42,6 +43,8 @@
   <link rel="apple-touch-startup-image"
     media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
     href="/icons/splash-390x844.png">
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
 <body class="has-fab-gradient">
   <!-- ARIA live region must exist before any toast fires -->
@@ -49,9 +52,7 @@
 
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  <div class="bubble-container" aria-hidden="true">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-  </div>
+  <div class="chapter-glow" aria-hidden="true"></div>
 
   <!-- 
     CRITICAL: .chapter-page has NO isolation, NO z-index.
@@ -74,11 +75,11 @@
         </button>
 
         <div id="chapter-nav-dropdown" class="nav-dropdown" role="menu" aria-hidden="true">
-          <button class="nav-dropdown__item" role="menuitem" onclick="openSummaryModal()"><span>📊</span> Summary</button>
-          <button class="nav-dropdown__item" role="menuitem" onclick="openSettlementModal()"><span>🤝</span> Settle Up</button>
-          <button class="nav-dropdown__item" role="menuitem" onclick="downloadReport()"><span>📥</span> Export Report</button>
+          <button class="nav-dropdown__item" role="menuitem" onclick="openSummaryModal()"><svg aria-hidden="true"><use href="icons/sprite.svg#bar-chart-2"></use></svg> Summary</button>
+          <button class="nav-dropdown__item" role="menuitem" onclick="openSettlementModal()"><svg aria-hidden="true"><use href="icons/sprite.svg#credit-card"></use></svg> Settle Up</button>
+          <button class="nav-dropdown__item" role="menuitem" onclick="downloadReport()"><svg aria-hidden="true"><use href="icons/sprite.svg#download"></use></svg> Export Report</button>
           <div class="nav-dropdown__divider"></div>
-          <button class="nav-dropdown__item" role="menuitem" onclick="openMembersPanel()"><span>👥</span> Members</button>
+          <button class="nav-dropdown__item" role="menuitem" onclick="openMembersPanel()"><svg aria-hidden="true"><use href="icons/sprite.svg#users"></use></svg> Members</button>
         </div>
       </div>
     </nav>
@@ -102,17 +103,14 @@
 
       <!-- Settlements -->
       <section class="settlement-section" aria-label="Settlements">
-        <div class="settlement-header" id="hero-settlement-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="settlement-header" id="hero-settlement-header">
           <div class="settlement-label">
             <div class="settlement-dot" aria-hidden="true"></div>
             Settlements
           </div>
           <div class="settlement-actions">
             <button class="icon-btn-sm" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            </button>
-            <button class="icon-btn-sm" id="hero-expand-btn" aria-label="Toggle settlements">
-              <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              <svg width="14" height="14"><use href="icons/sprite.svg#refresh-cw"></use></svg>
             </button>
           </div>
         </div>
@@ -129,7 +127,9 @@
         <div class="expense-list" id="expense-list"></div>
         <div id="load-more-container" class="load-more-container"></div>
         <div class="empty-state" id="chapter-empty-state" style="display:none;" role="status">
-          <div class="empty-state__icon">💸</div>
+          <div class="empty-state__icon">
+            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--brand); filter: drop-shadow(var(--brand-glow-sm));"><use href="icons/sprite.svg#credit-card"></use></svg>
+          </div>
           <div class="empty-state__title">No expenses yet</div>
           <div class="empty-state__subtitle">Tap the + button to add your first expense</div>
         </div>
@@ -177,6 +177,7 @@
   <script src="js/core/modal-manager.js" defer></script>
   <script src="js/pwa/offline-queue.js" defer></script>
   <script src="js/main.js" defer></script>
+  <script src="js/ui/command-palette.js" defer></script>
   <script src="js/chapter.js" defer></script>
   <script src="js/feature-settlements.js" defer></script>
   <script src="js/feature-categories.js" defer></script>

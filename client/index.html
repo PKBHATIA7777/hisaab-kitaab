@@ -1,223 +1,303 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="theme-color" content="#000000">
-  <title>Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-  <text x='50%' y='65%' text-anchor='middle'
-        font-size='80'
-        fill='%23d000ff'
-        font-family='Arial, sans-serif'>₹</text>
-</svg>">
 
+  <!-- SEO -->
+  <title>Hisaab-Kitaab — Split Expenses, Settle Debts</title>
+  <meta name="description" content="Track who paid what and settle group expenses fairly. Hisaab-Kitaab makes splitting bills with friends, flatmates, and family effortless.">
+
+  <!-- Favicon — violet ₹ mark -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%237C3AED' font-family='Arial,sans-serif'>&#8377;</text></svg>">
+
+  <!-- Design System — load order matters -->
   <link rel="stylesheet" href="css/tokens.css">
-<link rel="stylesheet" href="css/reset.css">
-<link rel="stylesheet" href="css/global.css">
-<link rel="stylesheet" href="css/components/button.css">
-<link rel="stylesheet" href="css/components/form.css">
-<link rel="stylesheet" href="css/components/toast.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
-        as="style"
-        onload="this.onload=null;this.rel='stylesheet'">
-  <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-  </noscript>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/auth-pages.css">
+  <link rel="stylesheet" href="css/layout/footer.css">
+  <link rel="stylesheet" href="css/pages/landing.css">
 
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-  <meta name="theme-color" content="#ffffff">
-  
-  <!-- Critical above-fold CSS — eliminates render-blocking for auth pages -->
-  <style>
-    /* Page foundation */
-    html, body {
-      background-color: #000000;
-      margin: 0;
-      font-family: 'Poppins', system-ui, sans-serif;
-      -webkit-tap-highlight-color: transparent;
-    }
-    /* Brand header */
-    .brand-header {
-      text-align: center;
-      padding: 48px 20px 20px;
-      position: relative;
-      z-index: 1;
-    }
-    .brand-header h1 {
-      font-size: clamp(1.8rem, 5vw, 2.4rem);
-      font-weight: 700;
-      color: #ffffff;
-      margin: 0 0 6px;
-      letter-spacing: -0.5px;
-    }
-    .brand-header p {
-      font-size: 0.95rem;
-      color: rgba(255,255,255,0.55);
-      margin: 0;
-    }
-    /* Auth card shell */
-    .auth-wrapper {
-      display: flex;
-      justify-content: center;
-      padding: 0 16px 40px;
-      position: relative;
-      z-index: 1;
-    }
-    .auth-card {
-      background: #ffffff;
-      border-radius: 24px;
-      padding: 32px 28px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 16px 48px rgba(0,0,0,0.45);
-    }
-  </style>
-
-  <!-- iOS PWA Configuration (Phase 5 Step 2) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hisaab">
-  <!-- Prevents white flash on launch — matches app background -->
+  <meta name="theme-color" content="#09090B">
+
+  <!-- Prevent FOUC on cold PWA launch -->
   <style>
-    /* Critical above-fold CSS to prevent FOUC on PWA launch */
-    html, body { 
-      background-color: #000000; 
-      -webkit-tap-highlight-color: transparent;
-    }
+    html, body { background-color: #09090B; -webkit-tap-highlight-color: transparent; }
   </style>
 
-  <!-- ── AUTH REDIRECT GUARD ──────────────────────────────────────
-       Runs synchronously before first paint. If the user already has
-       a valid session (session_expiry cookie is in the future), hide
-       the page immediately and redirect to dashboard. This eliminates
-       the 1-3 second flash of the login/landing page for logged-in users.
-       Zero network calls — reads only a cookie that the server already set.
+  <!-- Font — async, non-blocking -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+        as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </noscript>
+
+  <!-- Google Sign-In SDK (async — never blocks render) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- ── AUTH REDIRECT GUARD ────────────────────────────────────────
+       Synchronous check before first paint.
+       If the user has a valid session cookie → redirect to dashboard.
+       Zero network calls, zero flash for already-logged-in users.
   ──────────────────────────────────────────────────────────────── -->
   <script>
-    (function() {
+    (function () {
       try {
-        var cookie = document.cookie.split('; ').find(function(r) {
+        var cookie = document.cookie.split('; ').find(function (r) {
           return r.startsWith('session_expiry=');
         });
         if (cookie) {
           var expiry = parseInt(cookie.split('=')[1], 10);
-          // Add a 10-second buffer so we don't redirect on an expiry that's
-          // about to lapse — the dashboard will handle the 401 gracefully.
+          // 10s buffer so we don't redirect on an about-to-expire session
           if (!isNaN(expiry) && expiry > Date.now() + 10000) {
-            // Hide the page before it paints to prevent any flash
             document.documentElement.style.visibility = 'hidden';
             window.location.replace('dashboard.html');
           }
         }
-      } catch(e) { /* never block page load */ }
+      } catch (e) { /* never block page load */ }
     })();
   </script>
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
-<body>
 
-  <div id="app-loader">
-    <div class="loader-spinner"></div>
-    <p id="loader-text" class="loader-text">Loading...</p>
-  </div>
+<body class="landing-page">
 
+  <!-- Accessibility: jump to content -->
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  <div class="bubble-container">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  <!-- Ambient glow — pure CSS animated gradient, no JS -->
+  <div class="landing-glow" aria-hidden="true"></div>
+
+  <!-- App loader shown while JS checks session -->
+  <div id="app-loader" role="status" aria-label="Loading Hisaab-Kitaab">
+    <div class="loader-logo" aria-hidden="true">₹</div>
+    <div class="loader-spinner" aria-hidden="true"></div>
   </div>
 
-  <div class="brand-header">
-    <h1>Hisaab-Kitaab</h1>
-    <p>Your way of handling expenses</p>
-  </div>
+  <!-- Toast container -->
+  <div id="toast-container" role="region" aria-label="Notifications" aria-live="polite"></div>
 
-  <main id="main-content">
-    <div class="auth-wrapper">
-      <section class="auth-card">
-        <h1 class="auth-title">Split your bills</h1>
-        <p class="auth-subtitle">
-          Track who paid what and settle group expenses without fights.
-        </p>
+  <!-- ═══════════════════════════════════════════════════════════
+       MAIN
+  ═══════════════════════════════════════════════════════════ -->
+  <main id="main-content" class="landing-main">
 
-        <div style="display: flex; gap: 10px; flex-direction: column;">
-          <button type="button" class="btn-primary" onclick="window.location.href='signup.html'">
-            Sign up
-          </button>
-          
-          <button type="button" class="btn-secondary" onclick="window.location.href='login.html'">
-            Log in
-          </button>
+    <!-- ─────────────────────────────────────────
+         LEFT: Brand panel (desktop ≥ 900px only)
+    ───────────────────────────────────────────── -->
+    <aside class="landing-brand-panel" aria-label="About Hisaab-Kitaab">
+
+      <div class="landing-logo-mark" aria-hidden="true">₹</div>
+
+      <h1 class="landing-wordmark">Hisaab-Kitaab</h1>
+
+      <p class="landing-tagline">
+        <strong>Split expenses.</strong> Settle debts.<br>
+        Stay friends — without the maths.
+      </p>
+
+      <ul class="landing-features" aria-label="Key features">
+
+        <li class="landing-feature">
+          <div class="landing-feature-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div class="landing-feature-text">
+            <h4>Group Chapters</h4>
+            <p>Create expense groups for trips, flatmates, dinners — any shared cost.</p>
+          </div>
+        </li>
+
+        <li class="landing-feature">
+          <div class="landing-feature-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+              <line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+          </div>
+          <div class="landing-feature-text">
+            <h4>Smart Settlements</h4>
+            <p>Our algorithm minimises the number of payments to settle up.</p>
+          </div>
+        </li>
+
+        <li class="landing-feature">
+          <div class="landing-feature-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6"  y1="20" x2="6"  y2="14"/>
+            </svg>
+          </div>
+          <div class="landing-feature-text">
+            <h4>Clear Summaries</h4>
+            <p>Per-person breakdowns, category totals, and exportable history.</p>
+          </div>
+        </li>
+
+      </ul>
+    </aside>
+
+    <!-- Vertical divider between panels (desktop only) -->
+    <div class="landing-panel-divider" aria-hidden="true"></div>
+
+    <!-- ─────────────────────────────────────────
+         RIGHT: Auth card
+    ───────────────────────────────────────────── -->
+    <section class="landing-auth-panel" aria-labelledby="auth-card-title">
+
+      <div class="landing-card">
+
+        <!-- Card Header -->
+        <div class="landing-card-header">
+
+          <!-- Mini brand shown only on mobile (left panel hidden on mobile) -->
+          <div class="landing-card-mobile-brand" aria-hidden="true">
+            <div class="landing-card-mobile-logo">₹</div>
+            <span class="landing-card-mobile-name">Hisaab-Kitaab</span>
+          </div>
+
+          <h2 id="auth-card-title" class="landing-card-title">Welcome</h2>
+          <p class="landing-card-subtitle">
+            Split bills and settle debts in seconds.
+          </p>
         </div>
 
-        <div class="g_id_signin"></div>
-      </section>
-    </div>
-  </main>
+        <!-- Card Body -->
+        <div class="landing-card-body">
 
-  <footer class="app-footer">
-    <div class="footer-content">
-      <div class="footer-col">
-        <h4>Hisaab-Kitaab</h4>
-        <p>The smartest way to track expenses and settle debts with friends and family.</p>
-      </div>
-      
-      <div class="footer-col">
-        <h4>Quick Links</h4>
-        <div class="footer-links">
-          <a href="index.html">Home</a>
-          <a href="about.html">About Us</a>
-          <a href="privacy.html">Privacy Policy</a>
-        </div>
-      </div>
-  
-      <div class="footer-col">
-        <h4>Developer</h4>
-        <div class="dev-branding">
-          Developed and Managed by
-          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">
-            A PLUS TECHNOLOGIES
+          <!-- Sign up — primary action -->
+          <a href="signup.html"
+             id="btn-signup"
+             class="btn-primary"
+             aria-label="Create a new Hisaab-Kitaab account">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+                 stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/>
+              <line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+            Create account
           </a>
+
+          <!-- Log in — secondary action -->
+          <a href="login.html"
+             id="btn-login"
+             class="btn-secondary"
+             aria-label="Log in to your existing account">
+            Log in
+          </a>
+
+          <!-- Divider -->
+          <div class="landing-or" aria-label="or continue with Google">or</div>
+
+          <!-- Google Sign-In -->
+          <div class="landing-google-wrap">
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-size="large"
+                 data-theme="outline"
+                 data-text="continue_with"
+                 data-shape="rectangular"
+                 data-logo_alignment="left"
+                 aria-label="Continue with Google">
+            </div>
+          </div>
+
+          <!-- Fine print -->
+          <p class="landing-fine-print">
+            By continuing, you agree to our
+            <a href="privacy.html">Privacy Policy</a>.
+          </p>
+
         </div>
-      </div>
-    </div>
-    
-    <div class="footer-bottom">
-      &copy; 2026 Hisaab-Kitaab. All rights reserved.
-    </div>
-  </footer>
+      </div><!-- /landing-card -->
 
+    </section><!-- /landing-auth-panel -->
 
-  <!-- ADD THIS as the first script in every HTML file, before any other scripts -->
-<script src="js/core/storage.js"></script><script src="js/core/sanitize.js"></script>
-<script src="js/pwa/install-manager.js"></script>
-  <script src="js/core/csrf.js"></script>
-  <script src="js/core/session.js"></script>
+  </main><!-- /main -->
 
-  <script src="js/main.js"></script>
-  <!-- In login.html, REPLACE the large inline <script> block with: -->
-<script src="js/pages/index-page.js"></script>
+  <!-- ═══════════════════════════════════════════════════════════
+       FOOTER (injected by js/shared/footer.js)
+  ═══════════════════════════════════════════════════════════ -->
+  <footer id="app-footer" class="app-footer"></footer>
 
-  <div id="pwa-install-prompt" class="pwa-popup hidden">
+  <!-- ═══════════════════════════════════════════════════════════
+       PWA INSTALL PROMPT
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="pwa-install-prompt"
+       class="pwa-popup hidden"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="pwa-dialog-title">
     <div class="pwa-popup-content">
-      <div class="pwa-icon">📱</div>
+
+      <div class="pwa-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+          <line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      </div>
+
       <div class="pwa-text">
-        <h4>Install Hisaab-Kitaab</h4>
+        <h4 id="pwa-dialog-title">Install Hisaab-Kitaab</h4>
         <p id="pwa-instructions">Get quick access from your home screen!</p>
       </div>
+
       <div class="pwa-actions">
         <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
-        <button id="pwa-close-btn" class="pwa-btn-secondary">Later</button>
+        <button id="pwa-close-btn"   class="pwa-btn-secondary">Later</button>
       </div>
+
     </div>
   </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCRIPTS  (load order matters)
+  ═══════════════════════════════════════════════════════════ -->
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/sanitize.js"></script>
+  <script src="js/core/csrf.js"></script>
+  <script src="js/core/session.js"></script>
+  <script src="js/core/api-cache.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/pwa/install-manager.js"></script>
+
+  <!-- Page logic: checks session, hides loader, inits Google auth -->
+  <script src="js/pages/index-page.js"></script>
+
+  <!-- Shared footer (fills #app-footer) -->
+  <script src="js/shared/footer.js" defer></script>
 
 </body>
 </html>

@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#000000">
-  <title>Dashboard - Hisaab-Kitaab</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%23d000ff'>₹</text></svg>">
+  <meta name="theme-color" content="#09090B">
   
-  <!-- NEW CSS Architecture -->
+  <title>Dashboard - Hisaab-Kitaab</title>
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='65%' text-anchor='middle' font-size='80' fill='%237C3AED'>₹</text></svg>">
+  
+  <!-- Design System — load order matters -->
   <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/reset.css">
   <link rel="stylesheet" href="css/global.css">
@@ -21,46 +23,52 @@
   <link rel="stylesheet" href="css/components/avatar.css">
   <link rel="stylesheet" href="css/components/empty-state.css">
   <link rel="stylesheet" href="css/components/badge.css">
+  <link rel="stylesheet" href="css/components/command-palette.css">
+  
   <link rel="stylesheet" href="css/layout/navbar.css">
   <link rel="stylesheet" href="css/layout/footer.css">
-  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/pages/dashboard.css">
   <link rel="stylesheet" href="css/features.css">
   
+  <!-- Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
         as="style"
         onload="this.onload=null;this.rel='stylesheet'">
   <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   </noscript>
+
+  <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hisaab">
-  <!-- iOS splash screens (portrait iPhone) -->
+
+  <!-- Splash screens -->
   <link rel="apple-touch-startup-image"
     media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
     href="/icons/splash-390x844.png">
+
+  <!-- Theme Loader — synchronous to prevent FOUC -->
+  <script src="js/core/theme-loader.js"></script>
 </head>
 <body class="has-fab-gradient">
-  <!-- ARIA live region must exist before any toast fires -->
+  
+  <a href="#main-content" class="skip-link">Skip to content</a>
+
+  <!-- Ambient glow background backdrop -->
+  <div class="dashboard-glow" aria-hidden="true"></div>
+
+  <!-- ARIA live region for toasts -->
   <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <!-- ── REDIRECT LOOP GUARD ──────────────────────────────────────────────
-       Runs synchronously before any other script. Detects if dashboard is
-       being reloaded in a tight loop (auth_token expired but session_expiry
-       cookie still alive) and breaks the cycle by clearing both cookies and
-       forcing a hard redirect to login.
-  ──────────────────────────────────────────────────────────────────────── -->
+  <!-- Redirect Loop Guard -->
   <script>
     (function () {
-      // If login explicitly sent us here after expiry, do nothing — let
-      // the page load normally so dashboard.js can call /auth/me and fail cleanly.
-      // (This path should never reach dashboard in practice, but just in case.)
-
       var GUARD_KEY = '__dash_redirects';
       var now = Date.now();
       var raw = sessionStorage.getItem(GUARD_KEY);
@@ -75,8 +83,6 @@
       sessionStorage.setItem(GUARD_KEY, JSON.stringify(data));
 
       if (data.count > 3) {
-        // We've loaded dashboard 3+ times in 5 s — almost certainly a loop.
-        // Nuke both auth cookies and hard-redirect to login.
         var past = 'expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         document.cookie = 'auth_token=; '     + past + ' SameSite=Lax';
         document.cookie = 'auth_token=; '     + past + ' SameSite=None; Secure';
@@ -88,77 +94,107 @@
     })();
   </script>
 
-  <a href="#main-content" class="skip-link">Skip to content</a>
+  <!-- Main layout container -->
+  <main id="main-content" class="dashboard-page-main">
 
-  <div class="bubble-container" aria-hidden="true">
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
-  </div>
-
-  <main id="main-content">
-
-    <!-- Header -->
+    <!-- Header Navbar -->
     <header class="app-navbar">
       <div class="nav-content">
         <div class="nav-brand">
+          <div class="nav-brand-logo" aria-hidden="true">₹</div>
           <h1>Hisaab-Kitaab</h1>
         </div>
 
-        <div class="nav-center-desktop"></div>
-
         <div class="nav-right">
-          <button id="profile-trigger" class="profile-btn" title="My Profile">
-            <div id="header-profile-icon" class="header-profile-icon">?</div>
-            <span class="profile-name-desktop" id="desktop-profile-name">My Profile</span>
+          <button id="profile-trigger" class="profile-btn" title="My Profile & Friends">
+            ?
           </button>
         </div>
       </div>
     </header>
 
     <div class="dashboard-container">
-      <h2 class="section-title">Create your expense chapter</h2>
       
-      <!-- Search & Sort controls — referenced by new dashboard.js -->
-      <div class="dashboard-controls">
-        <div class="search-wrapper">
-          <input type="text" id="chapter-search" class="search-input" placeholder="Search chapters..." aria-label="Search chapters">
-        </div>
-        <div class="sort-wrapper">
-          <select id="chapter-sort" class="sort-select" aria-label="Sort chapters">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="name-asc">Name (A-Z)</option>
-            <option value="name-desc">Name (Z-A)</option>
-          </select>
-        </div>
+      <!-- Overall summary outstanding balances header widget -->
+      <div class="balance-overview-widget" id="balance-overview-box">
+        <span class="balance-overview-header">Net Outstanding Balance</span>
+        <span class="balance-overview-amount settled">₹0.00</span>
+        <span class="balance-overview-desc">Calculating balances across active chapters...</span>
       </div>
 
+      <!-- Toolbar controls layout -->
+      <div class="dashboard-controls">
+        <!-- Search field with SVG magnifying glass prefix -->
+        <div class="search-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="chapter-search" class="search-input" placeholder="Search chapters..." aria-label="Search chapters">
+        </div>
+        
+        <!-- Action filters & custom sorting trigger -->
+        <div class="toolbar-actions">
+          <button id="btn-sort-sheet" class="btn-filter-chip" aria-label="Sort chapters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 5h10M11 9h7M11 13h4M3 17l3-3 3 3M6 14v7"/>
+            </svg>
+            <span id="sort-current-label">Sort: Newest</span>
+          </button>
+          
+          <button id="btn-show-archived" class="btn-filter-chip" aria-label="Show archived chapters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="21 8 21 21 3 21 3 8"></polyline>
+              <rect x="1" y="3" width="22" height="5"></rect>
+              <line x1="10" y1="12" x2="14" y2="12"></line>
+            </svg>
+            <span>Archived</span>
+          </button>
+        </div>
+
+        <!-- Hidden native select for ChaptersGrid.initToolbar compatibility -->
+        <select id="chapter-sort" style="display:none">
+          <option value="newest" selected>Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="az">Name (A-Z)</option>
+          <option value="members">Members</option>
+        </select>
+      </div>
+
+      <!-- Grid list -->
       <div class="chapters-grid" id="chapters-grid"></div>
+
     </div>
-
-    <!-- 
-      ALL MODALS REMOVED FROM HTML
-      They are now created dynamically by dashboard.js via ModalManager.createOverlay()
-      - Create Chapter Modal
-      - Delete Chapter Modal  
-      - Profile Modal
-      - Friend Details Modal
-      - Friend Actions Modal
-    -->
-
   </main>
 
-  <!-- 
-    FAB is outside any stacking context — never trapped.
-    z-index: var(--z-sticky) = 100, sufficient since no wrapper has isolation.
-  -->
-  <button class="fab" id="dashboard-fab" aria-label="Create new chapter">
+  <!-- Floating Action Button (FAB) Speed-dial Menu Options -->
+  <div class="fab-menu" id="dashboard-fab-menu">
+    <button class="fab-menu-item" onclick="EventBus.emit(EVENTS.CHAPTER_MODAL_OPEN, {});" aria-label="Create chapter">
+      <span class="fab-menu-item__label">Create Chapter</span>
+      <span class="fab-menu-item__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"></path></svg>
+      </span>
+    </button>
+    
+    <button class="fab-menu-item" id="fab-action-profile" aria-label="Open profile and friends list">
+      <span class="fab-menu-item__label">My Profile & Friends</span>
+      <span class="fab-menu-item__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      </span>
+    </button>
+  </div>
+
+  <!-- Main Speed-Dial FAB -->
+  <button class="fab" id="dashboard-fab" aria-label="Open speed dial menu options">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
       <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
   </button>
 
-  <!-- Scripts — deferred for faster page paint, order preserved by defer -->
+  <!-- One-time shared app footer injected by footer.js -->
+  <footer id="app-footer" class="app-footer"></footer>
+
+  <!-- Scripts — deferred for faster paint, order preserved by defer -->
   <script src="js/core/storage.js" defer></script>
   <script src="js/core/sanitize.js" defer></script>
   <script src="js/core/csrf.js" defer></script>
@@ -171,6 +207,7 @@
   <script src="js/utils/time.js" defer></script>
   <script src="js/utils/format.js" defer></script>
   <script src="js/ui/toast.js" defer></script>
+  <script src="js/ui/command-palette.js" defer></script>
   <script src="js/ui/button.js" defer></script>
   <script src="js/ui/form-validator.js" defer></script>
   <script src="js/pwa/offline-queue.js" defer></script>
@@ -183,50 +220,97 @@
   <script src="js/features/creator-label.js" defer></script>
   <script src="js/features/personal-chapter.js" defer></script>
   <script src="js/features/categories.js" defer></script>
+  <script src="js/shared/footer.js" defer></script>
   <script src="js/pages/dashboard-page.js" defer></script>
 
-  <footer class="app-footer">
-    <div class="footer-content">
-      <div class="footer-col">
-        <h4>Hisaab-Kitaab</h4>
-        <p>The smartest way to track expenses and settle debts with friends and family.</p>
-      </div>
-      <div class="footer-col">
-        <h4>Quick Links</h4>
-        <div class="footer-links">
-          <a href="index.html">Home</a>
-          <a href="about.html">About Us</a>
-          <a href="privacy.html">Privacy Policy</a>
-        </div>
-      </div>
-      <div class="footer-col">
-        <h4>Developer</h4>
-        <div class="dev-branding">
-          Developed and Managed by
-          <a href="https://wa.me/919868097145" target="_blank" class="aplus-link">
-            A PLUS TECHNOLOGIES
-          </a>
-        </div>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      &copy; 2026 Hisaab-Kitaab. All rights reserved.
-    </div>
-  </footer>
+  <!-- Custom Sort Sheet and Speed Dial FAB Menu Toggle handlers -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Custom Sort Bottom Sheet
+      const sortTriggerBtn = document.getElementById('btn-sort-sheet');
+      const sortSelect = document.getElementById('chapter-sort');
+      const sortLabel = document.getElementById('sort-current-label');
+      
+      if (sortTriggerBtn && sortSelect && sortLabel) {
+        sortTriggerBtn.addEventListener('click', () => {
+          const currentVal = sortSelect.value;
+          
+          const overlay = ModalManager.createOverlay(`
+            <div class="modal-handle"></div>
+            <div class="modal-header" style="border-bottom: 1px solid var(--surface-border); padding-bottom: var(--s-3);">
+              <h2 class="modal-title" style="font-size: var(--text-base);">Sort Chapters</h2>
+            </div>
+            <div class="bottom-sheet-menu">
+              <button class="bottom-sheet-option ${currentVal === 'newest' ? 'selected' : ''}" data-val="newest">
+                <span>Newest first</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </button>
+              <button class="bottom-sheet-option ${currentVal === 'oldest' ? 'selected' : ''}" data-val="oldest">
+                <span>Oldest first</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </button>
+              <button class="bottom-sheet-option ${currentVal === 'az' ? 'selected' : ''}" data-val="az">
+                <span>Name (A-Z)</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </button>
+              <button class="bottom-sheet-option ${currentVal === 'members' ? 'selected' : ''}" data-val="members">
+                <span>Member count</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </button>
+            </div>
+          `, { type: 'bottom' });
 
-  <!-- PWA install prompt HTML (must be in DOM for install-manager.js to find it) -->
-  <div id="pwa-install-prompt" class="pwa-popup hidden">
-    <div class="pwa-popup-content">
-      <div class="pwa-icon">📱</div>
-      <div class="pwa-text">
-        <h4>Install Hisaab-Kitaab</h4>
-        <p id="pwa-instructions">Get quick access from your home screen!</p>
-      </div>
-      <div class="pwa-actions">
-        <button id="pwa-install-btn" class="pwa-btn-primary">Install</button>
-        <button id="pwa-close-btn" class="pwa-btn-secondary">Later</button>
-      </div>
-    </div>
-  </div>
+          overlay.querySelectorAll('.bottom-sheet-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+              const val = opt.dataset.val;
+              const text = opt.querySelector('span').textContent;
+              
+              // Set value & trigger change event
+              sortSelect.value = val;
+              sortSelect.dispatchEvent(new Event('change', { bubbles: true }));
+              
+              sortLabel.textContent = `Sort: ${text}`;
+              ModalManager.close(overlay);
+            });
+          });
+        });
+      }
+
+      // 2. Intercept and trigger Speed-dial FAB
+      setTimeout(() => {
+        const fab = document.getElementById('dashboard-fab');
+        const menu = document.getElementById('dashboard-fab-menu');
+        
+        if (fab && menu) {
+          const newFab = fab.cloneNode(true);
+          fab.parentNode.replaceChild(newFab, fab);
+          
+          const toggleMenu = (e) => {
+            e.stopPropagation();
+            const isActive = menu.classList.toggle('is-active');
+            newFab.classList.toggle('is-active', isActive);
+          };
+
+          newFab.addEventListener('click', toggleMenu);
+          
+          document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !newFab.contains(e.target)) {
+              menu.classList.remove('is-active');
+              newFab.classList.remove('is-active');
+            }
+          });
+
+          const profileLink = document.getElementById('fab-action-profile');
+          if (profileLink) {
+            profileLink.addEventListener('click', () => {
+              EventBus.emit(EVENTS.PROFILE_MODAL_OPEN, {});
+              menu.classList.remove('is-active');
+              newFab.classList.remove('is-active');
+            });
+          }
+        }
+      }, 500);
+    });
+  </script>
 </body>
 </html>

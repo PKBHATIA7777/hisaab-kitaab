@@ -1,0 +1,40 @@
+/* ================================================================
+   HISAAB-KITAAB — css/components/fab.css
+   Floating Action Button (FAB) component styles.
+   ================================================================ */
+
+.fab {
+  position: fixed;
+  bottom: max(24px, calc(16px + env(safe-area-inset-bottom)));
+  right: max(24px, calc(16px + env(safe-area-inset-right)));
+  width: var(--fab-size, 56px);
+  height: var(--fab-size, 56px);
+  border-radius: var(--r-full, 9999px);
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--brand-glow);
+  cursor: pointer;
+  z-index: var(--z-sticky, 100);
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  outline: none;
+}
+
+.fab:hover {
+  background: var(--brand-hover);
+  transform: scale(1.05);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+}

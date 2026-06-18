@@ -1,146 +1,285 @@
+/* ================================================================
+   HISAAB-KITAAB — tokens.css
+   Single source of truth for the entire design system.
+   All values are CSS custom properties (variables).
+
+   Theme: Premium dark app shell, white card surfaces, violet accent.
+
+   DO NOT put rules here — only custom property declarations.
+   ================================================================ */
+
 :root {
-  /* ── BRAND ─────────────────────────────────────── */
-  --brand: #d000ff;
-  --brand-dark: #8a00e0;
-  --brand-light: rgba(208, 0, 255, 0.12);
-  --brand-glow: 0 8px 24px rgba(208, 0, 255, 0.35);
 
-  /* ── BACKGROUND SCALE ───────────────────────────── */
-  --bg-base: #05000a;
-  --bg-elevated: #0d0018;
-  --bg-overlay: rgba(255, 255, 255, 0.06);
-  --bg-glass: rgba(0, 0, 0, 0.85);
-  --bg-glass-light: rgba(255, 255, 255, 0.08);
+  /* ──────────────────────────────────────────────────────────────
+     BRAND
+     Refined violet — premium, modern, finance-appropriate.
+     Replaces the previous harsh magenta (#d000ff).
+  ────────────────────────────────────────────────────────────── */
+  --brand:          #7C3AED;                      /* Violet 700     */
+  --brand-dark:     #5B21B6;                      /* Violet 800     */
+  --brand-hover:    #6D28D9;                      /* Violet 700-hover*/
+  --brand-light:    rgba(124, 58, 237, 0.10);    /* tinted bg      */
+  --brand-mid:      rgba(124, 58, 237, 0.22);    /* border/divider */
+  --brand-glow:     0 8px 32px rgba(124, 58, 237, 0.40);
+  --brand-glow-sm:  0 4px 16px rgba(124, 58, 237, 0.28);
 
-  /* ── SURFACE (cards, modals, inputs) ────────────── */
-  --surface: #ffffff;
-  --surface-alt: #f7f7f9;
-  --surface-border: rgba(0, 0, 0, 0.06);
+  /* ──────────────────────────────────────────────────────────────
+     APP SHELL  (dark — default)
+  ────────────────────────────────────────────────────────────── */
+  --bg-app:         #09090B;     /* near-black, used as page background */
+  --bg-elevated:    #18181B;     /* one step up — nav bar, overlays     */
+  --bg-elevated-2:  #27272A;     /* two steps up — hover states         */
+  --bg-overlay:     rgba(0, 0, 0, 0.80);
+  --bg-glass:       rgba(15, 15, 18, 0.85);
+  --bg-glass-border: rgba(255, 255, 255, 0.07);
 
-  /* ── TEXT ───────────────────────────────────────── */
-  --text-primary: #111111;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --text-on-dark: rgba(255, 255, 255, 0.90);
-  --text-on-dark-2: rgba(255, 255, 255, 0.70);
-  /* raised from 0.55 — passes WCAG AA on dark bg */
-  --text-on-dark-3: rgba(255, 255, 255, 0.50);
-  /* raised from 0.30 — use only for de-emphasised text */
+  /* ──────────────────────────────────────────────────────────────
+     SURFACE  (dark cards / overlays)
+  ────────────────────────────────────────────────────────────── */
+  --surface:              #18181B;
+  --surface-alt:          #27272A;
+  --surface-hover:        #3F3F46;
+  --surface-border:       rgba(255, 255, 255, 0.08);
+  --surface-border-strong:rgba(255, 255, 255, 0.15);
 
-  /* ── SEMANTIC ───────────────────────────────────── */
-  --positive: #00c853;
-  --positive-bg: rgba(0, 200, 83, 0.10);
-  --negative: #ff1744;
-  --negative-bg: rgba(255, 23, 68, 0.10);
-  --warning: #f57c00;
-  --info: #2979ff;
+  /* ──────────────────────────────────────────────────────────────
+     TEXT — on dark backgrounds (app shell, nav, dark sections)
+  ────────────────────────────────────────────────────────────── */
+  --text-on-dark:   rgba(255, 255, 255, 0.95);
+  --text-on-dark-2: rgba(255, 255, 255, 0.60);
+  --text-on-dark-3: rgba(255, 255, 255, 0.35);
 
-  /* ── SPACING (8px base) ─────────────────────────── */
-  --s-1: 4px;
-  --s-2: 8px;
-  --s-3: 12px;
-  --s-4: 16px;
-  --s-5: 20px;
-  --s-6: 24px;
-  --s-8: 32px;
-  --s-10: 40px;
-  --s-12: 48px;
+  /* ──────────────────────────────────────────────────────────────
+     TEXT — on card surfaces
+  ────────────────────────────────────────────────────────────── */
+  --text-primary:   rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.60);
+  --text-muted:     rgba(255, 255, 255, 0.35);
+  --text-link:      var(--brand);
+  --color-text-secondary: var(--text-secondary);   /* compat alias */
 
-  /* ── RADIUS ─────────────────────────────────────── */
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 24px;
+  /* ──────────────────────────────────────────────────────────────
+     SEMANTIC COLOURS
+  ────────────────────────────────────────────────────────────── */
+  --positive:    #16A34A;                       /* Green 600   */
+  --positive-bg: rgba(22, 163, 74, 0.10);
+  --negative:    #DC2626;                       /* Red 600     */
+  --negative-bg: rgba(220, 38, 38, 0.10);
+  --warning:     #D97706;                       /* Amber 600   */
+  --warning-bg:  rgba(217, 119, 6, 0.10);
+  --info:        #2563EB;                       /* Blue 600    */
+  --info-bg:     rgba(37, 99, 235, 0.10);
+  --color-error: var(--negative);               /* compat alias */
+
+  /* ──────────────────────────────────────────────────────────────
+     SPACING — 8-point grid
+  ────────────────────────────────────────────────────────────── */
+  --s-0:   0px;
+  --s-px:  1px;
+  --s-0h:  2px;
+  --s-1:   4px;
+  --s-2:   8px;
+  --s-3:   12px;
+  --s-4:   16px;
+  --s-5:   20px;
+  --s-6:   24px;
+  --s-7:   28px;
+  --s-8:   32px;
+  --s-9:   36px;
+  --s-10:  40px;
+  --s-11:  44px;
+  --s-12:  48px;
+  --s-16:  64px;
+  --s-20:  80px;
+  --s-24:  96px;
+
+  /* ──────────────────────────────────────────────────────────────
+     BORDER RADIUS
+  ────────────────────────────────────────────────────────────── */
+  --r-xs:   4px;
+  --r-sm:   8px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-xl:   20px;
+  --r-2xl:  28px;
+  --r-3xl:  36px;
   --r-full: 9999px;
 
-  /* ── SHADOWS ─────────────────────────────────────── */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.20);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.28);
+  /* ──────────────────────────────────────────────────────────────
+     SHADOWS
+  ────────────────────────────────────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm:  0 1px 4px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.18), 0 4px 8px rgba(0,0,0,0.10);
+  --shadow-xl:  0 16px 40px rgba(0,0,0,0.22), 0 8px 16px rgba(0,0,0,0.12);
+  --shadow-2xl: 0 24px 64px rgba(0,0,0,0.28), 0 12px 24px rgba(0,0,0,0.14);
 
-  /* ── TYPOGRAPHY ─────────────────────────────────── */
-  --font: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  --text-xs: 0.75rem;
-  /* 12px */
-  --text-sm: 0.875rem;
-  /* 14px */
-  --text-base: 1rem;
-  /* 16px */
-  --text-lg: 1.125rem;
-  /* 18px */
-  --text-xl: 1.25rem;
-  /* 20px */
-  --text-2xl: 1.5rem;
-  /* 24px */
-  --text-3xl: 2rem;
-  /* 32px */
-  --text-4xl: 2.5rem;
-  /* 40px */
+  /* ──────────────────────────────────────────────────────────────
+     TYPOGRAPHY
+  ────────────────────────────────────────────────────────────── */
+  --font:      'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-main: var(--font);   /* backward-compat alias */
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, monospace;
 
-  --leading-tight: 1.2;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.7;
+  /* Type scale — based on 16px root */
+  --text-2xs:  0.625rem;   /* 10px */
+  --text-xs:   0.75rem;    /* 12px */
+  --text-sm:   0.875rem;   /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-lg:   1.125rem;   /* 18px */
+  --text-xl:   1.25rem;    /* 20px */
+  --text-2xl:  1.5rem;     /* 24px */
+  --text-3xl:  1.875rem;   /* 30px */
+  --text-4xl:  2.25rem;    /* 36px */
+  --text-5xl:  3rem;       /* 48px */
 
-  --weight-normal: 400;
-  --weight-medium: 500;
+  --leading-none:    1.0;
+  --leading-tight:   1.2;
+  --leading-snug:    1.35;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+  --leading-loose:   1.8;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
   --weight-semibold: 600;
-  --weight-bold: 700;
+  --weight-bold:     700;
+  --weight-extrabold:800;
 
-  /* ── MOTION ─────────────────────────────────────── */
+  /* ──────────────────────────────────────────────────────────────
+     MOTION
+  ────────────────────────────────────────────────────────────── */
   --dur-instant: 50ms;
-  --dur-fast: 150ms;
-  --dur-normal: 250ms;
-  --dur-slow: 400ms;
-  --dur-page: 300ms;
+  --dur-fast:    120ms;
+  --dur-normal:  220ms;
+  --dur-slow:    380ms;
+  --dur-page:    280ms;
+  --dur-modal:   320ms;
 
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease:         cubic-bezier(0.4, 0, 0.2, 1);    /* standard   */
+  --ease-in:      cubic-bezier(0.4, 0, 1, 1);      /* accelerate */
+  --ease-out:     cubic-bezier(0, 0, 0.2, 1);      /* decelerate */
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot */
+  --ease-bounce:  cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-snappy:  cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
-  /* ── Z-INDEX LADDER ──────────────────────────────── */
-  --z-base: 1;
-  --z-card: 10;
-  --z-sticky: 100;
-  --z-dropdown: 200;
-  --z-panel: 300;
-  --z-modal: 400;
-  --z-toast: 500;
+  /* ──────────────────────────────────────────────────────────────
+     Z-INDEX LADDER
+  ────────────────────────────────────────────────────────────── */
+  --z-base:      1;
+  --z-raised:    10;
+  --z-sticky:    100;
+  --z-dropdown:  200;
+  --z-panel:     300;
+  --z-modal:     400;
+  --z-toast:     500;
+  --z-top:       9999;
+  --z-card:      var(--z-raised);   /* backward-compat alias */
 
-  /* ── COMPONENT TOKENS ────────────────────────────── */
-  --nav-height: 56px;
-  --fab-size: 56px;
-  --input-h: 44px;
-  /* Touch target */
-  --touch-min: 44px;
-  /* WCAG 2.5.5 */
+  /* ──────────────────────────────────────────────────────────────
+     COMPONENT SIZING
+  ────────────────────────────────────────────────────────────── */
+  --nav-height:    56px;
+  --nav-height-lg: 64px;
+  --fab-size:      56px;
+  --fab-size-sm:   44px;
+  --touch-min:     44px;       /* WCAG 2.5.5 minimum touch target */
+  --input-height:  48px;
+  --input-h:       var(--input-height);  /* backward-compat alias */
 
-  /* Card */
-  --card-bg: var(--surface);
+  /* ──────────────────────────────────────────────────────────────
+     LAYOUT WIDTHS
+  ────────────────────────────────────────────────────────────── */
+  --max-app:     1280px;
+  --max-content:  720px;
+  --max-narrow:   480px;
+  --max-xs:       380px;
+
+  /* ──────────────────────────────────────────────────────────────
+     COMPONENT-LEVEL DERIVED TOKENS
+     (Computed from the above — change once, applies everywhere)
+  ────────────────────────────────────────────────────────────── */
+
+  /* ── Card ─── */
+  --card-bg:     var(--surface);
   --card-radius: var(--r-lg);
-  --card-pad: var(--s-5);
-  --card-shadow: var(--shadow-sm);
   --card-border: 1px solid var(--surface-border);
+  --card-shadow: var(--shadow-sm);
+  --card-pad:    var(--s-5);
 
-  /* Modal */
-  --modal-radius: var(--r-xl);
-  --modal-pad: var(--s-6);
-  --modal-max-width: 480px;
+  /* ── Modal / Bottom Sheet ─── */
+  --modal-radius:    var(--r-xl);
+  --modal-pad:       var(--s-6);
+  --modal-max-width: 540px;
 
-  /* Input */
-  --input-bg: var(--surface-alt);
-  --input-bg-focus: var(--surface);
-  --input-radius: var(--r-md);
-  --input-border: 1.5px solid transparent;
+  /* ── Input ─── */
+  --input-bg:           var(--surface-alt);
+  --input-bg-focus:     var(--surface);
+  --input-radius:       var(--r-md);
+  --input-border:       1.5px solid transparent;
   --input-border-focus: 1.5px solid var(--brand);
   --input-shadow-focus: 0 0 0 3px var(--brand-light);
+
+  /* ── Button ─── */
+  --btn-radius: var(--r-md);
+  --btn-height: var(--touch-min);
+
+  /* ── Avatar — rounded square, the Hisaab signature ─── */
+  --avatar-radius: var(--r-sm);
+
+  /* ──────────────────────────────────────────────────────────────
+     BACKWARD-COMPAT ALIASES
+     Allows all existing component CSS to work without any changes.
+     Map old names → new names.
+  ────────────────────────────────────────────────────────────── */
+  --bg-base:        var(--bg-app);
+  --bg-glass-light: rgba(255, 255, 255, 0.06);
+  --radius-card:    var(--r-lg);
+  --radius-input:   var(--r-md);
+  --color-primary:  var(--text-primary);
+  --primary-color:  var(--brand);
+
 }
 
+/* ── LIGHT THEME (Warm Ledger / Parchment) ───────────────────────── */
+[data-theme="light"] {
+  --bg-app:         #FAF9F6;     /* soft off-white/warm gray page bg    */
+  --bg-elevated:    #FFFFFF;     /* clean white for navbar/menus        */
+  --bg-elevated-2:  #F4F4F5;     /* active states                       */
+  --bg-overlay:     rgba(0, 0, 0, 0.45);
+  --bg-glass:       rgba(250, 249, 246, 0.85);
+  --bg-glass-border: rgba(0, 0, 0, 0.08);
+
+  --surface:              #FFFFFF;     /* pure white card surfaces       */
+  --surface-alt:          #F4F4F5;     /* secondary items                */
+  --surface-hover:        #EBEBEC;     /* hover lists                    */
+  --surface-border:       rgba(0, 0, 0, 0.07);
+  --surface-border-strong:rgba(0, 0, 0, 0.13);
+
+  --text-on-dark:   #18181B;     /* dark text on page backgrounds      */
+  --text-on-dark-2: #52525B;
+  --text-on-dark-3: #A1A1AA;
+
+  --text-primary:   #18181B;     /* dark text on cards                 */
+  --text-secondary: #52525B;
+  --text-muted:     #A1A1AA;
+
+  --brand:          #6D28D9;     /* richer violet for accessibility    */
+  --brand-light:    rgba(109, 40, 217, 0.08);
+  --brand-mid:      rgba(109, 40, 217, 0.18);
+  --brand-glow:     0 8px 32px rgba(109, 40, 217, 0.20);
+  --brand-glow-sm:  0 4px 16px rgba(109, 40, 217, 0.14);
+}
+
+/* ── REDUCED MOTION ─────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --dur-fast: 0ms;
-    --dur-normal: 0ms;
-    --dur-slow: 0ms;
-    --dur-page: 0ms;
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-normal:  0ms;
+    --dur-slow:    0ms;
+    --dur-page:    0ms;
+    --dur-modal:   0ms;
   }
 }

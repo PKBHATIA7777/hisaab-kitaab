@@ -80,20 +80,21 @@ async function _injectHistorySection() {
     });
 
     histList.innerHTML = history.map(r => `
-      <div class="settled-record">
-        <div class="settled-record__info">
-          <div class="settled-record__names"><strong>${escapeHTML(r.from_name)}</strong> → <strong>${escapeHTML(r.to_name)}</strong></div>
-          <div class="settled-record__date">${new Date(r.marked_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}${r.note ? ' · ' + escapeHTML(r.note) : ''}</div>
+      <div class="settled-record-row" style="margin-bottom:8px;">
+        <div class="settled-record-info">
+          <div class="settled-record-names"><strong>${escapeHTML(r.from_name)}</strong> → <strong>${escapeHTML(r.to_name)}</strong></div>
+          <div class="settled-record-meta">${new Date(r.marked_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}${r.note ? ' · ' + escapeHTML(r.note) : ''}</div>
         </div>
-        <span class="settled-record__amount">₹${parseFloat(r.amount).toFixed(2)}</span>
-        <button class="btn-undo" data-record-id="${r.id}">Undo</button>
+        <span class="settled-record-amount">₹${parseFloat(r.amount).toFixed(2)}</span>
+        <button class="btn-undo-settle" data-record-id="${r.id}">Undo</button>
       </div>
     `).join('');
 
     histList.addEventListener('click', async (e) => {
-      const btn = e.target.closest('.btn-undo');
+      const btn = e.target.closest('.btn-undo-settle, .btn-undo');
       if (!btn) return;
-      if (!confirm('Undo this settlement?')) return;
+      const confirmed = await _confirmDialog('Undo this settlement?', 'The payment will return to pending.');
+      if (!confirmed) return;
       try {
         await apiFetch(`/chapters/${window.chapterId}/settlements/history/${btn.dataset.recordId}`, { method: 'DELETE' });
         showToast('Undone', 'info');

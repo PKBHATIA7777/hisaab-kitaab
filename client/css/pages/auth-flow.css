@@ -1,0 +1,296 @@
+/* ================================================================
+   HISAAB-KITAAB — css/pages/auth-flow.css
+   Flow-specific components and step layouts for multi-step authentication:
+   login.html, signup.html, forgot.html, set-password.html
+   ================================================================ */
+
+/* ── STEP TRANSITIONS (Preserving standard vanilla JS framework compatibility) ── */
+.step-wrapper {
+  will-change: transform, opacity;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  width: 100%;
+  transition: transform var(--dur-slow) var(--ease), opacity var(--dur-slow) var(--ease);
+}
+
+.step-active {
+  display: block;
+  transform: translateX(0) translateZ(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.step-hidden-left {
+  display: none;
+  pointer-events: none;
+  transform: translateX(-24px);
+  opacity: 0;
+}
+
+.step-hidden-right {
+  display: none;
+  pointer-events: none;
+  transform: translateX(24px);
+  opacity: 0;
+}
+
+/* During transition, briefly overlay step wrappers */
+.step-transitioning {
+  position: relative;
+  overflow: hidden;
+}
+.step-transitioning .step-hidden-left,
+.step-transitioning .step-hidden-right {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* ── STEP PROGRESS INDICATORS ── */
+.step-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s-6);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.step-dots {
+  display: flex;
+  gap: var(--s-1h);
+}
+
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-border-strong);
+  transition: background var(--dur-normal) var(--ease), width var(--dur-normal) var(--ease);
+}
+
+.step-dot.active {
+  background: var(--brand);
+  width: 14px;
+}
+
+.step-dot.completed {
+  background: var(--brand-mid);
+}
+
+/* ── SLEEK SWITCH TOGGLE (Remember Me / Remember email) ── */
+.switch-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) 0;
+  margin-bottom: var(--s-4);
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.switch-toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-toggle-btn {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  background-color: var(--surface-border-strong);
+  border-radius: var(--r-full);
+  transition: background-color var(--dur-normal) var(--ease);
+  flex-shrink: 0;
+}
+
+.switch-toggle-btn::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: #fff;
+  border-radius: var(--r-full);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform var(--dur-normal) var(--ease);
+}
+
+.switch-toggle-input:checked + .switch-toggle-btn {
+  background-color: var(--brand);
+}
+
+.switch-toggle-input:checked + .switch-toggle-btn::after {
+  transform: translateX(20px);
+}
+
+.switch-toggle-input:focus-visible + .switch-toggle-btn {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ── OTP 6-CELL GRID INPUT ── */
+.otp-cells-container {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin: var(--s-4) 0 var(--s-6);
+}
+
+.otp-cell {
+  width: 46px;
+  height: 52px;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  text-align: center;
+  border: var(--input-border);
+  border-radius: var(--input-radius);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  font-family: var(--font-mono);
+}
+
+.otp-cell:focus {
+  border: var(--input-border-focus);
+  background: var(--input-bg-focus);
+  box-shadow: var(--input-shadow-focus);
+}
+
+.otp-cell.cell-invalid {
+  border-color: var(--negative) !important;
+  box-shadow: 0 0 0 3px var(--negative-bg) !important;
+}
+
+/* Hidden container for full value storage */
+.hidden-otp-val {
+  position: absolute;
+  opacity: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ── REAL-TIME PASSWORD STRENGTH BAR ── */
+.pwd-strength-container {
+  margin-top: var(--s-2);
+  margin-bottom: var(--s-4);
+}
+
+.pwd-strength-bar-track {
+  width: 100%;
+  height: 5px;
+  background: var(--surface-alt);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  margin-bottom: var(--s-1h);
+  border: 1px solid var(--surface-border);
+}
+
+.pwd-strength-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: var(--r-full);
+  transition: width var(--dur-normal) var(--ease), background-color var(--dur-normal) var(--ease);
+}
+
+.pwd-strength-label {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: block;
+}
+
+.pwd-strength-bar-fill.weak {
+  width: 33%;
+  background-color: var(--negative);
+}
+.pwd-strength-bar-fill.medium {
+  width: 66%;
+  background-color: var(--warning);
+}
+.pwd-strength-bar-fill.strong {
+  width: 100%;
+  background-color: var(--positive);
+}
+
+/* ── MISC STYLING ── */
+.btn-back-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.btn-back-header:hover {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+
+.btn-back-header svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* OTP Resend Timer and countdown decoration */
+.otp-countdown-text {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--s-3);
+  font-weight: var(--weight-medium);
+}
+.otp-countdown-text span.expired {
+  color: var(--negative);
+}
+.otp-countdown-text button {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.otp-countdown-text button:hover {
+  color: var(--brand-hover);
+}
+
+/* Shake card animation for errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.shake-card {
+  animation: shake 0.35s ease-in-out;
+}

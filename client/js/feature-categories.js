@@ -2,6 +2,20 @@
 /* Feature 4: Expense Categories + Monthly View in My Expenses */
 /* Refactored for Phase 6: Uses EventBus instead of monkey-patching and setTimeout polling */
 
+// Expose globally for lookup
+window.getCategoryIconSvg = function(categoryName) {
+  const name = String(categoryName || '').toLowerCase().trim();
+  let iconId = 'cat-other';
+  if (name === 'food') iconId = 'cat-food';
+  else if (name === 'travel') iconId = 'cat-travel';
+  else if (name === 'monthly bill' || name === 'bills' || name === 'bill') iconId = 'cat-utilities';
+  else if (name === 'outing' || name === 'entertainment') iconId = 'cat-entertainment';
+  else if (name === 'health') iconId = 'cat-health';
+  else if (name === 'shopping') iconId = 'cat-shopping';
+  
+  return `<svg class="icon-cat" aria-hidden="true" style="width:14px; height:14px; stroke:currentColor; fill:none; display:inline-block; vertical-align:middle;"><use href="icons/sprite.svg#${iconId}"></use></svg>`;
+};
+
 // ─────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────
@@ -44,12 +58,13 @@ function renderCategoryPills(containerId, currentCategoryId) {
     const border = isSelected ? cat.color : `${cat.color}55`;
     const color = isSelected ? '#fff' : cat.color;
 
+    const svgHtml = window.getCategoryIconSvg(cat.name);
     return `
       <button type="button" class="category-pill ${isSelected ? 'selected' : ''}"
         data-cat-id="${cat.id}"
         data-cat-color="${cat.color}"
         style="background:${bg}; border-color:${border}; color:${color};">
-        ${cat.icon} ${cat.name}
+        ${svgHtml} ${cat.name}
       </button>
     `;
   }).join('');
@@ -176,7 +191,8 @@ function addCategoryBadgeToExpenseCard(card, expense) {
     font-size:0.68rem; font-weight:600;
     margin-top:3px;
   `;
-  badge.innerHTML = `${expense.category_icon || '📦'} ${expense.category_name}`;
+  const svgHtml = window.getCategoryIconSvg ? window.getCategoryIconSvg(expense.category_name) : '📦';
+  badge.innerHTML = `${svgHtml} <span>${expense.category_name}</span>`;
 
   const infoEl = card.querySelector('.expense-info p') || card.querySelector('.expense-info__meta');
   if (infoEl) infoEl.insertAdjacentElement('afterend', badge);
@@ -284,7 +300,7 @@ function renderMonthlyView(container) {
         <div class="expense-info">
           <h4>${ex.description || 'Expense'}</h4>
           <p>
-            ${ex.category_icon || '📦'} ${ex.category_name || 'Other'}
+            ${window.getCategoryIconSvg ? window.getCategoryIconSvg(ex.category_name) : '📦'} ${ex.category_name || 'Other'}
             ${ex.is_synced_from_chapter ? `<span class="synced-expense-tag">🔗 ${ex.source_chapter_name || 'Synced'}</span>` : ''}
           </p>
         </div>
@@ -330,7 +346,7 @@ function renderCategoryView(container) {
     return `
       <div class="category-breakdown-row">
         <div class="category-dot" style="background:${cat.category_color};"></div>
-        <span class="category-label">${cat.category_icon} ${cat.category_name}</span>
+        <span class="category-label">${window.getCategoryIconSvg ? window.getCategoryIconSvg(cat.category_name) : '📦'} ${cat.category_name}</span>
         <span class="category-amount">₹${parseFloat(cat.total).toFixed(2)}</span>
         <span class="category-pct">${pct}%</span>
       </div>
@@ -398,8 +414,8 @@ async function loadAndRenderProfileCategories() {
 
   listEl.innerHTML = allCategories.map(cat => `
     <div class="category-list-item" data-cat-id="${cat.id}">
-      <div class="category-icon-bubble" style="background:${cat.color}22;">
-        <span style="font-size:1rem;">${cat.icon}</span>
+      <div class="category-icon-bubble" style="background:${cat.color}22; display:flex; align-items:center; justify-content:center;">
+        ${window.getCategoryIconSvg ? window.getCategoryIconSvg(cat.name) : cat.icon}
       </div>
       <span class="category-list-name">${cat.name}</span>
       ${cat.is_system

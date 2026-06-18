@@ -640,7 +640,20 @@ if (res.status === 401) {
         const input = newBtn.previousElementSibling;
         const isPass = input.type === 'password';
         input.type = isPass ? 'text' : 'password';
-        newBtn.textContent = isPass ? '🙈' : '👁️';
+        
+        const svg = newBtn.querySelector('svg');
+        if (svg) {
+          if (isPass) {
+            // eye-off SVG path
+            svg.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`;
+          } else {
+            // eye SVG path
+            svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+          }
+        } else {
+          newBtn.textContent = isPass ? '🙈' : '👁️';
+        }
+        
         if (navigator.vibrate) navigator.vibrate(10);
       };
       newBtn.addEventListener('touchstart', toggle, { passive: false });
@@ -722,25 +735,30 @@ function initPasswordValidation() {
 
     let iconHtml = '';
     if (type === 'success') {
-      iconHtml = `<div class="checkmark-circle"><div class="background"></div><div class="draw"></div></div>`;
+      iconHtml = `<div class="toast-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></div>`;
     } else if (type === 'error') {
-      iconHtml = `<span style="margin-right:10px; font-size:1.2rem;">⚠️</span>`;
+      iconHtml = `<div class="toast-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>`;
     } else if (type === 'info') {
-      iconHtml = `<span style="margin-right:10px; font-size:1.2rem;">ℹ️</span>`;
+      iconHtml = `<div class="toast-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>`;
     }
 
     let actionHtml = '';
     if (options && options.label && typeof options.callback === 'function') {
       actionHtml = `<button class="toast-action-btn" style="
         margin-left:12px; background:none; border:1px solid rgba(255,255,255,0.4);
-        color:#fff; padding:3px 10px; border-radius:6px; cursor:pointer;
-        font-family:var(--font-main); font-size:0.8rem; font-weight:600;
+        color:var(--text-primary); padding:3px 10px; border-radius:6px; cursor:pointer;
+        font-family:var(--font); font-size:0.8rem; font-weight:600;
         white-space:nowrap; flex-shrink:0;">
         ${options.label}
       </button>`;
     }
 
-    toast.innerHTML = `${iconHtml}<span style="flex:1;">${message}</span>${actionHtml}`;
+    toast.innerHTML = `
+      ${iconHtml}
+      <span style="flex:1;">${message}</span>
+      ${actionHtml}
+      <div class="toast-progress"></div>
+    `;
     toast.style.display = 'flex';
     toast.style.alignItems = 'center';
     toast.setAttribute('role', 'alert');
@@ -757,9 +775,46 @@ function initPasswordValidation() {
       }
     }
 
+    // Touch Swipe-to-dismiss on Mobile
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+
+    toast.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      isDragging = true;
+      toast.style.transition = 'none';
+    }, { passive: true });
+
+    toast.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      currentX = e.touches[0].clientX - startX;
+      if (currentX > 0) {
+        toast.style.transform = `translateX(${currentX}px)`;
+        toast.style.opacity = 1 - (currentX / 200);
+      }
+    }, { passive: true });
+
+    toast.addEventListener('touchend', () => {
+      isDragging = false;
+      toast.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
+      if (currentX > 80) {
+        toast.style.transform = `translateX(120%)`;
+        toast.style.opacity = 0;
+        setTimeout(() => {
+          if (toast.parentElement) toast.remove();
+        }, 150);
+      } else {
+        toast.style.transform = 'translateX(0)';
+        toast.style.opacity = '1';
+      }
+      currentX = 0;
+    });
+
     requestAnimationFrame(() => toast.classList.add('show'));
 
     setTimeout(() => {
+      if (isDragging) return;
       toast.classList.add('hiding');
       toast.addEventListener('animationend', () => {
         if (toast.parentElement) toast.remove();
