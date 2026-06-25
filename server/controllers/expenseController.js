@@ -3,8 +3,10 @@
 /* ALL EXISTING FUNCTIONS ARE UNCHANGED — only additions at the bottom + small modifications noted */
 
 const db = require("../config/db");
+const log = require("../utils/logger");
 const { z } = require("zod");
 const xss = require("xss");
+const { distributeEqually } = require("../utils/splits");
 
 // --- VALIDATION SCHEMA (Updated: added categoryId, expenseDate) ---
 const addExpenseSchema = z.object({
@@ -62,37 +64,9 @@ async function addExpense(req, res) {
     } else {
       const count = involvedMemberIds.length;
       if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
-     function distributeEqually(totalCents, memberIds) {
-  const count = memberIds.length;
-  const baseShare = Math.floor(totalCents / count);
-  const remainder = totalCents % count;
 
-  // Create array of shares
-  const shares = memberIds.map(() => baseShare);
-
-  // Randomly distribute remainder cents to avoid systematic bias
-  if (remainder > 0) {
-    // Shuffle indices using Fisher-Yates
-    const indices = memberIds.map((_, i) => i);
-    for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-    // Give extra cent to first `remainder` shuffled positions
-    for (let i = 0; i < remainder; i++) {
-      shares[indices[i]]++;
-    }
-  }
-
-  return memberIds.map((mId, i) => ({
-    memberId: Number(mId),
-    amount: shares[i] / 100,
-  }));
-}
-
-// USAGE (replace the forEach block):
-const splits = distributeEqually(totalCents, involvedMemberIds);
-splits.forEach(s => finalSplits.push(s));
+      const splits = distributeEqually(totalCents, involvedMemberIds);
+      splits.forEach(s => finalSplits.push(s));
     }
 
     const client = await db.pool.connect();
@@ -108,10 +82,12 @@ splits.forEach(s => finalSplits.push(s));
       );
       const expenseId = expenseRows[0].id;
 
-      for (const split of finalSplits) {
+      if (finalSplits.length > 0) {
+        const values = finalSplits.map((s, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(", ");
+        const params = [expenseId, ...finalSplits.flatMap(s => [s.memberId, s.amount])];
         await client.query(
-          `INSERT INTO expense_splits (expense_id, member_id, amount_owed) VALUES ($1, $2, $3)`,
-          [expenseId, split.memberId, split.amount]
+          `INSERT INTO expense_splits (expense_id, member_id, amount_owed) VALUES ${values}`,
+          params
         );
       }
 
@@ -124,7 +100,7 @@ splits.forEach(s => finalSplits.push(s));
       client.release();
     }
   } catch (err) {
-    console.error("addExpense error:", err);
+    log.error({ err }, "addExpense error");
     res.status(500).json({ ok: false, message: "Failed to add expense" });
   }
 }
@@ -194,7 +170,7 @@ async function getChapterExpenses(req, res) {
       }
     });
   } catch (err) {
-    console.error("getExpenses error:", err);
+    log.error({ err }, "getExpenses error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -218,7 +194,7 @@ async function deleteExpense(req, res) {
     await db.query("DELETE FROM expenses WHERE id = $1", [id]);
     res.json({ ok: true, message: "Expense deleted" });
   } catch (err) {
-    console.error("deleteExpense error:", err);
+    log.error({ err }, "deleteExpense error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -268,7 +244,7 @@ async function getExpenseSummary(req, res) {
 
     res.json({ ok: true, summary: rows, grandTotal: grandTotal.toFixed(2) });
   } catch (err) {
-    console.error("getSummary error:", err);
+    log.error({ err }, "getSummary error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -296,7 +272,7 @@ async function getExpenseDetails(req, res) {
 
     res.json({ ok: true, expense: expenseRows[0], involvedMemberIds: splitRows.map(s => s.member_id) });
   } catch (err) {
-    console.error("getDetails error:", err);
+    log.error({ err }, "getDetails error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -340,37 +316,9 @@ async function updateExpense(req, res) {
     } else {
       const count = involvedMemberIds.length;
       if (count === 0) return res.status(400).json({ ok: false, message: "No members involved" });
-    function distributeEqually(totalCents, memberIds) {
-  const count = memberIds.length;
-  const baseShare = Math.floor(totalCents / count);
-  const remainder = totalCents % count;
 
-  // Create array of shares
-  const shares = memberIds.map(() => baseShare);
-
-  // Randomly distribute remainder cents to avoid systematic bias
-  if (remainder > 0) {
-    // Shuffle indices using Fisher-Yates
-    const indices = memberIds.map((_, i) => i);
-    for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-    // Give extra cent to first `remainder` shuffled positions
-    for (let i = 0; i < remainder; i++) {
-      shares[indices[i]]++;
-    }
-  }
-
-  return memberIds.map((mId, i) => ({
-    memberId: Number(mId),
-    amount: shares[i] / 100,
-  }));
-}
-
-// USAGE (replace the forEach block):
-const splits = distributeEqually(totalCents, involvedMemberIds);
-splits.forEach(s => finalSplits.push(s));
+      const splits = distributeEqually(totalCents, involvedMemberIds);
+      splits.forEach(s => finalSplits.push(s));
     }
 
     const client = await db.pool.connect();
@@ -390,10 +338,12 @@ splits.forEach(s => finalSplits.push(s));
 
       await client.query("DELETE FROM expense_splits WHERE expense_id = $1", [id]);
 
-      for (const split of finalSplits) {
+      if (finalSplits.length > 0) {
+        const values = finalSplits.map((s, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(", ");
+        const params = [id, ...finalSplits.flatMap(s => [s.memberId, s.amount])];
         await client.query(
-          `INSERT INTO expense_splits (expense_id, member_id, amount_owed) VALUES ($1, $2, $3)`,
-          [id, split.memberId, split.amount]
+          `INSERT INTO expense_splits (expense_id, member_id, amount_owed) VALUES ${values}`,
+          params
         );
       }
 
@@ -406,7 +356,7 @@ splits.forEach(s => finalSplits.push(s));
       client.release();
     }
   } catch (err) {
-    console.error("updateExpense error:", err);
+    log.error({ err }, "updateExpense error");
     res.status(500).json({ ok: false, message: "Update failed" });
   }
 }
@@ -509,7 +459,7 @@ async function getChapterSettlements(req, res) {
 
     res.json({ ok: true, settlements: pendingSettlements, rawSettlements });
   } catch (err) {
-    console.error("getChapterSettlements error:", err);
+    log.error({ err }, "getChapterSettlements error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -567,7 +517,7 @@ async function bulkAssignEvent(req, res) {
     const action = eventId ? "assigned to event" : "removed from event";
     res.json({ ok: true, message: `${expenseIds.length} expense(s) ${action}` });
   } catch (err) {
-    console.error("bulkAssignEvent error:", err);
+    log.error({ err }, "bulkAssignEvent error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }

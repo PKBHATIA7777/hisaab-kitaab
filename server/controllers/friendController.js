@@ -2,6 +2,7 @@
 const db = require("../config/db");
 const { z } = require("zod");
 const xss = require("xss");
+const log = require("../utils/logger");
 const { calculateSettlements } = require("./expenseController");
 
 // --- VALIDATION SCHEMAS ---
@@ -32,7 +33,7 @@ async function addFriend(req, res) {
     res.json({ ok: true, message: "Friend added successfully", friend: rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ ok: false, message: "Friend with this username already exists." });
-    console.error("addFriend error:", err);
+    log.error({ err }, "addFriend error");
     res.status(500).json({ ok: false, message: "Failed to add friend" });
   }
 }
@@ -70,13 +71,13 @@ async function getFriends(req, res) {
     const { rows } = await db.query(settlementQuery, [userId]);
     return res.json({ ok: true, friends: rows });
   } catch (err) {
-    console.warn("⚠️ Settlement Query failed. Falling back to simple list.");
+    log.warn({ err }, "Settlement Query failed. Falling back to simple list.");
     try {
       const { rows } = await db.query(simpleQuery, [userId]);
       const friendsWithZero = rows.map(f => ({ ...f, total_balance: 0 }));
       return res.json({ ok: true, friends: friendsWithZero });
     } catch (fallbackErr) {
-      console.error("❌ Critical Database Error:", fallbackErr);
+      log.error({ err: fallbackErr }, "Critical Database Error in getFriends fallback");
       return res.status(500).json({ ok: false, message: "Server error" });
     }
   }
@@ -103,7 +104,7 @@ async function updateFriend(req, res) {
     res.json({ ok: true, message: "Friend updated", friend: rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ ok: false, message: "Username already taken." });
-    console.error("updateFriend error:", err);
+    log.error({ err }, "updateFriend error");
     res.status(500).json({ ok: false, message: "Failed to update" });
   }
 }
@@ -117,7 +118,7 @@ async function deleteFriend(req, res) {
     if (rowCount === 0) return res.status(404).json({ ok: false, message: "Friend not found" });
     res.json({ ok: true, message: "Friend deleted" });
   } catch (err) {
-    console.error("deleteFriend error:", err);
+    log.error({ err }, "deleteFriend error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -229,7 +230,7 @@ async function getFriendSettlements(req, res) {
 
     res.json({ ok: true, friendName, grandTotal: grandTotal.toFixed(2), chapters: chapterDetails });
   } catch (err) {
-    console.error("getFriendSettlements error:", err);
+    log.error({ err }, "getFriendSettlements error");
     res.status(500).json({ ok: false, message: "Failed to load settlements" });
   }
 }

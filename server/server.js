@@ -1,4 +1,20 @@
 require("dotenv").config();
+
+// ── SENTRY INITIALIZATION (Must be before anything else) ──────
+const Sentry = require("@sentry/node");
+const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || "",
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+  profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+  environment: process.env.NODE_ENV || "development",
+  enabled: process.env.NODE_ENV !== "test" // Disable in tests to avoid open handles
+});
+
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -13,6 +29,7 @@ const httpLogger = require("./middleware/httpLogger");
 const csrfProtection = require("./middleware/csrfMiddleware");
 const db = require("./config/db");
 const log = require("./utils/logger"); // For structured logging in cleanup jobs & controllers
+const { requireAuth } = require("./middleware/authMiddleware");
 
 // ── EXISTING ROUTES ───────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
@@ -116,7 +133,9 @@ app.use(helmet({
         "https://lh3.googleusercontent.com",
         "https://www.gstatic.com",
       ],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
+      styleSrcElem: ["'self'", "https://fonts.googleapis.com"],
+      styleSrcAttr: ["'self'", "'unsafe-inline'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       frameAncestors: ["'self'"],
       // CSP violation reporting endpoint
@@ -194,7 +213,7 @@ app.use((req, res, next) => {
 async function otpEmailLimiter(req, res, next) {
   const email = (req.body?.email || "").toLowerCase().trim();
   if (!email) return next();
-  
+
   try {
     // Count OTP requests for this email in the last 15 minutes
     // We count rows in the otps table — each request creates/updates one row.
@@ -207,9 +226,9 @@ async function otpEmailLimiter(req, res, next) {
          AND created_at > NOW() - INTERVAL '15 minutes'`,
       [email]
     );
-    
+
     const count = parseInt(rows[0]?.request_count || '0');
-    
+
     // Allow max 5 OTP requests per email per 15 minutes
     if (count >= 5) {
       const lastRequest = rows[0]?.last_request;
@@ -220,7 +239,7 @@ async function otpEmailLimiter(req, res, next) {
         retryAfter: 900 // 15 minutes in seconds
       });
     }
-    
+
     next();
   } catch (err) {
     // If DB check fails, allow the request through (fail open for OTP)
@@ -232,9 +251,9 @@ async function otpEmailLimiter(req, res, next) {
 
 // Apply to OTP request routes (BEFORE authLimiter):
 // Note: These are now async middleware — Express 4/5 handles this correctly
-app.use("/api/auth/register/request-otp", otpEmailLimiter);
-app.use("/api/auth/login/otp-request", otpEmailLimiter);
-app.use("/api/auth/forgot/request-otp", otpEmailLimiter);
+app.use(["/api/auth/register/request-otp", "/api/v1/auth/register/request-otp"], otpEmailLimiter);
+app.use(["/api/auth/login/otp-request", "/api/v1/auth/login/otp-request"], otpEmailLimiter);
+app.use(["/api/auth/forgot/request-otp", "/api/v1/auth/forgot/request-otp"], otpEmailLimiter);
 // ── END PHASE 5 STEP 16 ──────────────────────────────────────
 
 // AUTH LIMITER: Use IP only — login/register endpoints have no verified user yet
@@ -250,15 +269,15 @@ const authLimiter = rateLimit({
     return req.ip || "unknown";
   }
 });
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/login/otp-request", authLimiter);
-app.use("/api/auth/login/otp-verify", authLimiter);
-app.use("/api/auth/register/request-otp", authLimiter);
-app.use("/api/auth/register/verify-otp", authLimiter);
-app.use("/api/auth/register/complete", authLimiter);
-app.use("/api/auth/forgot/request-otp", authLimiter);
-app.use("/api/auth/forgot/reset", authLimiter);
-app.use("/api/auth/google", authLimiter);
+app.use(["/api/auth/login", "/api/v1/auth/login"], authLimiter);
+app.use(["/api/auth/login/otp-request", "/api/v1/auth/login/otp-request"], authLimiter);
+app.use(["/api/auth/login/otp-verify", "/api/v1/auth/login/otp-verify"], authLimiter);
+app.use(["/api/auth/register/request-otp", "/api/v1/auth/register/request-otp"], authLimiter);
+app.use(["/api/auth/register/verify-otp", "/api/v1/auth/register/verify-otp"], authLimiter);
+app.use(["/api/auth/register/complete", "/api/v1/auth/register/complete"], authLimiter);
+app.use(["/api/auth/forgot/request-otp", "/api/v1/auth/forgot/request-otp"], authLimiter);
+app.use(["/api/auth/forgot/reset", "/api/v1/auth/forgot/reset"], authLimiter);
+app.use(["/api/auth/google", "/api/v1/auth/google"], authLimiter);
 // NOTE: /api/auth/me, /api/auth/logout, /api/auth/check-identifier deliberately excluded
 
 // WRITE LIMITER: Runs AFTER requireAuth middleware — req.user is cryptographically verified
@@ -277,18 +296,18 @@ const writeLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
-app.use("/api/chapters", (req, res, next) => {
+app.use(["/api/chapters", "/api/v1/chapters"], (req, res, next) => {
   if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) return writeLimiter(req, res, next);
   next();
 });
-app.use("/api/expenses", (req, res, next) => {
+app.use(["/api/expenses", "/api/v1/expenses"], (req, res, next) => {
   if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) return writeLimiter(req, res, next);
   next();
 });
 
 // ✅ ADD middleware to handle idempotency keys for expense creation:
 // This prevents duplicate expenses if the retry fires after a partially successful request
-app.use("/api/expenses", (req, res, next) => {
+app.use(["/api/expenses", "/api/v1/expenses"], (req, res, next) => {
   const key = req.headers["x-idempotency-key"];
   if (key && ["POST"].includes(req.method)) {
     req.idempotencyKey = key;
@@ -297,7 +316,7 @@ app.use("/api/expenses", (req, res, next) => {
 });
 
 // ✅ NEW: Apply write limiter to categories mutations
-app.use("/api/categories", (req, res, next) => {
+app.use(["/api/categories", "/api/v1/categories"], (req, res, next) => {
   if (["POST", "PUT", "DELETE"].includes(req.method)) return writeLimiter(req, res, next);
   next();
 });
@@ -311,8 +330,8 @@ const readHeavyLimiter = rateLimit({
   message: { ok: false, message: "Too many requests, please wait a moment." },
   keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req)
 });
-app.use("/api/expenses/chapter/:chapterId/settlements", readHeavyLimiter);
-app.use("/api/expenses/chapter/:chapterId/summary", readHeavyLimiter);
+app.use(["/api/expenses/chapter/:chapterId/settlements", "/api/v1/expenses/chapter/:chapterId/settlements"], readHeavyLimiter);
+app.use(["/api/expenses/chapter/:chapterId/summary", "/api/v1/expenses/chapter/:chapterId/summary"], readHeavyLimiter);
 
 // ── EXPORT ENDPOINT RATE LIMIT (SECURITY FIX AUTH-002) ────────────────────
 // Export endpoint runs after requireAuth, so req.user is safe to use
@@ -329,31 +348,41 @@ const exportLimiter = rateLimit({
     return req.ip || "unknown";
   }
 });
-app.use("/api/chapters/:id/export", exportLimiter);
+app.use(["/api/chapters/:id/export", "/api/v1/chapters/:id/export"], exportLimiter);
 
 // ── MIDDLEWARE (identical to original) ───────────────────────
-app.use(express.json());
+app.use(express.json({ limit: '16kb' }));
 app.use(cookieParser());
 app.use((req, res, next) => {  // Authenticated routes vary by cookie — critical for any CDN layer
   res.setHeader('Vary', 'Cookie, Accept-Encoding');
   next();
 });
-app.use((req, res, next) => {  if (req.path === '/ping') return next();
+app.use((req, res, next) => {
+  if (req.path === '/ping') return next();
   csrfProtection(req, res, next);
 });
 
 // ── CONFIG ENDPOINT (identical to original) ──────────────────
+app.get("/api/v1/config", (req, res) => {
+  res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID });
+});
 app.get("/api/config", (req, res) => {
   res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID });
 });
 
 // ── ROUTES ───────────────────────────────────────────────────
+// v1 routes (canonical)
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/chapters", chapterRoutes);
+app.use("/api/v1/expenses", expenseRoutes);
+app.use("/api/v1/friends", friendRoutes);
+app.use("/api/v1/categories", categoryRoutes);
+
+// Backward-compat alias (to be removed later)
 app.use("/api/auth", authRoutes);
 app.use("/api/chapters", chapterRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/friends", friendRoutes);
-
-// ✅ NEW route registrations
 app.use("/api/categories", categoryRoutes);
 
 // ── WARM UP EMAIL CONNECTION ON STARTUP ──────────────────────
@@ -373,7 +402,7 @@ const _metrics = {
 app.use((req, res, next) => {
   _metrics.requests++;
   const originalEnd = res.end;
-  res.end = function(...args) {
+  res.end = function (...args) {
     if (res.statusCode >= 500) _metrics.errors++;
     return originalEnd.apply(this, args);
   };
@@ -382,13 +411,27 @@ app.use((req, res, next) => {
 
 // 🔍 STEP 23 — Enhanced Health Check & Readiness Probe with Metrics
 app.get("/api/health", async (req, res) => {
-  const checks = { 
-    status: "ok", 
+  let isHealthy = true;
+  try {
+    await db.query("SELECT 1");
+  } catch (err) {
+    isHealthy = false;
+    log.error({ err }, "Health check: Database connection failed");
+  }
+
+  const status = isHealthy ? "ok" : "degraded";
+  const statusCode = isHealthy ? 200 : 503;
+  res.status(statusCode).json({ status });
+});
+
+app.get("/api/health/detailed", requireAuth, async (req, res) => {
+  const checks = {
+    status: "ok",
     timestamp: new Date().toISOString(),
     uptime: Math.floor((Date.now() - _metrics.startTime) / 1000) + 's',
     requests: _metrics.requests,
     errors: _metrics.errors,
-    errorRate: _metrics.requests > 0 
+    errorRate: _metrics.requests > 0
       ? (((_metrics.errors / _metrics.requests) * 100).toFixed(2) + '%')
       : '0%',
     memory: (() => {
@@ -407,17 +450,31 @@ app.get("/api/health", async (req, res) => {
   } catch (err) {
     checks.database = "error";
     checks.status = "degraded";
-    log.error({ err }, "Health check: Database connection failed");
+    log.error({ err }, "Detailed health check: Database connection failed");
   }
 
   // Check Neon connection pool
   try {
     const { rows } = await db.query("SELECT COUNT(*) as active FROM pg_stat_activity WHERE state = 'active'");
     checks.dbConnections = rows[0]?.active || 'unknown';
-  } catch(_) {}
+  } catch (_) { }
 
   const statusCode = checks.status === "ok" ? 200 : 503;
   res.status(statusCode).json(checks);
+});
+
+// ── SENTRY EXPRESS ERROR HANDLER ───────────────────────────────
+Sentry.setupExpressErrorHandler(app);
+
+// Global Error Handler for API routes
+app.use("/api", (err, req, res, next) => {
+  log.error({ err }, "Unhandled API Error");
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    ok: false,
+    message: process.env.NODE_ENV === "production" ? "Internal Server Error" : err.message,
+    sentryErrorId: res.sentry || undefined,
+  });
 });
 
 app.use("/api", (req, res) => {
@@ -431,9 +488,32 @@ app.use("/api", (req, res) => {
 // for <24h, which is acceptable for this app.
 const fs = require("fs");
 const swPath = path.join(__dirname, "../client/sw.js");
-app.get("/sw.js", (req, res) => {
+
+let cachedSwBase = null;
+let lastSwReadTime = 0;
+const SW_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+async function getSwContent() {
+  const now = Date.now();
+  if (!cachedSwBase || (now - lastSwReadTime > SW_CACHE_DURATION)) {
+    try {
+      const content = await fs.promises.readFile(swPath, "utf8");
+      cachedSwBase = content;
+      lastSwReadTime = now;
+    } catch (err) {
+      if (cachedSwBase) {
+        log.warn({ err }, "Failed to re-read sw.js, using stale cache");
+      } else {
+        throw err;
+      }
+    }
+  }
+  return cachedSwBase;
+}
+
+app.get("/sw.js", async (req, res) => {
   try {
-    let swContent = fs.readFileSync(swPath, "utf8");
+    let swContent = await getSwContent();
     // Inject today's date into the CACHE_VERSION constant
     // e.g. "v7" becomes "v7-20260524"
     const now = new Date();
@@ -459,42 +539,44 @@ app.get(/^(?!\/api).+/, (req, res) => {
 });
 
 // ── OTP CLEANUP (identical to original) ──────────────────────
-setInterval(async () => {
-  try {
-    await db.query("DELETE FROM otps WHERE expires_at < NOW()");
-    log.info({}, "Cleaned up expired OTPs");
-  } catch (err) {
-    log.error({ err }, "OTP Cleanup Error");
-  }
-}, 60 * 60 * 1000);
-
-// ── DEVICE SESSION CLEANUP (NEW: Remove stale sessions older than 90 days) ──────────────────────
-// Clean up stale device sessions (older than 90 days)
-setInterval(async () => {
-  try {
-    await db.query(
-      "DELETE FROM device_sessions WHERE last_active_at < NOW() - INTERVAL '90 days'"
-    );
-    log.info({}, "Cleaned up stale device sessions");
-  } catch (err) {
-    log.error({ err }, "Device session cleanup error");
-  }
-}, 24 * 60 * 60 * 1000); // Daily
-
-// ── STEP 18: Refresh Token Cleanup Job ───────────────────────
-// Runs every 6 hours to remove expired or revoked refresh tokens
-setInterval(async () => {
-  try {
-    const { rows } = await db.query(
-      "DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked = TRUE RETURNING id"
-    );
-    if (rows.length > 0) {
-      log.info({ count: rows.length }, "Cleaned up expired/revoked refresh tokens");
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(async () => {
+    try {
+      await db.query("DELETE FROM otps WHERE expires_at < NOW()");
+      log.info({}, "Cleaned up expired OTPs");
+    } catch (err) {
+      log.error({ err }, "OTP Cleanup Error");
     }
-  } catch (err) {
-    log.error({ err }, "Refresh token cleanup error");
-  }
-}, 6 * 60 * 60 * 1000); // Every 6 hours
+  }, 60 * 60 * 1000);
+
+  // ── DEVICE SESSION CLEANUP (NEW: Remove stale sessions older than 90 days) ──────────────────────
+  // Clean up stale device sessions (older than 90 days)
+  setInterval(async () => {
+    try {
+      await db.query(
+        "DELETE FROM device_sessions WHERE last_active_at < NOW() - INTERVAL '90 days'"
+      );
+      log.info({}, "Cleaned up stale device sessions");
+    } catch (err) {
+      log.error({ err }, "Device session cleanup error");
+    }
+  }, 24 * 60 * 60 * 1000); // Daily
+
+  // ── STEP 18: Refresh Token Cleanup Job ───────────────────────
+  // Runs every 6 hours to remove expired or revoked refresh tokens
+  setInterval(async () => {
+    try {
+      const { rows } = await db.query(
+        "DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked = TRUE RETURNING id"
+      );
+      if (rows.length > 0) {
+        log.info({ count: rows.length }, "Cleaned up expired/revoked refresh tokens");
+      }
+    } catch (err) {
+      log.error({ err }, "Refresh token cleanup error");
+    }
+  }, 6 * 60 * 60 * 1000); // Every 6 hours
+}
 // ── END STEP 18 ─────────────────────────────────────────────
 
 // ── GRACEFUL SHUTDOWN (identical to original) ─────────────────
@@ -503,9 +585,9 @@ process.on("SIGTERM", async () => {
   try {
     if (db.pool) { await db.pool.end(); log.info({}, "Database connection pool closed"); }
     process.exit(0);
-  } catch (err) { 
-    log.error({ err }, "Error during shutdown"); 
-    process.exit(1); 
+  } catch (err) {
+    log.error({ err }, "Error during shutdown");
+    process.exit(1);
   }
 });
 
@@ -514,19 +596,23 @@ process.on("SIGINT", async () => {
   try {
     if (db.pool) { await db.pool.end(); log.info({}, "Database connection pool closed"); }
     process.exit(0);
-  } catch (err) { 
-    log.error({ err }, "Error during shutdown"); 
-    process.exit(1); 
+  } catch (err) {
+    log.error({ err }, "Error during shutdown");
+    process.exit(1);
   }
 });
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔒 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`⚡ Rate Limits: Global=${isProduction ? 100 : 1000}/15min | Write=${isProduction ? 30 : 100}/min`);
-  log.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
-  
-  // Warm up email connection in background (non-blocking)
-  warmUpEmailConnection().catch(() => {}); // ← ADD THIS LINE ONLY
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 5001;
+  app.listen(PORT, () => {
+    log.info({ port: PORT }, `Server running on port ${PORT}`);
+    log.info({ env: process.env.NODE_ENV || "development" }, `Environment: ${process.env.NODE_ENV || "development"}`);
+    log.info(`Rate Limits: Global=${isProduction ? 100 : 1000}/15min | Write=${isProduction ? 30 : 100}/min`);
+    log.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
+
+    // Warm up email connection in background (non-blocking)
+    warmUpEmailConnection().catch(() => { }); // ← ADD THIS LINE ONLY
+  });
+}
+
+module.exports = app;

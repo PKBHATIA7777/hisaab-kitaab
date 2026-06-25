@@ -37,6 +37,7 @@ const ChapterCardMenu = (() => {
         try {
           await apiFetch(`/chapters/${chapter.id}/archive`, { method: 'PATCH', body: { is_archived: !chapter.is_archived } });
           showToast(chapter.is_archived ? 'Chapter restored' : 'Marked as settled', 'success');
+          if (typeof window.haptic === 'function') window.haptic('success');
           ChaptersGrid.load();
         } catch (err) { showToast(err.message || 'Failed', 'error'); }
       } else if (action === 'delete') {
@@ -44,6 +45,7 @@ const ChapterCardMenu = (() => {
         try {
           await apiFetch(`/chapters/${chapter.id}`, { method: 'DELETE' });
           showToast('Chapter deleted', 'info');
+          if (typeof window.haptic === 'function') window.haptic('medium');
           ChaptersGrid.load();
         } catch (err) { showToast(err.message || 'Failed', 'error'); }
       }

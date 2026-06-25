@@ -6,7 +6,8 @@
       try {
         await apiFetch("/auth/me");
       } catch (e) {
-        window.location.href = "signup.html";
+        if (typeof window.navigateTo === 'function') window.navigateTo("signup.html");
+        else window.location.href = "signup.html";
       }
     })();
 
@@ -53,7 +54,8 @@
           });
 
           alert("Password set successfully. You can now log in with email / username.");
-          window.location.href = "dashboard.html";
+          if (typeof window.navigateTo === 'function') window.navigateTo("dashboard.html");
+          else window.location.href = "dashboard.html";
         } catch (err) {
           alert(err.message || "Failed to set password");
         }

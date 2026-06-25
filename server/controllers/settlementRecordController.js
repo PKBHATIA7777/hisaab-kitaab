@@ -2,6 +2,7 @@
 /* Feature 1: Mark settlements as settled/received */
 
 const db = require("../config/db");
+const log = require("../utils/logger");
 const { z } = require("zod");
 
 const markSchema = z.object({
@@ -57,7 +58,7 @@ async function markSettlement(req, res) {
 
     res.json({ ok: true, message: "Settlement marked as completed", record: rows[0] });
   } catch (err) {
-    console.error("markSettlement error:", err);
+    log.error({ err }, "markSettlement error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -110,7 +111,7 @@ async function getSettlementHistory(req, res) {
     const { rows } = await db.query(queryText, params);
     res.json({ ok: true, history: rows });
   } catch (err) {
-    console.error("getSettlementHistory error:", err);
+    log.error({ err }, "getSettlementHistory error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -144,7 +145,7 @@ async function undoSettlement(req, res) {
 
     res.json({ ok: true, message: "Settlement undone — moved back to pending" });
   } catch (err) {
-    console.error("undoSettlement error:", err);
+    log.error({ err }, "undoSettlement error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }

@@ -21,35 +21,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   </noscript>
   
-  <style>
-    .glass-card h3 {
-      font-size: var(--text-md);
-      font-weight: var(--weight-bold);
-      color: var(--text-primary);
-      margin-top: var(--s-6);
-      margin-bottom: var(--s-2);
-      border-left: 3px solid var(--brand);
-      padding-left: var(--s-3);
-    }
-    .glass-card ul {
-      margin-bottom: var(--s-4);
-      padding-left: var(--s-5);
-      color: var(--text-secondary);
-    }
-    .glass-card li {
-      margin-bottom: var(--s-2);
-      font-size: var(--text-sm);
-      line-height: var(--leading-relaxed);
-    }
-    .last-updated {
-      font-size: var(--text-2xs);
-      color: var(--text-muted);
-      margin-bottom: var(--s-6);
-      display: block;
-    }
-  </style>
+
   <!-- Theme Loader — synchronous to prevent FOUC -->
   <script src="js/core/theme-loader.js"></script>
+  <!-- Social Media Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hisaab-Kitaab">
+  <meta property="og:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta property="og:description" content="Track who paid what and settle group expenses fairly. Hisaab-Kitaab makes splitting bills with friends, flatmates, and family effortless.">
+  <meta property="og:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta name="twitter:description" content="Track who paid what and settle group expenses fairly.">
+  <meta name="twitter:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  
+  <!-- Monitoring -->
+  <script src="https://browser.sentry-cdn.com/8.5.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js"></script>
+  <script src="js/monitoring.js" defer></script>
+
 </head>
 <body>
 

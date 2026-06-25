@@ -3,6 +3,7 @@
 
 const db = require("../config/db");
 const xss = require("xss");
+const log = require("../utils/logger");
 
 // ─────────────────────────────────────────────────────────────
 // Internal helper: create the "My Expenses" chapter for a user
@@ -55,7 +56,7 @@ async function createPersonalChapter(req, res) {
     const chapter = await createPersonalChapterForUser(userId, null);
     res.json({ ok: true, message: "Personal chapter ready", chapter });
   } catch (err) {
-    console.error("createPersonalChapter error:", err);
+    log.error({ err }, "createPersonalChapter error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -77,12 +78,12 @@ async function getPersonalChapterStatus(req, res) {
     // Lazily create for existing users — fire and forget, respond immediately
     setImmediate(() => {
       createPersonalChapterForUser(userId, null).catch(err =>
-        console.error(`Lazy personal chapter for user ${userId}:`, err.message)
+        log.error({ err, userId }, "Lazy personal chapter creation failed")
       );
     });
     res.json({ ok: true, hasPersonalChapter: false, chapter: null });
   } catch (err) {
-    console.error("getPersonalChapterStatus error:", err);
+    log.error({ err }, "getPersonalChapterStatus error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -173,7 +174,7 @@ async function addToPersonalFromChapter(req, res) {
       client.release();
     }
   } catch (err) {
-    console.error("addToPersonalFromChapter error:", err);
+    log.error({ err }, "addToPersonalFromChapter error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -236,7 +237,7 @@ async function getSyncStatus(req, res) {
       dismissed: synced.sync_dismissed
     });
   } catch (err) {
-    console.error("getSyncStatus error:", err);
+    log.error({ err }, "getSyncStatus error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -331,7 +332,7 @@ async function updateSyncedExpense(req, res) {
       client.release();
     }
   } catch (err) {
-    console.error("updateSyncedExpense error:", err);
+    log.error({ err }, "updateSyncedExpense error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }

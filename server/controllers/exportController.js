@@ -3,6 +3,7 @@
 /* All other logic is identical to original */
 
 const db = require("../config/db");
+const log = require("../utils/logger");
 const ExcelJS = require("exceljs");
 const { calculateSettlements } = require("./expenseController");
 const { getNetSettlements } = require("./settlementRecordController");
@@ -232,7 +233,7 @@ async function exportChapter(req, res) {
     res.end();
 
   } catch (err) {
-    console.error("Export Error:", err);
+    log.error({ err }, "Export Error");
     res.status(500).json({ ok: false, message: "Failed to generate export" });
   }
 }

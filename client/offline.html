@@ -19,72 +19,44 @@
   <noscript>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   </noscript>
-  <style>
-    body {
-      background-color: var(--bg-app);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100dvh;
-      margin: 0;
-      padding: var(--s-5);
-    }
-    .offline-card {
-      background: var(--surface);
-      border: 1px solid var(--surface-border);
-      border-radius: var(--r-xl);
-      padding: var(--s-8) var(--s-6);
-      max-width: 400px;
-      width: 100%;
-      text-align: center;
-      box-shadow: var(--shadow-xl);
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .offline-icon {
-      color: var(--brand);
-      filter: drop-shadow(var(--brand-glow-sm));
-      margin-bottom: var(--s-6);
-    }
-    .offline-title {
-      font-size: var(--text-xl);
-      font-weight: var(--weight-bold);
-      color: var(--text-primary);
-      margin: 0 0 var(--s-2);
-      letter-spacing: -0.5px;
-    }
-    .offline-text {
-      font-size: var(--text-sm);
-      color: var(--text-secondary);
-      line-height: var(--leading-relaxed);
-      margin: 0 0 var(--s-8);
-    }
-    .offline-btn {
-      width: 100%;
-      max-width: 200px;
-    }
-  </style>
+
   <!-- Theme Loader — synchronous to prevent FOUC -->
   <script src="js/core/theme-loader.js"></script>
+  <!-- Social Media Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hisaab-Kitaab">
+  <meta property="og:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta property="og:description" content="Track who paid what and settle group expenses fairly. Hisaab-Kitaab makes splitting bills with friends, flatmates, and family effortless.">
+  <meta property="og:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta name="twitter:description" content="Track who paid what and settle group expenses fairly.">
+  <meta name="twitter:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  
+  <!-- Monitoring -->
+  <script src="https://browser.sentry-cdn.com/8.5.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js"></script>
+  <script src="js/monitoring.js" defer></script>
+
 </head>
 <body>
 
   <!-- Ambient glow backdrop matching the landing page -->
   <div class="landing-glow" aria-hidden="true"></div>
 
-  <div class="offline-card" id="main-content">
-    <svg class="offline-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="1" y1="1" x2="23" y2="23"></line>
-      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
-      <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
-      <path d="M7.34 16.7a6 6 0 0 1 9.32 0"></path>
-      <line x1="12" y1="20" x2="12.01" y2="20"></line>
-    </svg>
-    <h1 class="offline-title">You're Offline</h1>
-    <p class="offline-text">Hisaab-Kitaab needs an active internet connection to sync your expenses. Check your network status and try again.</p>
-    <button class="btn-primary offline-btn" onclick="window.location.reload()">Try Again</button>
+  <div class="offline-container">
+    <div class="offline-card" id="main-content">
+      <svg class="offline-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
+        <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
+        <path d="M7.34 16.7a6 6 0 0 1 9.32 0"></path>
+        <line x1="12" y1="20" x2="12.01" y2="20"></line>
+      </svg>
+      <h1 class="offline-title">You're Offline</h1>
+      <p class="offline-text">Hisaab-Kitaab needs an active internet connection to sync your expenses. Check your network status and try again.</p>
+      <button class="btn-primary offline-btn" onclick="window.location.reload()">Try Again</button>
+    </div>
   </div>
 
 </body>

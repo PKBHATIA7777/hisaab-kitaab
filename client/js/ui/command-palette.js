@@ -17,7 +17,10 @@
         label: 'Go to Dashboard',
         icon: 'home',
         shortcut: 'G D',
-        action: () => { window.location.href = 'dashboard.html'; }
+        action: () => {
+          if (typeof window.navigateTo === 'function') window.navigateTo('dashboard.html');
+          else window.location.href = 'dashboard.html';
+        }
       },
       {
         id: 'toggle-theme',
@@ -206,7 +209,10 @@
     });
   }
 
+  let triggerElement = null;
+
   function openPalette() {
+    triggerElement = document.activeElement;
     buildPaletteDOM();
     selectedIndex = 0;
     input.value = '';
@@ -219,6 +225,10 @@
     if (overlay) {
       overlay.classList.remove('is-open');
       input.blur();
+      if (triggerElement && typeof triggerElement.focus === 'function') {
+        setTimeout(() => triggerElement.focus(), 10);
+      }
+      triggerElement = null;
     }
   }
 

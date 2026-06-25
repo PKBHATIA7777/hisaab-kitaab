@@ -3,7 +3,8 @@
 // and store fallback in sessionStorage
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const res = await fetch(window.APP_CONFIG?.API_BASE + '/auth/me' || '/api/auth/me', {
+    const apiBase = window.APP_CONFIG?.API_BASE || '/api/v1';
+    const res = await fetch(apiBase + '/auth/me', {
       method: 'GET',
       credentials: 'include',
     });
@@ -371,5 +372,6 @@ function loginSuccess(data) {
   // and can be manipulated to suppress expiry warnings. The session_expiry cookie
   // (set server-side, httpOnly:false so JS can read it) is the authoritative source.
   if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
-  window.location.href = "dashboard.html";
+  if (typeof window.navigateTo === 'function') window.navigateTo("dashboard.html");
+  else window.location.href = "dashboard.html";
 }

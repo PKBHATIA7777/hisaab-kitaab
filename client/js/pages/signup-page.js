@@ -3,7 +3,8 @@
 // and store fallback in sessionStorage
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const res = await fetch(window.APP_CONFIG?.API_BASE + '/auth/me' || '/api/auth/me', {
+    const apiBase = window.APP_CONFIG?.API_BASE || '/api/v1';
+    const res = await fetch(apiBase + '/auth/me', {
       method: 'GET',
       credentials: 'include',
     });
@@ -39,6 +40,15 @@ const els = {
 document.addEventListener('DOMContentLoaded', () => {
   if (window.initPasswordToggles) initPasswordToggles();
   els.inputEmail.focus();
+
+  // Show fallback message if Google button didn't render (e.g., Brave Shields)
+  setTimeout(() => {
+    const googleBtn = document.querySelector('.g_id_signin iframe');
+    if (!googleBtn) {
+      const msg = document.getElementById('google-blocked-msg');
+      if (msg) msg.style.display = 'block';
+    }
+  }, 2000);
 });
 
 /* --- STEP 1: EMAIL --- */
@@ -263,7 +273,8 @@ async function handleDetailsSubmit(e) {
     });
 
     if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
-    window.location.href = "dashboard.html";
+    if (typeof window.navigateTo === 'function') window.navigateTo("dashboard.html");
+    else window.location.href = "dashboard.html";
 
   } catch (err) {
     showToast(err.message || "Registration failed", "error");

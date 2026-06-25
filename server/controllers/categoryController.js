@@ -2,6 +2,7 @@
 /* Feature 4: Expense Categories */
 
 const db = require("../config/db");
+const log = require("../utils/logger");
 const { z } = require("zod");
 const xss = require("xss");
 
@@ -29,7 +30,7 @@ async function getCategories(req, res) {
 
     res.json({ ok: true, categories: rows });
   } catch (err) {
-    console.error("getCategories error:", err);
+    log.error({ err }, "getCategories error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -71,7 +72,7 @@ async function createCategory(req, res) {
     if (err.code === "23505") {
       return res.status(400).json({ ok: false, message: "A category with this name already exists" });
     }
-    console.error("createCategory error:", err);
+    log.error({ err }, "createCategory error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -110,7 +111,7 @@ async function updateCategory(req, res) {
     if (err.code === "23505") {
       return res.status(400).json({ ok: false, message: "A category with this name already exists" });
     }
-    console.error("updateCategory error:", err);
+    log.error({ err }, "updateCategory error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -136,7 +137,7 @@ async function deleteCategory(req, res) {
     // Expenses that had this category are set to NULL via ON DELETE SET NULL in DB
     res.json({ ok: true, message: "Category deleted" });
   } catch (err) {
-    console.error("deleteCategory error:", err);
+    log.error({ err }, "deleteCategory error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -210,7 +211,7 @@ async function getMonthlyBreakdown(req, res) {
 
     res.json({ ok: true, months: monthRows, categories: catRows, expenses: expRows });
   } catch (err) {
-    console.error("getMonthlyBreakdown error:", err);
+    log.error({ err }, "getMonthlyBreakdown error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }

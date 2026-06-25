@@ -1,5 +1,6 @@
 /* server/config/db.js */
 const { Pool } = require("pg");
+const log = require("../utils/logger");
 
 // =========================================
 // 1. STRICT ENV VALIDATION (Fail Fast)
@@ -14,8 +15,7 @@ const requiredEnv = [
 const missingEnv = requiredEnv.filter((key) => !process.env[key]);
 
 if (missingEnv.length > 0) {
-  console.error("❌ CRITICAL ERROR: Missing Environment Variables:");
-  missingEnv.forEach((key) => console.error(`   - ${key}`));
+  log.error({ missingEnv }, "CRITICAL ERROR: Missing Environment Variables");
   process.exit(1); // Stop the server immediately
 }
 
@@ -57,11 +57,11 @@ async function query(text, params) {
         (typeof err.message === "string" && err.message.includes("timeout"));
 
       if (attempt === 3 || !isConnectionError) {
-        console.error(`❌ Database Error (Attempt ${attempt}):`, err.message);
+        log.error({ err, attempt }, `Database Error`);
         throw err; // Give up after 3 tries or non-connection error
       }
 
-      console.log(`Database waking up (Attempt ${attempt})...`);
+      log.info({ attempt }, `Database waking up...`);
       await new Promise((res) => setTimeout(res, 1000)); // Wait 1 second
     }
   }

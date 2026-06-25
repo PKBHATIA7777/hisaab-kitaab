@@ -2,6 +2,7 @@
 const db = require("../config/db");
 const { z } = require("zod");
 const xss = require("xss");
+const log = require("../utils/logger");
 
 const createEventSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).trim(),
@@ -36,7 +37,7 @@ async function createEvent(req, res) {
 
     res.json({ ok: true, message: "Event created", event: rows[0] });
   } catch (err) {
-    console.error("createEvent error:", err);
+    log.error({ err }, "createEvent error");
     res.status(500).json({ ok: false, message: "Failed to create event" });
   }
 }
@@ -63,7 +64,7 @@ async function getChapterEvents(req, res) {
 
     res.json({ ok: true, events: rows });
   } catch (err) {
-    console.error("getChapterEvents error:", err);
+    log.error({ err }, "getChapterEvents error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }

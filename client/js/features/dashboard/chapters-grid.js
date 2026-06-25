@@ -239,6 +239,8 @@ const ChaptersGrid = (() => {
     
     const wrapper = document.createElement('div');
     wrapper.className = 'chapter-skeleton-grid';
+    wrapper.setAttribute('role', 'status');
+    wrapper.setAttribute('aria-label', 'Loading chapters...');
     wrapper.style.width = '100%';
     wrapper.style.gridColumn = '1 / -1';
     
@@ -266,8 +268,11 @@ const ChaptersGrid = (() => {
   }
 
   function navigateToChapter(id) {
-    document.body.classList.add('is-navigating');
-    setTimeout(() => window.location.href = `chapter.html?id=${id}`, 150);
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo(`chapter.html?id=${id}`);
+    } else {
+      window.location.href = `chapter.html?id=${id}`;
+    }
   }
 
   async function load() {

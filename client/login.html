@@ -27,10 +27,7 @@
   <meta name="apple-mobile-web-app-title" content="Hisaab">
   <meta name="theme-color" content="#09090B">
 
-  <!-- Prevent FOUC on cold PWA launch -->
-  <style>
-    html, body { background-color: #09090B; -webkit-tap-highlight-color: transparent; }
-  </style>
+
 
   <!-- Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,8 +40,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   </noscript>
 
-  <!-- Google Sign-In SDK -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
 
   <!-- AUTH REDIRECT GUARD -->
   <script>
@@ -66,6 +62,22 @@
   </script>
   <!-- Theme Loader — synchronous to prevent FOUC -->
   <script src="js/core/theme-loader.js"></script>
+  <!-- Social Media Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hisaab-Kitaab">
+  <meta property="og:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta property="og:description" content="Track who paid what and settle group expenses fairly. Hisaab-Kitaab makes splitting bills with friends, flatmates, and family effortless.">
+  <meta property="og:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta name="twitter:description" content="Track who paid what and settle group expenses fairly.">
+  <meta name="twitter:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  
+  <!-- Monitoring -->
+  <script src="https://browser.sentry-cdn.com/8.5.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js"></script>
+  <script src="js/monitoring.js" defer></script>
+
 </head>
 <body class="landing-page">
 

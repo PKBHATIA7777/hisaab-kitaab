@@ -38,7 +38,8 @@ const ModalManager = (() => {
   const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   function _trapFocus(el) {
-    const getFocusable = () => [...el.querySelectorAll(FOCUSABLE)];
+    const getFocusable = () => [...el.querySelectorAll(FOCUSABLE)]
+      .filter(node => node.offsetParent !== null && window.getComputedStyle(node).visibility !== 'hidden');
     const handler = (e) => {
       if (e.key !== 'Tab') return;
       const focusable = getFocusable();
@@ -71,6 +72,9 @@ const ModalManager = (() => {
   function open(overlayEl, options = {}) {
     const { closeOnBackdrop = true, closeOnEscape = true } = options;
 
+    // Save the element that triggered the modal
+    const triggerElement = document.activeElement;
+
     // Append to body if not already there (guarantees correct stacking context)
     if (overlayEl.parentElement !== document.body) {
       document.body.appendChild(overlayEl);
@@ -98,7 +102,7 @@ const ModalManager = (() => {
     // Escape listener (only add once)
     if (_stack.length === 1) document.addEventListener('keydown', _onEscape);
 
-    _cleanups.set(overlayEl, { backdropHandler, cleanupFocus });
+    _cleanups.set(overlayEl, { backdropHandler, cleanupFocus, triggerElement });
   }
 
   function close(overlayEl) {
@@ -107,7 +111,7 @@ const ModalManager = (() => {
 
     _stack.splice(idx, 1);
 
-    const { backdropHandler, cleanupFocus } = _cleanups.get(overlayEl) || {};
+    const { backdropHandler, cleanupFocus, triggerElement } = _cleanups.get(overlayEl) || {};
     if (backdropHandler) overlayEl.removeEventListener('click', backdropHandler);
     if (cleanupFocus) cleanupFocus();
     _cleanups.delete(overlayEl);
@@ -118,6 +122,11 @@ const ModalManager = (() => {
     if (_stack.length === 0) {
       _unlockScroll();
       document.removeEventListener('keydown', _onEscape);
+    }
+
+    // Restore focus if possible
+    if (triggerElement && typeof triggerElement.focus === 'function') {
+      setTimeout(() => triggerElement.focus(), 10);
     }
 
     // Remove from DOM after transition

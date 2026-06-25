@@ -81,8 +81,8 @@ const CONFIG = {
              window.location.port === "5500",
     get API_BASE() {
       return this.isLocal
-        ? `http://${window.location.hostname}:5001/api`
-        : "/api";
+        ? `http://${window.location.hostname}:5001/api/v1`
+        : "/api/v1";
     },
     TIMEOUTS: {
       TOAST_DURATION: 5000,
@@ -103,6 +103,31 @@ const CONFIG = {
   /* ======================================
      1. NETWORK STACK
      ====================================== */
+
+  window.haptic = function(type) {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      if (type === 'light') {
+        navigator.vibrate(10);
+      } else if (type === 'medium') {
+        navigator.vibrate(20);
+      } else if (type === 'success') {
+        navigator.vibrate([10, 50, 10]);
+      }
+    }
+  };
+
+  window.navigateTo = function(url) {
+    document.body.classList.add('is-navigating');
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        window.location.href = url;
+      });
+    } else {
+      setTimeout(() => {
+        window.location.href = url;
+      }, 140);
+    }
+  };
 
   window.debounce = function(func, wait) {
     let timeout;
@@ -266,33 +291,32 @@ const CONFIG = {
       }
 
       // 401 handling — only redirect if NOT on an auth page and NOT a background check
-// 401 handling — only redirect if NOT on an auth page and NOT a background check
-if (res.status === 401) {
-  if (!isAuthPage() && !options._silent) {
-    // Only attempt refresh on the FIRST try (attempt === 0)
-    // and only if this is not already a refresh call itself
-    // This prevents infinite loops: apiFetch → refresh → 401 → apiFetch → ...
-    if (attempt === 0 && !options._isRefreshAttempt) {
-      const refreshed = window.SessionManager
-        ? await window.SessionManager.attemptRefresh()
-        : false;
+      if (res.status === 401) {
+        if (!isAuthPage() && !options._silent) {
+          // Only attempt refresh on the FIRST try (attempt === 0)
+          // This prevents infinite loops: apiFetch → refresh → 401 → apiFetch → ...
+          if (attempt === 0) {
+            const refreshed = window.SessionManager
+              ? await window.SessionManager.attemptRefresh()
+              : false;
 
-      if (refreshed) {
-        // Retry once with fresh cookies.
-        // _isRefreshAttempt prevents a second refresh call if this retry also gets a 401.
-        return makeRequest(attempt + 1, { ...options, _isRefreshAttempt: true });
+            if (refreshed) {
+              // Retry once with fresh cookies.
+              // attempt > 0 prevents a second refresh if this retry also gets a 401.
+              return makeRequest(attempt + 1);
+            }
+          }
+
+          // Refresh failed — redirect to login.
+          // Throw so callers' catch blocks run and don't try to destructure undefined.
+          setTimeout(() => {
+            if (typeof window.navigateTo === 'function') window.navigateTo("login.html?expired=true");
+            else window.location.href = "login.html?expired=true";
+          }, 200);
+          throw Object.assign(new Error('Session expired'), { status: 401, isAuthRedirect: true });
+        }
+        // On auth pages or silent: fall through to throw error normally
       }
-    }
-
-    // Refresh failed — redirect to login.
-    // Throw so callers' catch blocks run and don't try to destructure undefined.
-    setTimeout(() => {
-      window.location.href = "login.html?expired=true";
-    }, 200);
-    throw Object.assign(new Error('Session expired'), { status: 401, isAuthRedirect: true });
-  }
-  // On auth pages or silent: fall through to throw error normally
-}
 
       // Rate limit
       if (res.status === 429) {
@@ -416,27 +440,63 @@ if (res.status === 401) {
   /* ======================================
      2. SESSION & AUTH
      ====================================== */
+  let googleScriptLoadingPromise = null;
+  function loadGoogleScript() {
+    if (window.google) return Promise.resolve();
+    if (googleScriptLoadingPromise) return googleScriptLoadingPromise;
+
+    googleScriptLoadingPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        resolve();
+      };
+      script.onerror = (err) => {
+        googleScriptLoadingPromise = null; // Allow retry on subsequent attempts
+        reject(err);
+      };
+      document.head.appendChild(script);
+    });
+
+    return googleScriptLoadingPromise;
+  }
+
   async function initGoogleAuth() {
     const googleBtnContainer = document.querySelector(CONFIG.SELECTORS.GOOGLE_BTN);
     if (!googleBtnContainer) return;
+
     try {
-      const { googleClientId } = await window.apiFetch("/config");
-      if (!window.google) {
-        setTimeout(initGoogleAuth, CONFIG.TIMEOUTS.GOOGLE_INIT_DELAY);
-        return;
-      }
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: window.handleGoogleCredential,
-        // FIX v2: use_fedcm_for_prompt helps on iOS Safari
-        use_fedcm_for_prompt: true,
-      });
-      window.google.accounts.id.renderButton(
-        googleBtnContainer,
-        { theme: "outline", size: "large", width: "100%" }
-      );
-    } catch (err) {
-      console.error("Failed to init Google Auth", err);
+      // Use IntersectionObserver to delay script injection until container enters viewport
+      const observer = new IntersectionObserver(async (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          observer.unobserve(googleBtnContainer);
+          try {
+            await loadGoogleScript();
+            const { googleClientId } = await window.apiFetch("/config");
+            if (!window.google) return;
+            
+            window.google.accounts.id.initialize({
+              client_id: googleClientId,
+              callback: window.handleGoogleCredential,
+              // FIX v2: use_fedcm_for_prompt helps on iOS Safari
+              use_fedcm_for_prompt: true,
+            });
+            window.google.accounts.id.renderButton(
+              googleBtnContainer,
+              { theme: "outline", size: "large", width: "100%" }
+            );
+          } catch (err) {
+            console.error("Failed to load Google SDK dynamically:", err);
+          }
+        }
+      }, { rootMargin: '100px' });
+
+      observer.observe(googleBtnContainer);
+    } catch (e) {
+      console.error("Failed to initialize Google Auth observer:", e);
     }
   }
 
@@ -447,7 +507,10 @@ if (res.status === 401) {
         body: { idToken: response.credential },
       });
       window.showToast("Logged in as " + data.user.username, "success");
-      setTimeout(() => { window.location.href = "dashboard.html"; }, 1000);
+      setTimeout(() => {
+        if (typeof window.navigateTo === 'function') window.navigateTo("dashboard.html");
+        else window.location.href = "dashboard.html";
+      }, 1000);
     } catch (err) {
       window.showToast(err.message || "Google sign-in failed", "error");
     }
@@ -588,7 +651,8 @@ if (res.status === 401) {
       '[tabindex]:not([tabindex="-1"])'
     ].join(', ');
 
-    const getFocusable = () => Array.from(modalElement.querySelectorAll(focusableSelectors));
+    const getFocusable = () => Array.from(modalElement.querySelectorAll(focusableSelectors))
+      .filter(node => node.offsetParent !== null && window.getComputedStyle(node).visibility !== 'hidden');
 
     const handler = (e) => {
       if (e.key !== 'Tab') return;
@@ -801,6 +865,7 @@ function initPasswordValidation() {
       if (currentX > 80) {
         toast.style.transform = `translateX(120%)`;
         toast.style.opacity = 0;
+        if (typeof window.haptic === 'function') window.haptic('light');
         setTimeout(() => {
           if (toast.parentElement) toast.remove();
         }, 150);
@@ -941,8 +1006,13 @@ function initPasswordValidation() {
           href.startsWith('#') || link.target === '_blank') return;
       // Don't interfere with modifier-key clicks (open in new tab, etc.)
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      // Trigger fade-out
-      document.body.classList.add('page-navigating');
+      
+      e.preventDefault();
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo(href);
+      } else {
+        window.location.href = href;
+      }
     }, { capture: true }); // capture: true so we run before other handlers
     // ── END PAGE FADE-OUT ─────────────────────────────────────────
 
@@ -1383,12 +1453,27 @@ function initPasswordValidation() {
       e.stopPropagation();
       const isActive = dropdown.classList.toggle('active');
       dropdown.setAttribute('aria-hidden', !isActive);
+      
+      if (isActive) {
+        setTimeout(() => {
+          const firstOption = dropdown.querySelector('.theme-option');
+          if (firstOption) firstOption.focus();
+        }, 50);
+      }
     });
 
     document.addEventListener('click', (e) => {
       if (!wrapper.contains(e.target)) {
         dropdown.classList.remove('active');
         dropdown.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dropdown.classList.contains('active')) {
+        dropdown.classList.remove('active');
+        dropdown.setAttribute('aria-hidden', 'true');
+        triggerBtn.focus();
       }
     });
 
@@ -1417,8 +1502,25 @@ function initPasswordValidation() {
           document.documentElement.removeAttribute('data-theme-mode');
         }
 
+        // Dynamic font loading for themes on theme change
+        const fontLinks = {
+          'beige': 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap',
+          'lavender': 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap',
+          'matcha': 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap',
+          'midnight-neon': 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap'
+        };
+        const url = fontLinks[activeTheme];
+        if (url && !document.getElementById('font-theme-' + activeTheme)) {
+          const link = document.createElement('link');
+          link.id = 'font-theme-' + activeTheme;
+          link.rel = 'stylesheet';
+          link.href = url;
+          document.head.appendChild(link);
+        }
+
         dropdown.classList.remove('active');
         dropdown.setAttribute('aria-hidden', 'true');
+        triggerBtn.focus();
 
         setTimeout(() => {
           document.documentElement.classList.remove('theme-transition');
@@ -1456,6 +1558,7 @@ class MemberAutocomplete {
 
     this.dropdown = document.createElement('div');
     this.dropdown.className = 'autocomplete-dropdown';
+    this.dropdown.setAttribute('role', 'listbox');
     this.wrapper.appendChild(this.dropdown);
 
     // Store handler references for cleanup
@@ -1533,6 +1636,7 @@ class MemberAutocomplete {
   renderItem({ type, data, html, className = '' }) {
     const item = document.createElement('div');
     item.className = `autocomplete-item ${className}`;
+    item.setAttribute('role', 'option');
     item.innerHTML = html;
     item.addEventListener('mousedown', (e) => {
       e.preventDefault();

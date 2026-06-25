@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="css/components/empty-state.css">
   <link rel="stylesheet" href="css/components/badge.css">
   <link rel="stylesheet" href="css/components/command-palette.css">
+  <link rel="stylesheet" href="css/components/pull-refresh.css">
   
   <link rel="stylesheet" href="css/layout/navbar.css">
   <link rel="stylesheet" href="css/layout/footer.css">
@@ -55,6 +56,22 @@
 
   <!-- Theme Loader — synchronous to prevent FOUC -->
   <script src="js/core/theme-loader.js"></script>
+  <!-- Social Media Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hisaab-Kitaab">
+  <meta property="og:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta property="og:description" content="Track who paid what and settle group expenses fairly. Hisaab-Kitaab makes splitting bills with friends, flatmates, and family effortless.">
+  <meta property="og:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta name="twitter:description" content="Track who paid what and settle group expenses fairly.">
+  <meta name="twitter:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  
+  <!-- Monitoring -->
+  <script src="https://browser.sentry-cdn.com/8.5.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js"></script>
+  <script src="js/monitoring.js" defer></script>
+
 </head>
 <body class="has-fab-gradient">
   
@@ -162,7 +179,66 @@
       </div>
 
       <!-- Grid list -->
-      <div class="chapters-grid" id="chapters-grid"></div>
+      <div class="chapters-grid" id="chapters-grid">
+        <div class="chapter-skeleton-grid" style="width: 100%; grid-column: 1 / -1;" aria-hidden="true">
+          <div class="chapter-skeleton-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="skeleton" style="width:40px; height:40px; border-radius:var(--avatar-radius);"></div>
+              <div class="skeleton" style="width:24px; height:24px; border-radius:var(--r-sm);"></div>
+            </div>
+            <div style="margin: var(--s-3) 0 var(--s-4); flex:1; display:flex; flex-direction:column; gap:var(--s-1h);">
+              <div class="skeleton" style="width:70%; height:14px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:40%; height:10px; border-radius:var(--r-xs);"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--surface-border); padding-top:var(--s-3);">
+              <div class="skeleton" style="width:30%; height:8px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:20%; height:8px; border-radius:var(--r-xs);"></div>
+            </div>
+          </div>
+          <div class="chapter-skeleton-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="skeleton" style="width:40px; height:40px; border-radius:var(--avatar-radius);"></div>
+              <div class="skeleton" style="width:24px; height:24px; border-radius:var(--r-sm);"></div>
+            </div>
+            <div style="margin: var(--s-3) 0 var(--s-4); flex:1; display:flex; flex-direction:column; gap:var(--s-1h);">
+              <div class="skeleton" style="width:70%; height:14px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:40%; height:10px; border-radius:var(--r-xs);"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--surface-border); padding-top:var(--s-3);">
+              <div class="skeleton" style="width:30%; height:8px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:20%; height:8px; border-radius:var(--r-xs);"></div>
+            </div>
+          </div>
+          <div class="chapter-skeleton-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="skeleton" style="width:40px; height:40px; border-radius:var(--avatar-radius);"></div>
+              <div class="skeleton" style="width:24px; height:24px; border-radius:var(--r-sm);"></div>
+            </div>
+            <div style="margin: var(--s-3) 0 var(--s-4); flex:1; display:flex; flex-direction:column; gap:var(--s-1h);">
+              <div class="skeleton" style="width:70%; height:14px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:40%; height:10px; border-radius:var(--r-xs);"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--surface-border); padding-top:var(--s-3);">
+              <div class="skeleton" style="width:30%; height:8px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:20%; height:8px; border-radius:var(--r-xs);"></div>
+            </div>
+          </div>
+          <div class="chapter-skeleton-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="skeleton" style="width:40px; height:40px; border-radius:var(--avatar-radius);"></div>
+              <div class="skeleton" style="width:24px; height:24px; border-radius:var(--r-sm);"></div>
+            </div>
+            <div style="margin: var(--s-3) 0 var(--s-4); flex:1; display:flex; flex-direction:column; gap:var(--s-1h);">
+              <div class="skeleton" style="width:70%; height:14px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:40%; height:10px; border-radius:var(--r-xs);"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--surface-border); padding-top:var(--s-3);">
+              <div class="skeleton" style="width:30%; height:8px; border-radius:var(--r-xs);"></div>
+              <div class="skeleton" style="width:20%; height:8px; border-radius:var(--r-xs);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </div>
   </main>
@@ -210,6 +286,7 @@
   <script src="js/ui/command-palette.js" defer></script>
   <script src="js/ui/button.js" defer></script>
   <script src="js/ui/form-validator.js" defer></script>
+  <script src="js/ui/pull-to-refresh.js" defer></script>
   <script src="js/pwa/offline-queue.js" defer></script>
   <script src="js/pwa/install-manager.js" defer></script>
   <script src="js/main.js" defer></script>
@@ -289,14 +366,39 @@
             e.stopPropagation();
             const isActive = menu.classList.toggle('is-active');
             newFab.classList.toggle('is-active', isActive);
+            if (typeof window.haptic === 'function') window.haptic('light');
+            
+            if (isActive) {
+              // Focus first interactive element in menu after a short delay for animation
+              setTimeout(() => {
+                const firstAction = menu.querySelector('a, button, [tabindex]');
+                if (firstAction) firstAction.focus();
+              }, 50);
+            } else {
+              // Focus FAB when closed explicitly
+              newFab.focus();
+            }
           };
 
           newFab.addEventListener('click', toggleMenu);
           
           document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !newFab.contains(e.target)) {
+              if (menu.classList.contains('is-active')) {
+                menu.classList.remove('is-active');
+                newFab.classList.remove('is-active');
+                if (typeof window.haptic === 'function') window.haptic('light');
+                // Don't forcefully restore focus on outside click, as user clicked elsewhere
+              }
+            }
+          });
+
+          // Close on Escape
+          document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && menu.classList.contains('is-active')) {
               menu.classList.remove('is-active');
               newFab.classList.remove('is-active');
+              newFab.focus();
             }
           });
 

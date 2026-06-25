@@ -8,6 +8,7 @@ body.has-fab-gradient {
   background-color: var(--bg-app);
   font-family: var(--font);
   color: var(--text-on-dark);
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -275,6 +276,9 @@ body.has-fab-gradient {
 @media (min-width: 1200px) {
   .chapters-grid { grid-template-columns: repeat(4, 1fr); }
 }
+@media (min-width: 1600px) {
+  .chapters-grid { grid-template-columns: repeat(5, 1fr); gap: var(--s-6); }
+}
 
 /* ─── CHAPTER CARD ─── */
 .chapter-card {
@@ -531,7 +535,13 @@ body.has-fab-gradient {
   .chapter-skeleton-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (min-width: 900px) {
-  .chapter-skeleton-grid { grid-template-columns: repeat(3, 1fr); }
+  .chapter-skeleton-grid { grid-template-columns: repeat(3, 1fr); gap: var(--s-5); }
+}
+@media (min-width: 1200px) {
+  .chapter-skeleton-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 1600px) {
+  .chapter-skeleton-grid { grid-template-columns: repeat(5, 1fr); gap: var(--s-6); }
 }
 
 .chapter-skeleton-card {

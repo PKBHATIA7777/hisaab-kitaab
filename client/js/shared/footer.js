@@ -65,6 +65,16 @@
     // Set the current year dynamically — no hardcoding
     const yearEl = el.querySelector('.footer-year');
     if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+    // Mark current active link in navigation with aria-current="page"
+    const pathname = window.location.pathname;
+    const links = el.querySelectorAll('.footer-links a');
+    links.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && (pathname === href || pathname.endsWith(href) || (pathname === '/' && href.includes('index.html')))) {
+        link.setAttribute('aria-current', 'page');
+      }
+    });
   }
 
   // Run after DOM is ready

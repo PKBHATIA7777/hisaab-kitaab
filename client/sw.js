@@ -31,23 +31,12 @@ const WARM_CACHE_ASSETS = [
   "/css/components/button.css",
   "/css/components/card.css",
   "/css/components/modal.css",
-  "/css/components/form.css",
   "/css/components/toast.css",
-  "/css/components/skeleton.css",
-  "/css/components/fab.css",
   "/css/components/avatar.css",
-  "/css/components/empty-state.css",
-  "/css/components/badge.css",
-  "/css/components/command-palette.css",
 
-  // Layout styles
+  // Layout & Page styles
   "/css/layout/navbar.css",
-  "/css/layout/footer.css",
-
-  // Pages styles
   "/css/auth-pages.css",
-  "/css/pages/landing.css",
-  "/css/pages/auth-flow.css",
   "/css/pages/dashboard.css",
   "/css/pages/chapter.css",
 
@@ -56,47 +45,19 @@ const WARM_CACHE_ASSETS = [
 
   // Core JS Infrastructure
   "/js/core/theme-loader.js",
-  "/js/core/sanitize.js",
-  "/js/core/storage.js",
-  "/js/core/csrf.js",
   "/js/core/session.js",
-  "/js/core/api-cache.js",
-  "/js/core/event-bus.js",
   "/js/core/modal-manager.js",
 
   // API & Utils JS
   "/js/api/client.js",
   "/js/api/error-handler.js",
-  "/js/utils/avatar.js",
-  "/js/utils/format.js",
-  "/js/utils/time.js",
 
   // PWA & Shared JS
-  "/js/pwa/install-manager.js",
   "/js/pwa/offline-queue.js",
-  "/js/shared/footer.js",
   "/js/main.js",
-
-  // UI Components JS
-  "/js/ui/button.js",
-  "/js/ui/form-validator.js",
-  "/js/ui/toast.js",
-  "/js/ui/command-palette.js",
-
-  // Page specific JS
-  "/js/pages/index-page.js",
-  "/js/pages/login-page.js",
-  "/js/pages/signup-page.js",
-  "/js/pages/forgot-page.js",
-  "/js/pages/set-password-page.js",
-  "/js/pages/dashboard-page.js",
   "/js/chapter.js",
 
   // Feature logic JS
-  "/js/features/dashboard/chapter-card-menu.js",
-  "/js/features/dashboard/chapter-modal.js",
-  "/js/features/dashboard/chapters-grid.js",
-  "/js/features/dashboard/profile-modal.js",
   "/js/feature-settlements.js",
   "/js/feature-categories.js",
   "/js/feature-personal-chapter.js",

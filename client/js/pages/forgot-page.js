@@ -44,7 +44,10 @@ if (resetForm) {
         body: { email: resetEmail, otp: fd.get("otp"), newPassword: fd.get("newPassword") },
       });
       showToast("Password reset successfully. Redirecting to login...", "success");
-      setTimeout(() => window.location.href = "login.html", 1500);
+      setTimeout(() => {
+        if (typeof window.navigateTo === 'function') window.navigateTo("login.html");
+        else window.location.href = "login.html";
+      }, 1500);
     } catch (err) {
       showToast(err.message || "Invalid or expired code. Please try again.", "error");
     } finally {

@@ -117,6 +117,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       is_archived: isArchived === 'true', is_personal: isPersonal === 'true',
     });
   });
+
+  // Pull-to-refresh
+  if (typeof initPullToRefresh === 'function') {
+    initPullToRefresh(async () => {
+      try {
+        await Promise.all([
+          apiFetch('/friends').then(d => { window._cachedFriends = d.friends || []; }).catch(() => {}),
+          ChaptersGrid.load()
+        ]);
+      } catch (err) {
+        showToast(getUserMessage ? getUserMessage(err) : (err.message || 'Failed to refresh'), 'error');
+      }
+    });
+  }
 });
 
 function renderNavProfile(user) {

@@ -5,10 +5,11 @@
 
 /* ─── PAGE STRUCTURE ─── */
 .chapter-page-wrapper {
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  max-width: var(--max-content);
+  max-width: var(--max-app);
   margin: 0 auto;
   width: 100%;
 }
@@ -694,6 +695,7 @@
   top: 0;
   right: -320px;
   width: 300px;
+  height: 100vh;
   height: 100dvh;
   background: var(--surface);
   box-shadow: var(--shadow-xl);
@@ -866,6 +868,7 @@
     right: 0;
     width: 100%;
     height: auto;
+    max-height: 85vh;
     max-height: 85dvh;
     border-left: none;
     border-top: 1px solid var(--surface-border);
@@ -876,5 +879,46 @@
   .members-panel.is-open, .members-panel.active {
     bottom: 0;
     right: 0;
+  }
+}
+
+/* ─── TABLET & DESKTOP LAYOUT (STEP 34) ─── */
+@media (min-width: 768px) {
+  .chapter-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: var(--s-8);
+    align-items: start;
+    padding-top: var(--s-4);
+  }
+  
+  .chapter-sidebar {
+    position: sticky;
+    top: 80px; /* Account for navbar + some spacing */
+  }
+
+  .chapter-hero {
+    padding: var(--s-4) 0 var(--s-6);
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  .hero-skeleton {
+    padding: var(--s-4) 0 var(--s-6);
+    align-items: flex-start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .chapter-layout {
+    grid-template-columns: 380px 1fr;
+    gap: var(--s-10);
+  }
+}
+
+@media (min-width: 1600px) {
+  .chapter-layout {
+    grid-template-columns: 440px 1fr;
+    gap: var(--s-12);
   }
 }

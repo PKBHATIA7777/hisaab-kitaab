@@ -62,11 +62,13 @@ const ChapterModal = (() => {
         if (isEdit) {
           await apiFetch(`/chapters/${data.id}`, { method: 'PUT', body: { name, description } });
           showToast('Chapter updated', 'success');
+          if (typeof window.haptic === 'function') window.haptic('success');
         } else {
           const memberInputs = overlay.querySelectorAll('.ch-member-input');
           const members = [...memberInputs].map(i => ({ name: i.value.trim() })).filter(m => m.name);
           await apiFetch('/chapters', { method: 'POST', body: { name, description, members } });
           showToast('Chapter created!', 'success');
+          if (typeof window.haptic === 'function') window.haptic('success');
         }
         ModalManager.close(overlay);
         await ChaptersGrid.load();

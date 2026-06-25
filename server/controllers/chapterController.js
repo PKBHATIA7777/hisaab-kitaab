@@ -2,6 +2,7 @@
 const db = require("../config/db");
 const { z } = require("zod");
 const xss = require("xss");
+const log = require("../utils/logger");
 
 // --- VALIDATION SCHEMAS ---
 
@@ -109,7 +110,7 @@ async function createChapter(req, res) {
       client.release();
     }
   } catch (err) {
-    console.error("createChapter error:", err);
+    log.error({ err }, "createChapter error");
     res.status(500).json({ ok: false, message: "Failed to create chapter" });
   }
 }
@@ -147,7 +148,7 @@ async function addMember(req, res) {
 
     res.json({ ok: true, message: "Member added", member: newMember[0] });
   } catch (err) {
-    console.error("addMember error:", err);
+    log.error({ err }, "addMember error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -175,7 +176,7 @@ async function deleteMember(req, res) {
 
     res.json({ ok: true, message: "Member removed" });
   } catch (err) {
-    console.error("deleteMember error:", err);
+    log.error({ err }, "deleteMember error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -211,7 +212,7 @@ async function getMemberDeletability(req, res) {
     const involvedIds = rows.map(r => r.id);
     res.json({ ok: true, involvedMemberIds: involvedIds });
   } catch (err) {
-    console.error("getMemberDeletability error:", err);
+    log.error({ err }, "getMemberDeletability error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -244,7 +245,7 @@ async function getMyChapters(req, res) {
     );
     res.json({ ok: true, chapters: rows });
   } catch (err) { 
-    console.error("getMyChapters error:", err);
+    log.error({ err }, "getMyChapters error");
     res.status(500).json({ ok: false, message: "Server error" }); 
   }
 }
@@ -271,7 +272,7 @@ async function toggleArchiveChapter(req, res) {
       is_archived: !!is_archived
     });
   } catch (err) {
-    console.error("toggleArchiveChapter error:", err);
+    log.error({ err }, "toggleArchiveChapter error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -296,7 +297,7 @@ async function getChapterDetails(req, res) {
     
     res.json({ ok: true, chapter: chapterRows[0], members: memberRows });
   } catch (err) { 
-    console.error("getChapterDetails error:", err);
+    log.error({ err }, "getChapterDetails error");
     res.status(500).json({ ok: false, message: "Server error" }); 
   }
 }
@@ -329,7 +330,7 @@ async function updateChapter(req, res) {
 
     res.json({ ok: true, message: "Chapter updated" });
   } catch (err) {
-    console.error("updateChapter error:", err);
+    log.error({ err }, "updateChapter error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -391,7 +392,7 @@ async function deleteChapter(req, res) {
       client.release();
     }
   } catch (err) {
-    console.error("deleteChapter error:", err);
+    log.error({ err }, "deleteChapter error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -420,6 +421,9 @@ async function getChapterHeartbeat(req, res) {
       return res.status(404).json({ ok: false, message: "Chapter not found or no access" });
     }
     
+    // Set cache header programmatically (short cache for polling)
+    res.setHeader('Cache-Control', 'max-age=2, must-revalidate');
+
     res.json({ 
       ok: true, 
       chapterId: id,
@@ -428,11 +432,8 @@ async function getChapterHeartbeat(req, res) {
       // The low max-age means fresh data arrives quickly
     });
     
-    // Set cache header programmatically (short cache for polling)
-    res.setHeader('Cache-Control', 'max-age=2, must-revalidate');
-    
   } catch (err) {
-    console.error("getChapterHeartbeat error:", err);
+    log.error({ err }, "getChapterHeartbeat error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }

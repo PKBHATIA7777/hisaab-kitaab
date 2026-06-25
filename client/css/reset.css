@@ -31,6 +31,8 @@ body {
 input, button, textarea, select {
   font: inherit;
   color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 /* 6. Block-level media */

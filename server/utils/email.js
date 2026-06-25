@@ -1,4 +1,5 @@
 const { Resend } = require("resend");
+const log = require("./logger");
 
 // ── RESEND SETUP ──────────────────────────────────────────────
 // Using Resend HTTP API — works on Render free tier (port 443).
@@ -16,10 +17,10 @@ function getResendClient() {
 // ── WARM UP (no-op for HTTP API, kept for interface compatibility) ──
 async function warmUpEmailConnection() {
   if (!process.env.RESEND_API_KEY) {
-    console.warn("⚠️  RESEND_API_KEY not set — emails will not be sent in production");
+    log.warn("RESEND_API_KEY not set — emails will not be sent in production");
     return;
   }
-  console.log("✅ Email service ready (Resend HTTP API)");
+  log.info("Email service ready (Resend HTTP API)");
 }
 
 // ── MAIN SEND FUNCTION ────────────────────────────────────────
@@ -27,13 +28,9 @@ async function sendOtpEmail(to, subject, text) {
   // Dev mode: log to console if no API key configured
   if (!process.env.RESEND_API_KEY) {
     if (process.env.NODE_ENV !== "production") {
-      console.log(`\n${"=".repeat(50)}`);
-      console.log(`[DEV EMAIL] To: ${to}`);
-      console.log(`[DEV EMAIL] Subject: ${subject}`);
-      console.log(`[DEV EMAIL] Body: ${text}`);
-      console.log(`${"=".repeat(50)}\n`);
+      log.info({ to, subject, text }, "Development email logger");
     } else {
-      console.warn("⚠️  RESEND_API_KEY not set in production — OTP not sent");
+      log.warn("RESEND_API_KEY not set in production — OTP not sent");
     }
     return;
   }
@@ -63,14 +60,14 @@ async function sendOtpEmail(to, subject, text) {
     });
 
     if (error) {
-      console.error(`❌ Resend email failed to ${to}:`, error.message || JSON.stringify(error));
+      log.error({ error, to }, "Resend email failed");
       throw new Error(`Email delivery failed: ${error.message || JSON.stringify(error)}`);
     }
 
-    console.log(`✅ Email sent to ${to} via Resend (id: ${data?.id})`);
+    log.info({ to, emailId: data?.id }, "Email sent successfully");
   } catch (err) {
     if (err.message.startsWith("Email delivery failed:")) throw err;
-    console.error(`❌ Resend unexpected error to ${to}:`, err.message);
+    log.error({ err, to }, "Resend unexpected error");
     throw new Error(`Email delivery failed: ${err.message}`);
   }
 }

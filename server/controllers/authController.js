@@ -8,6 +8,7 @@ const db = require("../config/db");
 const { createToken, sendAuthCookie, clearAuthCookies, SHORT_MS, LONG_MS, incrementJwtGeneration, rotateRefreshToken, revokeAllRefreshTokens } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto"); // ✅ ADDED for constant-time OTP comparison
+const log = require("../utils/logger");
 const {
   registerSchema,
   loginSchema,
@@ -21,7 +22,7 @@ const { createPersonalChapterForUser } = require("./personalChapterController");
 const isProduction = process.env.NODE_ENV === "production";
 
 function generateOtpCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 // Detect device info from User-Agent for device session tracking
@@ -78,7 +79,7 @@ async function registerDeviceSession(userId, jwtIat, req) {
     return sessionId;
   } catch (err) {
     // Non-fatal — don't block login if session tracking fails
-    console.error('registerDeviceSession error (non-fatal):', err.message);
+    log.error({ err }, 'registerDeviceSession error (non-fatal)');
     return null;
   }
 }
@@ -105,7 +106,7 @@ async function checkIdentifier(req, res) {
     if (!user) return res.json({ ok: true, exists: false });
     return res.json({ ok: true, exists: true, email: user.email, provider: user.provider, hasPassword: !!user.password_hash });
   } catch (err) {
-    console.error("checkIdentifier error:", err);
+    log.error({ err }, "checkIdentifier error");
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -127,9 +128,8 @@ async function loginRequestOtp(req, res) {
     await sendOtpEmail(email, "Your Hisaab-Kitaab login code", `Your login code is ${code}. It will expire in 10 minutes.`);
     return res.json({ ok: true, message: "Login OTP sent to your email" });
   } catch (err) {
-    console.error("loginRequestOtp error — message:", err.message);
-    console.error("loginRequestOtp error — stack:", err.stack);
-    return res.status(500).json({ ok: false, message: "Server error", detail: err.message });
+    log.error({ err }, "loginRequestOtp error");
+    return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
 
@@ -239,9 +239,8 @@ async function registerRequestOtp(req, res) {
     await sendOtpEmail(email, "Your Hisaab-Kitaab verification code", `Your verification code is ${code}. It will expire in 10 minutes.`);
     return res.json({ ok: true, message: "OTP sent to your email address" });
   } catch (err) {
-    console.error("registerRequestOtp error — message:", err.message);
-    console.error("registerRequestOtp error — stack:", err.stack);
-    return res.status(500).json({ ok: false, message: "Server error", detail: err.message });
+    log.error({ err }, "registerRequestOtp error");
+    return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
 
@@ -425,7 +424,7 @@ async function registerComplete(req, res) {
       try {
         setImmediate(() => {
           createPersonalChapterForUser(user.id, null).catch(err =>
-            console.error(`Background: personal chapter creation failed for user ${user.id}:`, err.message)
+            log.error({ err, userId: user.id }, "Background: personal chapter creation failed")
           );
         });
       } catch (_) { /* setImmediate itself never throws */ }
@@ -470,7 +469,7 @@ async function registerComplete(req, res) {
       client.release();
     }
   } catch (err) {
-    console.error("registerComplete error:", err);
+    log.error({ err }, "registerComplete error");
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -509,7 +508,7 @@ async function login(req, res) {
 
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + LONG_MS });
   } catch (err) {
-    console.error("login error:", err);
+    log.error({ err }, "login error");
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -545,7 +544,7 @@ if (!user) {
   
   setImmediate(() => {
     createPersonalChapterForUser(user.id, null).catch(err =>
-      console.error(`Background: personal chapter for Google user ${user.id}:`, err.message)
+      log.error({ err, userId: user.id }, "Background: personal chapter creation failed for Google user")
     );
   });
 } else {
@@ -595,7 +594,7 @@ if (!user) {
 
     return res.json({ ok: true, message: "Google login successful", isNewUser, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email } });
   } catch (err) {
-    console.error("googleLogin error:", err);
+    log.error({ err }, "googleLogin error");
     return res.status(500).json({ ok: false, message: "Google login failed" });
   }
 }
@@ -643,7 +642,7 @@ async function setPassword(req, res) {
 
     return res.json({ ok: true, message: "Password set successfully" });
   } catch (err) {
-    console.error("setPassword error:", err);
+    log.error({ err }, "setPassword error");
     return res.status(500).json({ ok: false, message: "Server error in set-password" });
   }
 }
@@ -681,7 +680,7 @@ async function forgotRequestOtp(req, res) {
     
     return res.json({ ok: true, message: "If this email exists, an OTP has been sent" });
   } catch (err) {
-    console.error("forgotRequestOtp error:", err);
+    log.error({ err }, "forgotRequestOtp error");
     return res.status(500).json({ ok: false, message: "Server error in forgot request-otp" });
   }
 }
@@ -746,7 +745,7 @@ async function me(req, res) {
       },
     });
   } catch (err) {
-    console.error("me error:", err);
+    log.error({ err }, "me error");
     return res.status(500).json({ ok: false, message: "Server error in me" });
   }
 }
@@ -770,7 +769,7 @@ async function logout(req, res) {
     });
     return res.json({ ok: true, message: "Logged out" });
   } catch (err) {
-    console.error("logout error:", err);
+    log.error({ err }, "logout error");
     // Even if DB fails, clear cookies so the user is logged out client-side
     clearAuthCookies(res);
     return res.json({ ok: true, message: "Logged out" });
@@ -789,7 +788,7 @@ async function updateProfile(req, res) {
     if (rows.length === 0) return res.status(404).json({ ok: false, message: "User not found" });
     res.json({ ok: true, message: "Name updated", realName: rows[0].real_name });
   } catch (err) {
-    console.error("updateProfile error:", err);
+    log.error({ err }, "updateProfile error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -818,7 +817,7 @@ async function getDeviceSessions(req, res) {
     
     res.json({ ok: true, sessions });
   } catch (err) {
-    console.error("getDeviceSessions error:", err);
+    log.error({ err }, "getDeviceSessions error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -859,7 +858,7 @@ async function logoutDevice(req, res) {
     
     res.json({ ok: true, message: "Device session removed. That device will be signed out on its next activity." });
   } catch (err) {
-    console.error("logoutDevice error:", err);
+    log.error({ err }, "logoutDevice error");
     res.status(500).json({ ok: false, message: "Server error" });
   }
 }
@@ -949,7 +948,7 @@ async function refreshSession(req, res) {
       user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }
     });
   } catch (err) {
-    console.error("refreshSession error:", err);
+    log.error({ err }, "refreshSession error");
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 }

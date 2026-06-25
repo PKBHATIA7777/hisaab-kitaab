@@ -98,6 +98,7 @@ async function _injectHistorySection() {
       try {
         await apiFetch(`/chapters/${window.chapterId}/settlements/history/${btn.dataset.recordId}`, { method: 'DELETE' });
         showToast('Undone', 'info');
+        if (typeof window.haptic === 'function') window.haptic('medium');
         window.loadExpenses();
         window.loadHeroSettlements(true);
       } catch (err) { showToast('Failed', 'error'); }

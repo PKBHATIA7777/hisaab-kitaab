@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="css/components/empty-state.css" />
 <link rel="stylesheet" href="css/components/badge.css" />
 <link rel="stylesheet" href="css/components/command-palette.css" />
+<link rel="stylesheet" href="css/components/pull-refresh.css" />
 <link rel="stylesheet" href="css/pages/chapter.css" />
 <link rel="stylesheet" href="css/features.css" />
   
@@ -45,6 +46,22 @@
     href="/icons/splash-390x844.png">
   <!-- Theme Loader — synchronous to prevent FOUC -->
   <script src="js/core/theme-loader.js"></script>
+  <!-- Social Media Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hisaab-Kitaab">
+  <meta property="og:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta property="og:description" content="Track who paid what and settle group expenses fairly. Hisaab-Kitaab makes splitting bills with friends, flatmates, and family effortless.">
+  <meta property="og:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Hisaab-Kitaab — Split Expenses, Settle Debts">
+  <meta name="twitter:description" content="Track who paid what and settle group expenses fairly.">
+  <meta name="twitter:image" content="https://hisaab-kitaab.onrender.com/icons/icon-512x512.png">
+  
+  <!-- Monitoring -->
+  <script src="https://browser.sentry-cdn.com/8.5.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js"></script>
+  <script src="js/monitoring.js" defer></script>
+
 </head>
 <body class="has-fab-gradient">
   <!-- ARIA live region must exist before any toast fires -->
@@ -85,56 +102,59 @@
     </nav>
 
     <!-- Main content -->
-    <main class="chapter-main">
+    <main class="container page-content chapter-layout">
+      <!-- Tablet Layout Wrappers -->
+      <div class="chapter-sidebar">
+        <!-- Hero Skeleton -->
+        <div id="chapter-hero-skeleton" class="hero-skeleton">
+          <div class="skeleton hero-skeleton__icon"></div>
+          <div class="skeleton hero-skeleton__title"></div>
+          <div class="skeleton hero-skeleton__subtitle" style="width: 20%;"></div>
+        </div>
 
-      <!-- Hero skeleton (replaced by JS after load) -->
-      <div class="hero-skeleton" id="chapter-hero-skeleton" aria-hidden="true">
-        <div class="hero-skeleton__icon skeleton"></div>
-        <div class="hero-skeleton__title skeleton"></div>
-        <div class="hero-skeleton__subtitle skeleton"></div>
+        <!-- Hero Content -->
+        <div id="chapter-hero" class="chapter-hero" style="display:none;">
+          <div class="chapter-hero__icon" id="chapter-icon"></div>
+          <h1 class="chapter-hero__title" id="chapter-title"></h1>
+          <p class="chapter-hero__desc" id="chapter-desc"></p>
+        </div>
+
+        <!-- Settlements -->
+        <section class="settlement-section" aria-label="Settlements">
+          <div class="settlement-header" id="hero-settlement-header">
+            <div class="settlement-label">
+              <div class="settlement-dot" aria-hidden="true"></div>
+              Settlements
+            </div>
+            <div class="settlement-actions">
+              <button class="icon-btn-sm" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh">
+                <svg width="14" height="14"><use href="icons/sprite.svg#refresh-cw"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div class="settlement-body" id="hero-settlement-body">
+            <div class="settlement-list" id="hero-settlement-list" role="list"></div>
+          </div>
+        </section>
       </div>
 
-      <!-- Hero (hidden until loaded) -->
-      <div class="chapter-hero" id="chapter-hero" style="display:none;">
-        <div class="chapter-hero__icon" id="chapter-icon"></div>
-        <h1 class="chapter-hero__title" id="chapter-title"></h1>
-        <p class="chapter-hero__desc" id="chapter-desc"></p>
+      <div class="chapter-content">
+        <!-- Events strip -->
+        <div id="events-strip" class="events-strip" role="tablist" aria-label="Filter by event"></div>
+
+        <!-- Expenses -->
+        <section class="expenses-section" aria-label="Expenses">
+          <div class="expense-list" id="expense-list" role="list"></div>
+          <div id="load-more-container" class="load-more-container"></div>
+          <div class="empty-state" id="chapter-empty-state" style="display:none;" role="status">
+            <div class="empty-state__icon">
+              <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--brand); filter: drop-shadow(var(--brand-glow-sm));"><use href="icons/sprite.svg#credit-card"></use></svg>
+            </div>
+            <div class="empty-state__title">No expenses yet</div>
+            <div class="empty-state__subtitle">Tap the + button to add your first expense</div>
+          </div>
+        </section>
       </div>
-
-      <!-- Settlements -->
-      <section class="settlement-section" aria-label="Settlements">
-        <div class="settlement-header" id="hero-settlement-header">
-          <div class="settlement-label">
-            <div class="settlement-dot" aria-hidden="true"></div>
-            Settlements
-          </div>
-          <div class="settlement-actions">
-            <button class="icon-btn-sm" onclick="refreshSettlements(); event.stopPropagation();" aria-label="Refresh">
-              <svg width="14" height="14"><use href="icons/sprite.svg#refresh-cw"></use></svg>
-            </button>
-          </div>
-        </div>
-        <div class="settlement-body" id="hero-settlement-body">
-          <div class="settlement-list" id="hero-settlement-list"></div>
-        </div>
-      </section>
-
-      <!-- Events strip -->
-      <div id="events-strip" class="events-strip" role="tablist" aria-label="Filter by event"></div>
-
-      <!-- Expenses -->
-      <section class="expenses-section" aria-label="Expenses">
-        <div class="expense-list" id="expense-list"></div>
-        <div id="load-more-container" class="load-more-container"></div>
-        <div class="empty-state" id="chapter-empty-state" style="display:none;" role="status">
-          <div class="empty-state__icon">
-            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--brand); filter: drop-shadow(var(--brand-glow-sm));"><use href="icons/sprite.svg#credit-card"></use></svg>
-          </div>
-          <div class="empty-state__title">No expenses yet</div>
-          <div class="empty-state__subtitle">Tap the + button to add your first expense</div>
-        </div>
-      </section>
-
     </main>
   </div>
 
@@ -160,7 +180,7 @@
       <h3 class="members-panel__title">Members</h3>
       <button class="members-panel__close" onclick="closeMembersPanel()" aria-label="Close">×</button>
     </div>
-    <div class="members-panel__list" id="members-panel-list"></div>
+    <div class="members-panel__list" id="members-panel-list" role="list"></div>
     <div class="members-panel__footer" id="member-panel-admin" style="display:none;">
       <button class="btn-add-member" onclick="openAddMemberModal()">+ Add Member</button>
     </div>
@@ -176,6 +196,7 @@
   <script src="js/core/event-bus.js" defer></script>
   <script src="js/core/modal-manager.js" defer></script>
   <script src="js/pwa/offline-queue.js" defer></script>
+  <script src="js/ui/pull-to-refresh.js" defer></script>
   <script src="js/main.js" defer></script>
   <script src="js/ui/command-palette.js" defer></script>
   <script src="js/chapter.js" defer></script>

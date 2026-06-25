@@ -1,6 +1,7 @@
 /* server/middleware/authMiddleware.js */
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
+const log = require("../utils/logger");
 
 // In-memory cache to avoid DB hit on every request for the same user.
 // Key: userId, Value: { updatedAt: timestamp, jwtGeneration: number, cachedAt: Date.now() }
@@ -66,7 +67,7 @@ async function requireAuth(req, res, next) {
       // AUTH-08 FIX: Fail closed on DB error.
       // Failing open would allow revoked sessions (post-logout, post-password-change)
       // to remain valid during a DB outage. A brief 503 is the safer trade-off.
-      console.error("requireAuth DB error:", err.message);
+      log.error({ err }, "requireAuth DB error");
       return res.status(503).json({
         ok: false,
         message: "Service temporarily unavailable. Please try again in a moment.",

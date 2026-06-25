@@ -7,7 +7,10 @@ const _chapterId = _urlParams.get('id');
 window.chapterId = _chapterId; // for feature scripts
 const _SETTLE_EXPAND_KEY = `hk_settle_expand_${_chapterId}`;
 
-if (!_chapterId) window.location.href = 'dashboard.html';
+if (!_chapterId) {
+  if (typeof window.navigateTo === 'function') window.navigateTo('dashboard.html');
+  else window.location.href = 'dashboard.html';
+}
 
 let _loadExpensesAbort = null;   // Cancels in-flight expense loads on rapid tab switches
 let _settlementsAbort  = null;   // Cancels in-flight settlement loads on rapid tab switches
@@ -98,7 +101,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (err.isAuthRedirect) return; // Navigation already triggered
     console.error('Chapter load failed:', err);
     showToast('Failed to load chapter', 'error');
-    setTimeout(() => window.location.href = 'dashboard.html', 2000);
+    setTimeout(() => {
+      if (typeof window.navigateTo === 'function') window.navigateTo('dashboard.html');
+      else window.location.href = 'dashboard.html';
+    }, 2000);
+  }
+
+  // Pull-to-refresh
+  if (typeof initPullToRefresh === 'function') {
+    initPullToRefresh(async () => {
+      try {
+        const [chapterData] = await Promise.all([
+          apiFetch(`/chapters/${_chapterId}`),
+          _loadEvents().catch(() => {}),
+          _loadFriendsForAutocomplete().catch(() => {}),
+          _loadExpenses(false)
+        ]);
+
+        _state.chapter = chapterData.chapter;
+        _state.members = chapterData.members;
+        window.currentChapter = chapterData.chapter;
+        window.currentMembers = chapterData.members;
+
+        _renderChapterInfo();
+
+        EventBus.emit('chapter:loaded', {
+          chapter: _state.chapter,
+          members: _state.members,
+          currentUser: _state.currentUser,
+        });
+      } catch (err) {
+        showToast(err.message || 'Failed to refresh', 'error');
+      }
+    });
   }
 });
 
@@ -182,6 +217,8 @@ function _createPill(label, isActive, onClick) {
   const btn = document.createElement('button');
   btn.className = 'event-pill' + (isActive ? ' is-active' : '');
   btn.textContent = label;
+  btn.setAttribute('role', 'tab');
+  btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
   btn.addEventListener('click', onClick);
   return btn;
 }
@@ -255,8 +292,8 @@ async function _loadExpenses(append = false) {
     _state.expenses = [];
     const list = document.getElementById('expense-list');
     if (list) list.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${Array(3).fill('<div class="skeleton" style="height:68px;border-radius:var(--radius-lg);"></div>').join('')}
+      <div style="display:flex;flex-direction:column;gap:8px;" role="status" aria-label="Loading expenses...">
+        ${Array(3).fill('<div class="skeleton" style="height:68px;border-radius:var(--radius-lg);" aria-hidden="true"></div>').join('')}
       </div>
     `;
   }
@@ -460,6 +497,7 @@ function _openContextMenu(e, ex) {
       };
       await apiFetch('/expenses', { method: 'POST', body: payload });
       showToast('Expense duplicated!', 'success');
+      if (typeof window.haptic === 'function') window.haptic('success');
       await _loadExpenses();
     } catch (err) {
       showToast('Failed to duplicate expense', 'error');
@@ -472,6 +510,7 @@ function _openContextMenu(e, ex) {
     try {
       await apiFetch(`/expenses/${ex.id}`, { method: 'DELETE' });
       showToast('Expense deleted', 'success');
+      if (typeof window.haptic === 'function') window.haptic('medium');
       await _loadExpenses();
     } catch (err) {
       showToast('Failed to delete expense', 'error');
@@ -494,7 +533,7 @@ function _buildExpenseCard(ex) {
   const when = _timeAgo(ex.expense_date);
 
   // Accessibility attributes
-  card.setAttribute('role', 'article');
+  card.setAttribute('role', 'listitem');
   card.setAttribute('aria-label', `${name}, paid by ${payer}, ${amount}`);
 
   card.innerHTML = `
@@ -510,7 +549,6 @@ function _buildExpenseCard(ex) {
 
   if (!ex.isTemp) {
     card.setAttribute('tabindex', '0');
-    card.setAttribute('role', 'button');
     
     // Normal tap triggers edit modal
     card.addEventListener('click', () => {
@@ -783,6 +821,7 @@ async function _openExpenseModal(mode, expenseId) {
       try {
         await apiFetch(`/expenses/${expenseId}`, { method: 'DELETE' });
         showToast('Expense deleted', 'success');
+        if (typeof window.haptic === 'function') window.haptic('medium');
         ModalManager.close(overlay);
         await _loadExpenses();
       } catch (err) { showToast('Failed', 'error'); }
@@ -866,10 +905,12 @@ async function _openExpenseModal(mode, expenseId) {
       if (isEdit) {
         await apiFetch(`/expenses/${expenseId}`, { method: 'PUT', body: payload });
         showToast('Expense updated', 'success');
+        if (typeof window.haptic === 'function') window.haptic('success');
         ModalManager.close(overlay);
       } else {
         await apiFetch('/expenses', { method: 'POST', body: payload });
         showToast('Expense added!', 'success');
+        if (typeof window.haptic === 'function') window.haptic('success');
       }
       await _loadExpenses();
       EventBus.emit('expense:saved', { mode });
@@ -1227,6 +1268,7 @@ window._openMarkModal = (s) => {
         body: { fromMemberId: fromMember.id, toMemberId: toMember.id, amount, note, eventId: _state.currentEventId },
       });
       showToast('Settlement marked ✓', 'success');
+      if (typeof window.haptic === 'function') window.haptic('success');
       ModalManager.close(overlay);
       await _loadExpenses();
       await _loadHeroSettlements(true);
@@ -1276,6 +1318,7 @@ async function _renderMembers() {
 
     const row = document.createElement('div');
     row.className = 'member-panel-row';
+    row.setAttribute('role', 'listitem');
     row.innerHTML = `
       <div class="avatar avatar--sm" style="background:${_getAvatarColor(m.member_name)}">${escapeHTML(_getInitials(m.member_name))}</div>
       <div class="member-panel-row__name">
@@ -1358,7 +1401,7 @@ window.downloadReport = async () => {
   try {
     showToast('Generating report…', 'info');
     const csrfToken = CSRFManager.get();
-    let url = `/api/chapters/${_chapterId}/export`;
+    let url = `${window.APP_CONFIG?.API_BASE || '/api/v1'}/chapters/${_chapterId}/export`;
     if (_state.currentEventId) url += `?eventId=${_state.currentEventId}`;
 
     const res = await fetch(url, { headers: { 'X-CSRF-Token': csrfToken }, credentials: 'include' });
@@ -1425,7 +1468,10 @@ document.addEventListener('click', (e) => {
 /* =============================================
    FAB
    ============================================= */
-document.getElementById('chapter-fab')?.addEventListener('click', () => _openExpenseModal('add'));
+document.getElementById('chapter-fab')?.addEventListener('click', () => {
+  if (typeof window.haptic === 'function') window.haptic('light');
+  _openExpenseModal('add');
+});
 
 /* =============================================
    FRIENDS FOR AUTOCOMPLETE
