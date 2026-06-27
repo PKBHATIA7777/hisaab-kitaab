@@ -116,16 +116,81 @@ const CONFIG = {
     }
   };
 
-  window.navigateTo = function(url) {
+  // ── SPA ROUTER ──────────────────────────────────────────────
+  window.addEventListener('click', async (e) => {
+    const link = e.target.closest('a');
+    if (!link) return;
+    
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    if (link.hasAttribute('download') || link.target === '_blank') return;
+    if (url.pathname.startsWith('/api')) return;
+    if (url.pathname === window.location.pathname && url.search === window.location.search) {
+      e.preventDefault();
+      return;
+    }
+
+    e.preventDefault();
+    await window.navigateTo(url.href);
+  });
+
+  window.addEventListener('popstate', async (e) => {
+    await window.navigateTo(window.location.href, true);
+  });
+
+  window.navigateTo = async function(url, isPopState = false) {
     document.body.classList.add('is-navigating');
-    if (document.startViewTransition) {
-      document.startViewTransition(() => {
-        window.location.href = url;
-      });
-    } else {
-      setTimeout(() => {
-        window.location.href = url;
-      }, 140);
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to load page');
+      const html = await res.text();
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      if (!isPopState) {
+        window.history.pushState({}, doc.title, url);
+      }
+      document.title = doc.title;
+
+      const newBody = doc.querySelector('body');
+      
+      const swap = () => {
+        document.body.innerHTML = newBody.innerHTML;
+        document.body.className = newBody.className;
+
+        // Force execution of scripts inside the new body (page-specific logic)
+        const scripts = document.body.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          const src = oldScript.getAttribute('src') || '';
+          if (src.includes('core/') || src.includes('main.js') || src.includes('pwa/') || src.includes('shared/') || src.includes('monitoring.js')) return;
+
+          const newScript = document.createElement('script');
+          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+          newScript.textContent = oldScript.textContent;
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+
+        document.body.classList.remove('is-navigating');
+        window.scrollTo(0, 0);
+        
+        // Re-initialize mobile tweaks or global UI events if necessary
+        initMobileTweaks();
+        initPasswordToggles();
+        initPasswordValidation();
+      };
+
+      if (document.startViewTransition) {
+        document.startViewTransition(swap);
+      } else {
+        swap();
+      }
+
+    } catch (err) {
+      console.error('Router error:', err);
+      // Fallback to hard navigation
+      window.location.href = url;
     }
   };
 
@@ -155,7 +220,7 @@ const CONFIG = {
     // options._noCache = true skips cache for one-off forced refreshes.
     const cache = window.ApiCache;
     if (!isMutation && !options._noCache && cache) {
-      const cached = cache.get(path);
+      const cached = await cache.get(path);
       if (cached) {
         if (!cached.isStale) {
           // Fresh — return immediately, no network call
@@ -167,7 +232,7 @@ const CONFIG = {
           try {
             const fresh = await window.apiFetch(path, { ...options, _noCache: true });
             if (fresh) {
-              cache.set(path, fresh);
+              await cache.set(path, fresh);
               // Notify any subscriber that wants to react to fresh data
               if (window.EventBus) {
                 window.EventBus.emit('cache:revalidated', { path, data: fresh });
@@ -370,10 +435,10 @@ const CONFIG = {
     if (cache && result) {
       if (!isMutation && !options._noCache) {
         // Store successful GET response
-        cache.set(path, result);
+        await cache.set(path, result);
       } else if (isMutation) {
         // Invalidate related cache entries after any write
-        cache.invalidate(path);
+        await cache.invalidate(path);
       }
     }
     return result;

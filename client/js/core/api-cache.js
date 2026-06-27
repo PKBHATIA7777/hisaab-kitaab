@@ -25,8 +25,105 @@
  */
 
 const ApiCache = (() => {
-  // Map<string, { data: any, cachedAt: number, ttl: number }>
-  const _store = new Map();
+  const DB_NAME = 'HisaabKitaabCache';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'api_responses';
+
+  let dbPromise = null;
+
+  function initDB() {
+    if (!dbPromise) {
+      dbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+    return dbPromise;
+  }
+
+  async function idbGet(key) {
+    try {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("IndexedDB get error:", e);
+      return null;
+    }
+  }
+
+  async function idbPut(key, value) {
+    try {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.put(value, key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("IndexedDB put error:", e);
+    }
+  }
+
+  async function idbDelete(key) {
+    try {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("IndexedDB delete error:", e);
+    }
+  }
+
+  async function idbKeys() {
+    try {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAllKeys();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("IndexedDB keys error:", e);
+      return [];
+    }
+  }
+
+  async function idbClear() {
+    try {
+      const db = await initDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("IndexedDB clear error:", e);
+    }
+  }
 
   // ── TTL rules ────────────────────────────────────────────────
   const TTL_RULES = [
@@ -49,44 +146,39 @@ const ApiCache = (() => {
   }
 
   // ── Invalidation rules ───────────────────────────────────────
-  // When a mutation happens on a path, which cache keys should be cleared?
-  // Keys are matched by prefix or exact string.
   const INVALIDATION_MAP = [
-    // Mutating /chapters or /chapters/:id clears all chapter-related cache
     { mutationPrefix: '/chapters',   clearPrefixes: ['/chapters'] },
-    // Mutating /expenses clears expense lists, summaries, settlements
     { mutationPrefix: '/expenses',   clearPrefixes: ['/expenses'] },
-    // Mutating /friends clears friend list
     { mutationPrefix: '/friends',    clearPrefixes: ['/friends'] },
-    // Mutating /categories clears category list
     { mutationPrefix: '/categories', clearPrefixes: ['/categories'] },
-    // Mutating /auth (profile update, logout) clears user cache
     { mutationPrefix: '/auth',       clearPrefixes: ['/auth/me'] },
   ];
 
-  function _invalidateFor(mutationPath) {
+  async function _invalidateFor(mutationPath) {
+    const keys = await idbKeys();
+    const keysToDelete = new Set();
+
     for (const rule of INVALIDATION_MAP) {
       if (mutationPath.startsWith(rule.mutationPrefix)) {
         rule.clearPrefixes.forEach(prefix => {
-          for (const key of _store.keys()) {
+          for (const key of keys) {
             if (key.startsWith(prefix)) {
-              _store.delete(key);
+              keysToDelete.add(key);
             }
           }
         });
       }
     }
+
+    for (const key of keysToDelete) {
+      await idbDelete(key);
+    }
   }
 
   // ── Public API ────────────────────────────────────────────────
 
-  /**
-   * get(path) → { data, isStale } | null
-   * Returns cached data if it exists (even if stale).
-   * Returns null if nothing is cached for this path.
-   */
-  function get(path) {
-    const entry = _store.get(path);
+  async function get(path) {
+    const entry = await idbGet(path);
     if (!entry) return null;
     const age = Date.now() - entry.cachedAt;
     return {
@@ -95,41 +187,24 @@ const ApiCache = (() => {
     };
   }
 
-  /**
-   * set(path, data)
-   * Stores a fresh response in the cache.
-   */
-  function set(path, data) {
-    _store.set(path, {
+  async function set(path, data) {
+    await idbPut(path, {
       data,
       cachedAt: Date.now(),
       ttl: _ttlFor(path),
     });
   }
 
-  /**
-   * invalidate(mutationPath)
-   * Called after any POST/PUT/PATCH/DELETE.
-   * Clears all cache entries related to the mutated resource.
-   */
-  function invalidate(mutationPath) {
-    _invalidateFor(mutationPath);
+  async function invalidate(mutationPath) {
+    await _invalidateFor(mutationPath);
   }
 
-  /**
-   * clear()
-   * Wipes the entire cache. Useful after logout.
-   */
-  function clear() {
-    _store.clear();
+  async function clear() {
+    await idbClear();
   }
 
-  /**
-   * invalidateExact(path)
-   * Removes a single exact cache key.
-   */
-  function invalidateExact(path) {
-    _store.delete(path);
+  async function invalidateExact(path) {
+    await idbDelete(path);
   }
 
   return { get, set, invalidate, clear, invalidateExact };
