@@ -15,12 +15,16 @@ const ProfileModal = (() => {
     const color = getAvatarColor(name);
     const initials = getInitials(name);
 
-    // Fetch friends list dynamically on open
     let friends = [];
+    let devices = [];
     try {
-      const res = await apiFetch('/friends');
-      friends = res.friends || [];
+      const [friendsRes, devicesRes] = await Promise.all([
+        apiFetch('/friends'),
+        apiFetch('/auth/devices').catch(() => ({ sessions: [] }))
+      ]);
+      friends = friendsRes.friends || [];
       window._cachedFriends = friends;
+      devices = devicesRes.sessions || [];
     } catch (_) {}
 
     // Calculate net balance across friends
@@ -63,7 +67,7 @@ const ProfileModal = (() => {
         <div id="pm-edit-form" style="display:none; margin-bottom: var(--s-5); background: var(--surface-alt); padding: var(--s-4); border-radius: var(--r-md); border: 1px solid var(--surface-border);">
           <div class="form-group" style="margin: 0 0 var(--s-3);">
             <label style="font-size: var(--text-2xs); font-weight: var(--weight-bold); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--s-1); display: block;">Full Name</label>
-            <input type="text" id="pm-name-input" class="form-input" value="${escapeHTML(name)}" style="width: 100%; height: 38px; padding: 0 var(--s-3); border-radius: var(--r-sm); border: 1px solid var(--surface-border-strong);" maxlength="100">
+            <input type="text" id="pm-name-input" class="form-input" value="${escapeHTML(name)}" style="width: 100%; height: 38px; padding: 0 var(--s-3); border-radius: var(--r-sm); border: 1px solid var(--surface-border-strong);" minlength="2" maxlength="100">
           </div>
           <div style="display:flex; gap:var(--s-2);">
             <button type="button" class="btn btn--primary" id="pm-save-name" style="flex:1; height: 36px; font-size: var(--text-xs);">Save</button>
@@ -128,14 +132,44 @@ const ProfileModal = (() => {
           <div class="profile-panel-section-title">Add New Friend</div>
           <form id="pm-add-friend-form" style="display:flex; flex-direction:column; gap: var(--s-2h);">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2);">
-              <input type="text" id="add-friend-name" placeholder="Full Name" required style="height: 38px; border-radius: var(--r-sm); border:1px solid var(--surface-border-strong); padding: 0 var(--s-3); font-size: var(--text-xs); background: var(--surface-alt);">
-              <input type="text" id="add-friend-username" placeholder="Username" required style="height: 38px; border-radius: var(--r-sm); border:1px solid var(--surface-border-strong); padding: 0 var(--s-3); font-size: var(--text-xs); background: var(--surface-alt);">
+              <input type="text" id="add-friend-name" placeholder="Full Name" required maxlength="100" style="height: 38px; border-radius: var(--r-sm); border:1px solid var(--surface-border-strong); padding: 0 var(--s-3); font-size: var(--text-xs); background: var(--surface-alt);">
+              <input type="text" id="add-friend-username" placeholder="Username" required maxlength="50" style="height: 38px; border-radius: var(--r-sm); border:1px solid var(--surface-border-strong); padding: 0 var(--s-3); font-size: var(--text-xs); background: var(--surface-alt);">
             </div>
             <div style="display:flex; gap:var(--s-2);">
-              <input type="email" id="add-friend-email" placeholder="Email Address" required style="flex:1; height: 38px; border-radius: var(--r-sm); border:1px solid var(--surface-border-strong); padding: 0 var(--s-3); font-size: var(--text-xs); background: var(--surface-alt);">
+              <input type="email" id="add-friend-email" placeholder="Email Address" required maxlength="255" style="flex:1; height: 38px; border-radius: var(--r-sm); border:1px solid var(--surface-border-strong); padding: 0 var(--s-3); font-size: var(--text-xs); background: var(--surface-alt);">
               <button type="submit" class="btn btn--primary" style="height: 38px; padding: 0 var(--s-4); font-size: var(--text-xs);">Add Friend</button>
             </div>
           </form>
+        </div>
+
+        <!-- SECURITY & DEVICES -->
+        <div style="margin-top: var(--s-5); border-top: 1px solid var(--surface-border); padding-top: var(--s-4);">
+          <div class="profile-panel-section-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Manage Devices (${devices.length})</span>
+            ${devices.length > 1 ? `<button type="button" id="pm-revoke-all" class="btn btn--ghost btn--danger" style="font-size: 10px; padding: 2px 6px; height: 24px;">Sign out all other devices</button>` : ''}
+          </div>
+          <div class="friends-scroller" style="max-height: 200px;">
+            ${devices.map(d => {
+              const isCurrent = d.isCurrent;
+              const time = new Date(d.last_active_at).toLocaleString();
+              return \`
+                <div class="friend-row">
+                  <div class="friend-row-left">
+                    <div>
+                      <div class="friend-row-name" style="font-size: 13px;">\${escapeHTML(d.device_name || 'Unknown Device')}</div>
+                      <div class="friend-row-email" style="font-size: 11px;">\${escapeHTML(d.ip_address || '')} • Active: \${time}</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: var(--s-3);">
+                    \${isCurrent ? 
+                      \`<span class="friend-row-balance positive" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid currentColor;">This Device</span>\` : 
+                      \`<button type="button" class="btn btn--danger pm-revoke-device" data-id="\${d.session_id}" style="height: 26px; font-size: 11px; padding: 0 var(--s-2);">Revoke</button>\`
+                    }
+                  </div>
+                </div>
+              \`;
+            }).join('')}
+          </div>
         </div>
 
         <!-- SIGNOUT BUTTON -->
@@ -230,6 +264,52 @@ const ProfileModal = (() => {
         }
       });
     });
+
+    // Revoke Device handlers
+    overlay.querySelectorAll('.pm-revoke-device').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sessionId = btn.dataset.id;
+        
+        if (!confirm('Are you sure you want to sign out this device?')) return;
+
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Revoking...';
+          await apiFetch(`/auth/devices/${sessionId}`, { method: 'DELETE' });
+          showToast('Device signed out successfully', 'success');
+          ModalManager.close(overlay);
+          setTimeout(() => _open(), 100);
+        } catch (err) {
+          showToast(err.message || 'Failed to revoke device', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Revoke';
+        }
+      });
+    });
+
+    // Revoke All Devices handler
+    const revokeAllBtn = overlay.querySelector('#pm-revoke-all');
+    if (revokeAllBtn) {
+      revokeAllBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to sign out ALL other devices? You will remain signed in here.')) return;
+        
+        try {
+          revokeAllBtn.disabled = true;
+          revokeAllBtn.textContent = 'Signing out...';
+          await apiFetch('/auth/devices/all?all=true', { method: 'DELETE' });
+          showToast('All other devices signed out', 'success');
+          // Refresh list
+          ModalManager.close(overlay);
+          setTimeout(() => _open(), 100);
+        } catch (err) {
+          showToast(err.message || 'Failed to sign out devices', 'error');
+          revokeAllBtn.disabled = false;
+          revokeAllBtn.textContent = 'Sign out all other devices';
+        }
+      });
+    }
   }
 
   EventBus.on(EVENTS.PROFILE_MODAL_OPEN, _open);

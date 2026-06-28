@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS chapters (
   last_opened_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_chapters_created_by ON chapters(created_by);
 
 -- 3. friends table
 CREATE TABLE IF NOT EXISTS friends (
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS chapter_members (
 CREATE INDEX IF NOT EXISTS idx_chapter_members_user_id ON chapter_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_chapter_members_friend_id ON chapter_members(friend_id);
 CREATE INDEX IF NOT EXISTS idx_chapter_members_user_chapter ON chapter_members(user_id, chapter_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_members_chapter_id ON chapter_members(chapter_id);
 
 -- 5. events table
 CREATE TABLE IF NOT EXISTS events (
@@ -105,6 +107,7 @@ CREATE TABLE IF NOT EXISTS expense_splits (
   amount_owed DECIMAL(12, 2) NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_expense_splits_member_id ON expense_splits(member_id);
+CREATE INDEX IF NOT EXISTS idx_expense_splits_expense_id ON expense_splits(expense_id);
 
 -- 9. otps table
 CREATE TABLE IF NOT EXISTS otps (

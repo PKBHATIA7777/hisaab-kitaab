@@ -151,13 +151,37 @@
         </div>
         
         <!-- Action filters & custom sorting trigger -->
-        <div class="toolbar-actions">
-          <button id="btn-sort-sheet" class="btn-filter-chip" aria-label="Sort chapters">
+        <div class="toolbar-actions" style="position: relative;">
+          <button id="btn-sort-sheet" class="btn-filter-chip" aria-label="Sort chapters" aria-haspopup="true" aria-expanded="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 5h10M11 9h7M11 13h4M3 17l3-3 3 3M6 14v7"/>
             </svg>
-            <span id="sort-current-label">Sort: Newest</span>
+            <span id="sort-current-label">Sort: Last opened</span>
           </button>
+          
+          <!-- Custom sleek popover menu -->
+          <div id="sort-dropdown-menu" class="sort-dropdown hidden">
+            <button class="sort-option selected" data-val="last_opened">
+              <span>Last opened</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+            <button class="sort-option" data-val="newest">
+              <span>Newest first</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+            <button class="sort-option" data-val="oldest">
+              <span>Oldest first</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+            <button class="sort-option" data-val="az">
+              <span>Name (A-Z)</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+            <button class="sort-option" data-val="members">
+              <span>Member count</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+          </div>
           
           <button id="btn-show-archived" class="btn-filter-chip" aria-label="Show archived chapters">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -171,7 +195,8 @@
 
         <!-- Hidden native select for ChaptersGrid.initToolbar compatibility -->
         <select id="chapter-sort" style="display:none">
-          <option value="newest" selected>Newest first</option>
+          <option value="last_opened" selected>Last opened</option>
+          <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="az">Name (A-Z)</option>
           <option value="members">Members</option>
@@ -303,52 +328,52 @@
   <!-- Custom Sort Sheet and Speed Dial FAB Menu Toggle handlers -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // 1. Custom Sort Bottom Sheet
+      // 1. Custom Sort Dropdown Popover
       const sortTriggerBtn = document.getElementById('btn-sort-sheet');
       const sortSelect = document.getElementById('chapter-sort');
       const sortLabel = document.getElementById('sort-current-label');
+      const sortDropdown = document.getElementById('sort-dropdown-menu');
       
-      if (sortTriggerBtn && sortSelect && sortLabel) {
-        sortTriggerBtn.addEventListener('click', () => {
-          const currentVal = sortSelect.value;
-          
-          const overlay = ModalManager.createOverlay(`
-            <div class="modal-handle"></div>
-            <div class="modal-header" style="border-bottom: 1px solid var(--surface-border); padding-bottom: var(--s-3);">
-              <h2 class="modal-title" style="font-size: var(--text-base);">Sort Chapters</h2>
-            </div>
-            <div class="bottom-sheet-menu">
-              <button class="bottom-sheet-option ${currentVal === 'newest' ? 'selected' : ''}" data-val="newest">
-                <span>Newest first</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </button>
-              <button class="bottom-sheet-option ${currentVal === 'oldest' ? 'selected' : ''}" data-val="oldest">
-                <span>Oldest first</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </button>
-              <button class="bottom-sheet-option ${currentVal === 'az' ? 'selected' : ''}" data-val="az">
-                <span>Name (A-Z)</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </button>
-              <button class="bottom-sheet-option ${currentVal === 'members' ? 'selected' : ''}" data-val="members">
-                <span>Member count</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </button>
-            </div>
-          `, { type: 'bottom' });
+      if (sortTriggerBtn && sortSelect && sortLabel && sortDropdown) {
+        // Toggle dropdown
+        sortTriggerBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isExpanded = sortDropdown.classList.contains('hidden');
+          if (isExpanded) {
+            sortDropdown.classList.remove('hidden');
+            sortTriggerBtn.setAttribute('aria-expanded', 'true');
+          } else {
+            sortDropdown.classList.add('hidden');
+            sortTriggerBtn.setAttribute('aria-expanded', 'false');
+          }
+        });
 
-          overlay.querySelectorAll('.bottom-sheet-option').forEach(opt => {
-            opt.addEventListener('click', () => {
-              const val = opt.dataset.val;
-              const text = opt.querySelector('span').textContent;
-              
-              // Set value & trigger change event
-              sortSelect.value = val;
-              sortSelect.dispatchEvent(new Event('change', { bubbles: true }));
-              
-              sortLabel.textContent = `Sort: ${text}`;
-              ModalManager.close(overlay);
-            });
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+          if (!sortDropdown.contains(e.target) && !sortTriggerBtn.contains(e.target)) {
+            sortDropdown.classList.add('hidden');
+            sortTriggerBtn.setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        // Handle option selection
+        sortDropdown.querySelectorAll('.sort-option').forEach(opt => {
+          opt.addEventListener('click', () => {
+            const val = opt.dataset.val;
+            const text = opt.querySelector('span').textContent;
+            
+            // Set value & trigger change event
+            sortSelect.value = val;
+            sortSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            // Update UI
+            sortLabel.textContent = \`Sort: \${text}\`;
+            sortDropdown.querySelectorAll('.sort-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            
+            // Close dropdown
+            sortDropdown.classList.add('hidden');
+            sortTriggerBtn.setAttribute('aria-expanded', 'false');
           });
         });
       }

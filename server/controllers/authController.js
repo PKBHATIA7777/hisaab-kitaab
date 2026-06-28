@@ -58,14 +58,14 @@ function parseDeviceInfo(userAgent, ip) {
   return { deviceType, browser, os, deviceName, ip: ip || 'Unknown' };
 }
 
-async function registerDeviceSession(userId, jwtIat, req) {
+async function registerDeviceSession(userId, jwtIat, req, providedSessionId) {
   try {
     const { deviceType, browser, os, deviceName, ip } = parseDeviceInfo(
       req.headers['user-agent'],
       req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress
     );
     
-    const sessionId = require('crypto').randomBytes(32).toString('hex');
+    const sessionId = providedSessionId || require('crypto').randomBytes(32).toString('hex');
     
     await db.query(
       `INSERT INTO device_sessions 
@@ -150,8 +150,8 @@ async function loginVerifyOtp(req, res) {
 
     // Issue refresh token for silent session renewal (60-day sliding window)
     const { issueRefreshToken } = require("../utils/jwt");
-    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
-    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    const sessionId = require('crypto').randomBytes(32).toString('hex');
+    const rawRefresh = await issueRefreshToken(db, user.id, sessionId);
     res.cookie("refresh_token", rawRefresh, {
       httpOnly: true,
       secure: isProduction,
@@ -162,7 +162,7 @@ async function loginVerifyOtp(req, res) {
 
     // Register device session for multi-device management (non-blocking)
     const decoded = require('jsonwebtoken').decode(token);
-    registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
+    registerDeviceSession(user.id, decoded?.iat, req, sessionId).catch(() => {});
 
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + LONG_MS });
   } catch (err) {
@@ -446,8 +446,8 @@ async function registerComplete(req, res) {
 
       // Issue refresh token for silent session renewal (60-day sliding window)
       const { issueRefreshToken } = require("../utils/jwt");
-      const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
-      const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+      const sessionId = require('crypto').randomBytes(32).toString('hex');
+      const rawRefresh = await issueRefreshToken(db, user.id, sessionId);
       res.cookie("refresh_token", rawRefresh, {
         httpOnly: true,
         secure: isProduction,
@@ -455,6 +455,10 @@ async function registerComplete(req, res) {
         maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
         path: "/api/auth/refresh",
       });
+
+      // Register device session for multi-device management (non-blocking)
+      const decoded = require('jsonwebtoken').decode(token);
+      registerDeviceSession(user.id, decoded?.iat, req, sessionId).catch(() => {});
 
       return res.json({
         ok: true,
@@ -492,8 +496,8 @@ async function login(req, res) {
 
     // Issue refresh token for silent session renewal (60-day sliding window)
     const { issueRefreshToken } = require("../utils/jwt");
-    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
-    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    const sessionId = require('crypto').randomBytes(32).toString('hex');
+    const rawRefresh = await issueRefreshToken(db, user.id, sessionId);
     res.cookie("refresh_token", rawRefresh, {
       httpOnly: true,
       secure: isProduction,
@@ -504,7 +508,7 @@ async function login(req, res) {
 
     // Register device session for multi-device management (non-blocking)
     const decoded = require('jsonwebtoken').decode(token);
-    registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
+    registerDeviceSession(user.id, decoded?.iat, req, sessionId).catch(() => {});
 
     return res.json({ ok: true, message: "Login successful", user: { id: user.id, realName: user.real_name, username: user.username, email: user.email }, sessionExpiresAt: Date.now() + LONG_MS });
   } catch (err) {
@@ -578,8 +582,8 @@ if (!user) {
 
     // Issue refresh token for silent session renewal (60-day sliding window)
     const { issueRefreshToken } = require("../utils/jwt");
-    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
-    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    const sessionId = require('crypto').randomBytes(32).toString('hex');
+    const rawRefresh = await issueRefreshToken(db, user.id, sessionId);
     res.cookie("refresh_token", rawRefresh, {
       httpOnly: true,
       secure: isProduction,
@@ -590,7 +594,7 @@ if (!user) {
 
     // Register device session for multi-device management (non-blocking)
     const decoded = require('jsonwebtoken').decode(token);
-    registerDeviceSession(user.id, decoded?.iat, req).catch(() => {});
+    registerDeviceSession(user.id, decoded?.iat, req, sessionId).catch(() => {});
 
     return res.json({ ok: true, message: "Google login successful", isNewUser, user: { id: user.id, realName: user.real_name, username: user.username, email: user.email } });
   } catch (err) {
@@ -630,8 +634,8 @@ async function setPassword(req, res) {
 
     // Issue a fresh refresh token for the current device
     const { issueRefreshToken } = require("../utils/jwt");
-    const deviceHint = req.headers['user-agent']?.slice(0, 100) || '';
-    const rawRefresh = await issueRefreshToken(db, user.id, deviceHint);
+    const sessionId = require('crypto').randomBytes(32).toString('hex');
+    const rawRefresh = await issueRefreshToken(db, user.id, sessionId);
     res.cookie("refresh_token", rawRefresh, {
       httpOnly: true,
       secure: isProduction,
@@ -639,6 +643,10 @@ async function setPassword(req, res) {
       maxAge: 60 * 24 * 60 * 60 * 1000,
       path: "/api/auth/refresh",
     });
+
+    // Register device session for multi-device management (non-blocking)
+    const decoded = require('jsonwebtoken').decode(newToken);
+    registerDeviceSession(user.id, decoded?.iat, req, sessionId).catch(() => {});
 
     return res.json({ ok: true, message: "Password set successfully" });
   } catch (err) {
@@ -853,8 +861,15 @@ async function logoutDevice(req, res) {
     
     // Note: Removing a specific device session does not immediately invalidate
     // its JWT (which would require a full jwt_generation increment affecting all devices).
-    // The removed device's token will naturally expire within its remaining lifetime.
+    // The removed device's token will naturally expire within its remaining lifetime (max 15m).
     // The device session row is deleted so it no longer appears in the devices list.
+
+    // ✅ CRITICAL FIX: Also revoke the specific refresh token tied to this session ID.
+    // This prevents the device from silently refreshing its session after the JWT expires.
+    await db.query(
+      "UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1 AND device_hint = $2",
+      [userId, sessionId]
+    );
     
     res.json({ ok: true, message: "Device session removed. That device will be signed out on its next activity." });
   } catch (err) {

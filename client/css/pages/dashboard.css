@@ -555,7 +555,7 @@ body.has-fab-gradient {
   justify-content: space-between;
 }
 
-/* ─── CUSTOM SORT OPTIONS BOTTOM SHEET / MENU ─── */
+/* ─── CUSTOM SORT OPTIONS BOTTOM SHEET / MENU (LEGACY) ─── */
 .bottom-sheet-menu {
   padding: var(--s-4) 0;
 }
@@ -595,6 +595,71 @@ body.has-fab-gradient {
 
 .bottom-sheet-option.selected svg {
   visibility: visible;
+}
+
+/* ─── INLINE SORT DROPDOWN ─── */
+.sort-dropdown {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  left: 0;
+  width: 220px;
+  background: var(--surface-alt);
+  border: 1px solid var(--surface-border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-1h);
+  z-index: 100;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), visibility var(--dur-fast);
+}
+
+.sort-dropdown.hidden {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+
+.sort-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--s-2h) var(--s-3);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.sort-option:hover {
+  background: var(--bg-elevated-2);
+}
+
+.sort-option.selected {
+  color: var(--brand);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.sort-option svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+
+.sort-option.selected svg {
+  opacity: 1;
 }
 
 /* ─── SLIDE-IN PROFILE PANEL (DESKTOP WRAPPER) ─── */

@@ -1742,3 +1742,23 @@ class MemberAutocomplete {
 }
 
 window.MemberAutocomplete = MemberAutocomplete;
+/* ======================================
+   GLOBAL EXCEPTION HANDLING
+   ====================================== */
+window.addEventListener('error', function(event) {
+  console.error('Unhandled JS Error:', event.error);
+  if (window.showToast) {
+    window.showToast("An unexpected error occurred. Please refresh.", "error");
+  }
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('Unhandled Promise Rejection:', event.reason);
+  // Do not show a toast for intentional auth redirects or network fallbacks
+  if (event.reason && (event.reason.isAuthRedirect || event.reason.isTimeout || event.reason.isOffline)) {
+    return;
+  }
+  if (window.showToast) {
+    window.showToast("An unexpected error occurred. Please try again.", "error");
+  }
+});

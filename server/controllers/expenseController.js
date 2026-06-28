@@ -16,7 +16,7 @@ const addExpenseSchema = z.object({
   description: z.string().max(100, "Description too long").optional(),
   payerMemberId: z.string().or(z.number()),
   categoryId: z.number().int().nullish(), // ✅ NEW: Feature 4
-  expenseDate: z.string().nullish(), // ✅ NEW: Step 5 Date Picker
+  expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").nullish(), // ✅ NEW: Step 5 Date Picker
   involvedMemberIds: z.array(z.string().or(z.number())).optional(),
   customSplits: z.array(z.object({
     memberId: z.string().or(z.number()),

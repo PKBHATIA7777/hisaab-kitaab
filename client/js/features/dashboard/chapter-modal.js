@@ -42,7 +42,7 @@ const ChapterModal = (() => {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;gap:var(--s-2);align-items:center;';
         row.innerHTML = `
-          <input type="text" class="form-input ch-member-input" placeholder="Member name" style="flex:1;">
+          <input type="text" class="form-input ch-member-input" placeholder="Member name" style="flex:1;" maxlength="50">
           <button type="button" style="color:var(--negative);background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px;">×</button>
         `;
         row.querySelector('button').addEventListener('click', () => row.remove());
