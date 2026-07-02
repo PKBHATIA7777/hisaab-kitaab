@@ -14,9 +14,9 @@ const ChapterCardMenu = (() => {
     const menu = document.createElement('div');
     menu.className = 'card-menu is-open';
     menu.innerHTML = `
-      <button class="card-menu__item" data-action="edit">✏️ Edit</button>
-      ${!chapter.is_personal ? `<button class="card-menu__item" data-action="archive">${chapter.is_archived ? '📋 Restore' : '✅ Mark Settled'}</button>` : ''}
-      ${!chapter.is_personal ? `<button class="card-menu__item card-menu__item--danger" data-action="delete">🗑️ Delete</button>` : ''}
+      <button class="card-menu__item" data-action="edit"> Edit</button>
+      ${!chapter.is_personal ? `<button class="card-menu__item" data-action="archive">${chapter.is_archived ? ' Restore' : ' Mark Settled'}</button>` : ''}
+      ${!chapter.is_personal ? `<button class="card-menu__item card-menu__item--danger" data-action="delete"> Delete</button>` : ''}
     `;
 
     // Position relative to trigger

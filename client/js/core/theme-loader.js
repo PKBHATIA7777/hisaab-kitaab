@@ -5,7 +5,7 @@
 
 (function () {
   try {
-    const savedTheme = localStorage.getItem('hk_theme') || 'dark';
+    const savedTheme = localStorage.getItem('hk_theme') || 'light';
     let activeTheme = savedTheme;
     if (savedTheme === 'weekly') {
       const themes = ['light', 'dark', 'beige', 'matcha', 'lavender', 'midnight-neon'];

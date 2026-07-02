@@ -152,22 +152,22 @@ const ProfileModal = (() => {
             ${devices.map(d => {
               const isCurrent = d.isCurrent;
               const time = new Date(d.last_active_at).toLocaleString();
-              return \`
+              return `
                 <div class="friend-row">
                   <div class="friend-row-left">
                     <div>
-                      <div class="friend-row-name" style="font-size: 13px;">\${escapeHTML(d.device_name || 'Unknown Device')}</div>
-                      <div class="friend-row-email" style="font-size: 11px;">\${escapeHTML(d.ip_address || '')} • Active: \${time}</div>
+                      <div class="friend-row-name" style="font-size: 13px;">${escapeHTML(d.device_name || 'Unknown Device')}</div>
+                      <div class="friend-row-email" style="font-size: 11px;">${escapeHTML(d.ip_address || '')} • Active: ${time}</div>
                     </div>
                   </div>
                   <div style="display: flex; align-items: center; gap: var(--s-3);">
-                    \${isCurrent ? 
-                      \`<span class="friend-row-balance positive" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid currentColor;">This Device</span>\` : 
-                      \`<button type="button" class="btn btn--danger pm-revoke-device" data-id="\${d.session_id}" style="height: 26px; font-size: 11px; padding: 0 var(--s-2);">Revoke</button>\`
+                    ${isCurrent ? 
+                      `<span class="friend-row-balance positive" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid currentColor;">This Device</span>` : 
+                      `<button type="button" class="btn btn--danger pm-revoke-device" data-id="${d.session_id}" style="height: 26px; font-size: 11px; padding: 0 var(--s-2);">Revoke</button>`
                     }
                   </div>
                 </div>
-              \`;
+              `;
             }).join('')}
           </div>
         </div>

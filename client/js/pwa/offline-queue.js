@@ -128,7 +128,7 @@ const OfflineQueue = (() => {
     }
 
     if (successCount > 0 && window.showToast) {
-      window.showToast(`${successCount} offline expense${successCount !== 1 ? "s" : ""} synced ✓`, "success");
+      window.showToast(`${successCount} offline expense${successCount !== 1 ? "s" : ""} synced`, "success");
       // Refresh the current page's data
       if (typeof window.loadExpenses === "function") window.loadExpenses();
     }

@@ -43,19 +43,19 @@
   </noscript>
 
   <!-- PWA -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <!-- PWA Apple Icons & Splash Screens -->
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_15_Pro_Max__iPhone_15_Plus__iPhone_14_Pro_Max_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_15_Pro__iPhone_15__iPhone_14_Pro_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_14_Plus__iPhone_13_Pro_Max__iPhone_12_Pro_Max_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_14__iPhone_13_Pro__iPhone_13__iPhone_12_Pro__iPhone_12_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_13_mini__iPhone_12_mini__iPhone_11_Pro__iPhone_XS__iPhone_X_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_11_Pro_Max__iPhone_XS_Max_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="/icons/splash/iPhone_11__iPhone_XR_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" href="/icons/splash/iPhone_8_Plus__iPhone_7_Plus__iPhone_6s_Plus__iPhone_6_Plus_portrait.png">
-  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="/icons/splash/iPhone_8__iPhone_7__iPhone_6s__iPhone_6__4.7__iPhone_SE_portrait.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152x152.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_15_Pro_Max__iPhone_15_Plus__iPhone_14_Pro_Max_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_15_Pro__iPhone_15__iPhone_14_Pro_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_14_Plus__iPhone_13_Pro_Max__iPhone_12_Pro_Max_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_14__iPhone_13_Pro__iPhone_13__iPhone_12_Pro__iPhone_12_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_13_mini__iPhone_12_mini__iPhone_11_Pro__iPhone_XS__iPhone_X_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_11_Pro_Max__iPhone_XS_Max_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="icons/splash/iPhone_11__iPhone_XR_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" href="icons/splash/iPhone_8_Plus__iPhone_7_Plus__iPhone_6s_Plus__iPhone_6_Plus_portrait.png">
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="icons/splash/iPhone_8__iPhone_7__iPhone_6s__iPhone_6__4.7__iPhone_SE_portrait.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hisaab">
@@ -139,12 +139,6 @@
 
     <div class="dashboard-container">
       
-      <!-- Overall summary outstanding balances header widget -->
-      <div class="balance-overview-widget" id="balance-overview-box">
-        <span class="balance-overview-header">Net Outstanding Balance</span>
-        <span class="balance-overview-amount settled">₹0.00</span>
-        <span class="balance-overview-desc">Calculating balances across active chapters...</span>
-      </div>
 
       <!-- Toolbar controls layout -->
       <div class="dashboard-controls">
@@ -326,9 +320,9 @@
   <script src="js/features/dashboard/chapter-card-menu.js" defer></script>
   <script src="js/features/dashboard/chapter-modal.js" defer></script>
   <script src="js/features/dashboard/profile-modal.js" defer></script>
-  <script src="js/features/creator-label.js" defer></script>
-  <script src="js/features/personal-chapter.js" defer></script>
-  <script src="js/features/categories.js" defer></script>
+  <script src="js/feature-creator-label.js" defer></script>
+  <script src="js/feature-personal-chapter.js" defer></script>
+  <script src="js/feature-categories.js" defer></script>
   <script src="js/shared/footer.js" defer></script>
   <script src="js/pages/dashboard-page.js" defer></script>
 

@@ -18,7 +18,7 @@ function _showOnboardingIfNeeded(chaptersCount) {
                 border:1.5px solid rgba(208,0,255,0.3);border-radius:var(--r-lg);
                 padding:var(--s-5);margin-bottom:var(--s-6);display:flex;
                 align-items:flex-start;gap:var(--s-4);">
-      <span style="font-size:1.8rem;flex-shrink:0;">👋</span>
+      <span style="font-size:1.8rem;flex-shrink:0;"></span>
       <div style="flex:1;">
         <p style="color:#fff;font-weight:600;font-size:var(--text-base);margin:0 0 var(--s-1);">
           Welcome to Hisaab-Kitaab!
@@ -47,21 +47,7 @@ function _showOnboardingIfNeeded(chaptersCount) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Guard against redirect loops (existing logic, kept)
-  const GUARD_KEY = '__dash_redirects';
-  const now = Date.now();
-  const raw = sessionStorage.getItem(GUARD_KEY);
-  const data = raw ? JSON.parse(raw) : { count: 0, time: 0 };
-  if (now - data.time < 5000) { data.count++; } else { data.count = 1; data.time = now; }
-  sessionStorage.setItem(GUARD_KEY, JSON.stringify(data));
-  if (data.count > 3) {
-    ['auth_token', 'session_expiry'].forEach(name => {
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-    });
-    sessionStorage.removeItem(GUARD_KEY);
-    window.location.replace('login.html');
-    return;
-  }
+
 
   // Cross-tab logout listener
   if (typeof SessionManager !== 'undefined') {
@@ -76,8 +62,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const [authData] = await Promise.all([
       apiFetch('/auth/me'),
-      apiFetch('/friends').then(d => { window._cachedFriends = d.friends || []; }).catch(() => {}),
+      apiFetch('/friends').then(d => { window._cachedFriends = d?.friends || []; }).catch(e => { console.error('Failed to load friends', e); return {}; }),
     ]);
+
+    if (!authData || !authData.user) {
+      console.error('Invalid authData received:', authData);
+      if (window.ApiCache) {
+        await window.ApiCache.clear();
+      }
+      throw new Error('User data is missing from auth response.');
+    }
 
     window.currentUser = authData.user;
     ProfileModal.init(authData.user);
@@ -85,11 +79,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await ChaptersGrid.load();
 
-    // Show onboarding for first-time users with no chapters (cache hit — no extra network call)
-    const chaptersData = await apiFetch('/chapters').catch(() => null);
+    // Show onboarding for first-time users with no chapters
+    const chaptersData = await apiFetch('/chapters').catch(e => { console.error('Failed to load chapters for onboarding', e); return null; });
     _showOnboardingIfNeeded(chaptersData?.chapters?.length ?? 0);
 
   } catch (err) {
+    console.error('Error during dashboard initialization:', err);
+    const grid = document.getElementById('chapters-grid');
+    if (grid) grid.innerHTML = '';
+    
+    // DEBUG: show the exact error on screen
+    const dbg = document.createElement('div');
+    dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;z-index:9999;padding:20px;white-space:pre-wrap;font-family:monospace;font-size:12px;';
+    dbg.textContent = `DASHBOARD INIT ERROR:\n${err.message}\n${err.stack}`;
+    document.body.appendChild(dbg);
+
     if (err.isAuthRedirect) return; // Navigation already triggered
     if (err.status === 401 || err.status === 403) {
       ['session_expiry'].forEach(name => {
@@ -97,7 +101,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       window.location.replace('login.html?expired=true');
     } else {
-      showToast(getUserMessage(err), 'error', { label: 'Retry', callback: () => window.location.reload() });
+      if (window.showToast) {
+        showToast(window.getUserMessage ? getUserMessage(err) : err.message, 'error', { label: 'Retry', callback: () => window.location.reload() });
+      }
     }
   }
 
@@ -135,9 +141,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function renderNavProfile(user) {
   const btn = document.getElementById('profile-trigger');
-  if (!btn) return;
-  const color    = getAvatarColor(user.realName || user.username || '');
-  const initials = getInitials(user.realName || user.username || '?');
+  if (!btn || !user) return;
+  const color    = window.getAvatarColor ? getAvatarColor(user.realName || user.username || '') : '#7C3AED';
+  const initials = window.getInitials ? getInitials(user.realName || user.username || '?') : '?';
   btn.style.background = color;
   btn.textContent = initials;
   btn.setAttribute('aria-label', `Profile: ${user.realName}`);

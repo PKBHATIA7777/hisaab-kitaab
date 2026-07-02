@@ -157,7 +157,7 @@
     Store.remove("pwa_prompt_available");
     hidePopup();
     updateInstallUI();
-    if (window.showToast) window.showToast("App installed! 🎉", "success");
+    if (window.showToast) window.showToast("App installed! ", "success");
   });
 
   // ── INSTALL CONFIG ───────────────────────────────────────────
@@ -181,23 +181,23 @@
           type: "manual",
           browser: "safari-ios",
           title: "Add to Home Screen",
-          icon: "📲",
+          icon: "",
           canInstallDirectly: false,
           isIOS: true,
           isIPad,
           steps: [
             {
-              icon: "1️⃣",
+              icon: "1.",
               text: `Tap the <strong>Share</strong> button`,
               sub: `The box with an arrow — at ${shareLocation}`,
             },
             {
-              icon: "2️⃣",
+              icon: "2.",
               text: "Scroll and tap <strong>Add to Home Screen</strong>",
               sub: "It has a + icon in a square",
             },
             {
-              icon: "3️⃣",
+              icon: "3.",
               text: "Tap <strong>Add</strong> to confirm",
               sub: "The app icon will appear on your home screen",
             },
@@ -211,13 +211,13 @@
           type: "manual",
           browser: "chrome-ios",
           title: "Add to Home Screen",
-          icon: "📲",
+          icon: "",
           canInstallDirectly: false,
           isIOS: true,
           steps: [
-            { icon: "1️⃣", text: "Tap the <strong>⋯</strong> menu button", sub: "Three dots in the bottom right" },
-            { icon: "2️⃣", text: "Tap <strong>Add to Home Screen</strong>", sub: "" },
-            { icon: "3️⃣", text: "Tap <strong>Add</strong> to confirm", sub: "" },
+            { icon: "1.", text: "Tap the <strong>⋯</strong> menu button", sub: "Three dots in the bottom right" },
+            { icon: "2.", text: "Tap <strong>Add to Home Screen</strong>", sub: "" },
+            { icon: "3.", text: "Tap <strong>Add</strong> to confirm", sub: "" },
           ],
           note: "For the best experience, open this page in Safari and add from there.",
         };
@@ -228,13 +228,13 @@
           type: "manual",
           browser: "firefox-ios",
           title: "Add to Home Screen",
-          icon: "📲",
+          icon: "",
           canInstallDirectly: false,
           isIOS: true,
           steps: [
-            { icon: "1️⃣", text: "Tap the <strong>⋯</strong> menu at the bottom", sub: "" },
-            { icon: "2️⃣", text: "Tap <strong>Share</strong>", sub: "" },
-            { icon: "3️⃣", text: "Tap <strong>Add to Home Screen</strong>", sub: "" },
+            { icon: "1.", text: "Tap the <strong>⋯</strong> menu at the bottom", sub: "" },
+            { icon: "2.", text: "Tap <strong>Share</strong>", sub: "" },
+            { icon: "3.", text: "Tap <strong>Add to Home Screen</strong>", sub: "" },
           ],
           note: "For full PWA features, use Safari to add to home screen.",
         };
@@ -245,13 +245,13 @@
         type: "manual",
         browser: "other-ios",
         title: "Install App",
-        icon: "📲",
+        icon: "",
         canInstallDirectly: false,
         isIOS: true,
         steps: [
-          { icon: "💡", text: "Open this page in <strong>Safari</strong>", sub: "Copy the URL and paste in Safari" },
-          { icon: "1️⃣", text: "Tap the <strong>Share ↑</strong> button", sub: "At the bottom of Safari" },
-          { icon: "2️⃣", text: "Tap <strong>Add to Home Screen</strong>", sub: "" },
+          { icon: "", text: "Open this page in <strong>Safari</strong>", sub: "Copy the URL and paste in Safari" },
+          { icon: "1.", text: "Tap the <strong>Share ↑</strong> button", sub: "At the bottom of Safari" },
+          { icon: "2.", text: "Tap <strong>Add to Home Screen</strong>", sub: "" },
         ],
         note: "PWA installation on iOS works best through Safari.",
       };
@@ -261,19 +261,19 @@
     if (detect.isAndroid) {
       // Samsung Internet 14+ supports native prompt
       if (detect.isSamsung && detect.samsungVersion >= 14 && promptAvailable) {
-        return { type: "prompt", browser: "samsung", canInstallDirectly: true, title: "Install App", icon: "📱", buttonText: "Install" };
+        return { type: "prompt", browser: "samsung", canInstallDirectly: true, title: "Install App", icon: "", buttonText: "Install" };
       }
       if (detect.isSamsung) {
         return {
           type: "manual",
           browser: "samsung",
           title: "Add to Home Screen",
-          icon: "📱",
+          icon: "",
           canInstallDirectly: false,
           steps: [
-            { icon: "1️⃣", text: "Tap the <strong>⋮ menu</strong>", sub: "Top right of Samsung Internet" },
-            { icon: "2️⃣", text: "Tap <strong>Add page to</strong>", sub: "" },
-            { icon: "3️⃣", text: "Select <strong>Home screen</strong>", sub: "" },
+            { icon: "1.", text: "Tap the <strong>⋮ menu</strong>", sub: "Top right of Samsung Internet" },
+            { icon: "2.", text: "Tap <strong>Add page to</strong>", sub: "" },
+            { icon: "3.", text: "Select <strong>Home screen</strong>", sub: "" },
           ],
         };
       }
@@ -282,11 +282,11 @@
           type: "manual",
           browser: "firefox-android",
           title: "Add to Home Screen",
-          icon: "📱",
+          icon: "",
           canInstallDirectly: false,
           steps: [
-            { icon: "1️⃣", text: "Tap the <strong>⋮ menu</strong>", sub: "Three dots at the bottom right" },
-            { icon: "2️⃣", text: "Tap <strong>Install</strong>", sub: 'Or "Add to Home Screen"' },
+            { icon: "1.", text: "Tap the <strong>⋮ menu</strong>", sub: "Three dots at the bottom right" },
+            { icon: "2.", text: "Tap <strong>Install</strong>", sub: 'Or "Add to Home Screen"' },
           ],
         };
       }
@@ -295,11 +295,11 @@
           type: "manual",
           browser: "opera-android",
           title: "Add to Home Screen",
-          icon: "📱",
+          icon: "",
           canInstallDirectly: false,
           steps: [
-            { icon: "1️⃣", text: "Tap the <strong>Opera logo</strong> or <strong>⋮</strong>", sub: "" },
-            { icon: "2️⃣", text: "Tap <strong>Home Screen</strong>", sub: "" },
+            { icon: "1.", text: "Tap the <strong>Opera logo</strong> or <strong>⋮</strong>", sub: "" },
+            { icon: "2.", text: "Tap <strong>Home Screen</strong>", sub: "" },
           ],
         };
       }
@@ -310,12 +310,12 @@
           browser: detect.isEdge ? "edge-android" : detect.isBrave ? "brave-android" : "chrome-android",
           canInstallDirectly: true,
           title: "Install App",
-          icon: "📱",
+          icon: "",
           buttonText: "Install",
         };
       }
       // Generic Android fallback
-      return { type: "prompt", browser: "android-generic", canInstallDirectly: promptAvailable, title: "Install App", icon: "📱", buttonText: "Install" };
+      return { type: "prompt", browser: "android-generic", canInstallDirectly: promptAvailable, title: "Install App", icon: "", buttonText: "Install" };
     }
 
     // ── Desktop ──────────────────────────────────────────────
@@ -326,7 +326,7 @@
           browser: detect.isEdge ? "edge-desktop" : detect.isBrave ? "brave-desktop" : "chrome-desktop",
           canInstallDirectly: promptAvailable,
           title: "Install App",
-          icon: "💻",
+          icon: "",
           buttonText: "Install",
         };
       }
@@ -345,12 +345,12 @@
             type: "manual",
             browser: "safari-mac",
             title: "Add to Dock",
-            icon: "💻",
+            icon: "",
             canInstallDirectly: false,
             steps: [
-              { icon: "1️⃣", text: "Click <strong>File</strong> in the menu bar", sub: "" },
-              { icon: "2️⃣", text: "Click <strong>Add to Dock...</strong>", sub: "macOS Sonoma+ feature" },
-              { icon: "3️⃣", text: "Click <strong>Add</strong>", sub: "" },
+              { icon: "1.", text: "Click <strong>File</strong> in the menu bar", sub: "" },
+              { icon: "2.", text: "Click <strong>Add to Dock...</strong>", sub: "macOS Sonoma+ feature" },
+              { icon: "3.", text: "Click <strong>Add</strong>", sub: "" },
             ],
           };
         }
@@ -367,7 +367,7 @@
       type: "prompt",
       canInstallDirectly: promptAvailable,
       title: "Install App",
-      icon: "📱",
+      icon: "",
       buttonText: "Install",
     };
   }
@@ -425,7 +425,7 @@
     const iconEl = popup.querySelector(".pwa-icon");
 
     if (titleEl) titleEl.textContent = config.title || "Install App";
-    if (iconEl) iconEl.textContent = config.icon || "📱";
+    if (iconEl) iconEl.textContent = config.icon || "";
 
     if (config.canInstallDirectly && deferredPrompt) {
       if (instructEl) instructEl.textContent = "Install for a faster experience!";
@@ -507,14 +507,14 @@
           <button id="pwa-guide-close" style="background:#f5f5f5;border:none;
             border-radius:50%;width:32px;height:32px;font-size:1rem;
             cursor:pointer;display:flex;align-items:center;justify-content:center;">
-            ✕
+            
           </button>
         </div>
         ${stepsHTML}
         ${config.note ? `
           <div style="margin-top:16px;background:#f0f7ff;border-radius:12px;
                       padding:12px 14px;display:flex;gap:10px;align-items:flex-start;">
-            <span style="font-size:1.1rem;flex-shrink:0;">💡</span>
+            <span style="font-size:1.1rem;flex-shrink:0;"></span>
             <p style="margin:0;font-size:0.82rem;color:#555;line-height:1.5;">
               ${config.note}
             </p>

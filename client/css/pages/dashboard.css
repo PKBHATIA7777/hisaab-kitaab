@@ -75,7 +75,7 @@ body.has-fab-gradient {
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: var(--s-2h);
+  gap: var(--s-2);
 }
 
 .nav-brand-logo {

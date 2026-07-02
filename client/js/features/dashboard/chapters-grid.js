@@ -179,7 +179,7 @@ const ChaptersGrid = (() => {
     const filtered = _filterChapters(_sortChapters(_chapters));
 
     // Update overall summary header balance widget
-    _updateNetBalanceWidget(_chapters);
+
 
     if (!_chapters.length) {
       g.appendChild(_buildEmptyState());
@@ -205,32 +205,7 @@ const ChaptersGrid = (() => {
     EventBus.emit(EVENTS.DASHBOARD_CHAPTERS_RENDERED, { chapters: filtered });
   }
 
-  function _updateNetBalanceWidget(chapters) {
-    const widget = document.getElementById('balance-overview-box');
-    if (!widget) return;
-    
-    // Sum balances across active chapters
-    const activeChaps = chapters.filter(c => !c.is_archived);
-    const sum = activeChaps.reduce((acc, c) => acc + parseFloat(c.user_net_balance || 0), 0);
-    
-    const amtEl = widget.querySelector('.balance-overview-amount');
-    const descEl = widget.querySelector('.balance-overview-desc');
-    if (!amtEl || !descEl) return;
 
-    if (sum > 0.005) {
-      amtEl.className = 'balance-overview-amount positive';
-      amtEl.textContent = `+ ₹${sum.toFixed(2)}`;
-      descEl.textContent = 'You are owed this sum across all active chapters';
-    } else if (sum < -0.005) {
-      amtEl.className = 'balance-overview-amount negative';
-      amtEl.textContent = `- ₹${Math.abs(sum).toFixed(2)}`;
-      descEl.textContent = 'You owe this sum across all active chapters';
-    } else {
-      amtEl.className = 'balance-overview-amount settled';
-      amtEl.textContent = `₹0.00`;
-      descEl.textContent = 'You are fully settled up across all active chapters';
-    }
-  }
 
   function renderSkeletons(count = 4) {
     const g = grid();

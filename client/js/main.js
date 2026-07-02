@@ -11,13 +11,13 @@
    LOADER QUESTIONS & ROTATION LOGIC
    ====================================== */
 const loaderQuestions = [
-  "Remember your favourite dish 🍕",
-  "Imagine you are dancing with your celebrity crush ✨",
-  "Which is your favourite movie? 🎬",
+  "Remember your favourite dish ",
+  "Imagine you are dancing with your celebrity crush ",
+  "Which is your favourite movie? ",
   "Who is your best friend?",
-  "What was the last song that made you smile? 🎶",
+  "What was the last song that made you smile? ",
   "What's your comfort food after a long day?",
-  "Imagine you're at your favourite vacation spot right now 🌴",
+  "Imagine you're at your favourite vacation spot right now ",
   "Who's the first person you'd call with good news?",
   "Remember the last time you laughed uncontrollably?",
   "If today was a movie, what genre would it be?",
@@ -139,57 +139,9 @@ const CONFIG = {
   });
 
   window.navigateTo = async function(url, isPopState = false) {
-    document.body.classList.add('is-navigating');
-
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to load page');
-      const html = await res.text();
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      if (!isPopState) {
-        window.history.pushState({}, doc.title, url);
-      }
-      document.title = doc.title;
-
-      const newBody = doc.querySelector('body');
-      
-      const swap = () => {
-        document.body.innerHTML = newBody.innerHTML;
-        document.body.className = newBody.className;
-
-        // Force execution of scripts inside the new body (page-specific logic)
-        const scripts = document.body.querySelectorAll('script');
-        scripts.forEach(oldScript => {
-          const src = oldScript.getAttribute('src') || '';
-          if (src.includes('core/') || src.includes('main.js') || src.includes('pwa/') || src.includes('shared/') || src.includes('monitoring.js')) return;
-
-          const newScript = document.createElement('script');
-          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
-          newScript.textContent = oldScript.textContent;
-          oldScript.parentNode.replaceChild(newScript, oldScript);
-        });
-
-        document.body.classList.remove('is-navigating');
-        window.scrollTo(0, 0);
-        
-        // Re-initialize mobile tweaks or global UI events if necessary
-        initMobileTweaks();
-        initPasswordToggles();
-        initPasswordValidation();
-      };
-
-      if (document.startViewTransition) {
-        document.startViewTransition(swap);
-      } else {
-        swap();
-      }
-
-    } catch (err) {
-      console.error('Router error:', err);
-      // Fallback to hard navigation
+    if (isPopState) {
+      window.location.reload();
+    } else {
       window.location.href = url;
     }
   };
@@ -283,6 +235,7 @@ const CONFIG = {
           method,
           headers,
           credentials: "include",
+          cache: "no-store",
           body: options.body ? JSON.stringify(options.body) : undefined,
           signal: controller.signal,
         });
@@ -423,8 +376,15 @@ const CONFIG = {
       const contentType = res.headers.get("content-type") || "";
       let data;
       if (contentType.includes("application/json")) {
-        try { data = await res.json(); }
-        catch (_) { data = { message: "Invalid response from server." }; }
+        try { 
+          data = await res.json(); 
+        } catch (_) { 
+          if (res.ok) {
+            throw new Error("Received malformed JSON from server.");
+          } else {
+            data = { message: "Invalid response from server." }; 
+          }
+        }
       } else {
         await res.text(); // Drain body
         data = { message: res.ok ? "OK" : `Server error (${res.status})` };
@@ -616,7 +576,7 @@ const CONFIG = {
             // Attempt silent refresh first
             const refreshed = await window.SessionManager.attemptRefresh();
             if (!refreshed) {
-              showToast("⚠️ Session expires soon. Please save your work.", "info");
+              showToast("Warning: Session expires soon. Please save your work.", "info");
               try { sessionStorage.setItem("sessionWarned", "true"); } catch(_) {}
             } else {
               // Refresh succeeded — clear the warned flag
@@ -790,7 +750,7 @@ const CONFIG = {
             svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
           }
         } else {
-          newBtn.textContent = isPass ? '🙈' : '👁️';
+          newBtn.textContent = isPass ? 'Hide' : 'Show';
         }
         
         if (navigator.vibrate) navigator.vibrate(10);
@@ -800,7 +760,7 @@ const CONFIG = {
     });
   }
 
-  // 🔐 UPDATED: Hardened password validation (AUTH-015)
+  //  UPDATED: Hardened password validation (AUTH-015)
 function initPasswordValidation() {
   document.querySelectorAll('input[type="password"]').forEach(input => {
     const wrapper = input.closest('.password-wrapper');
@@ -817,7 +777,7 @@ function initPasswordValidation() {
           return;
         }
         if (isValid) {
-          hint.textContent = "✓ Good password";
+          hint.textContent = "Good password";
           hint.className = "password-hint valid";
         } else {
           const remaining = 8 - pwd.length;
@@ -870,7 +830,7 @@ function initPasswordValidation() {
     if (!container) return;
 
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.className = `toast ${type}`;
 
     let iconHtml = '';
     if (type === 'success') {
@@ -1106,7 +1066,7 @@ function initPasswordValidation() {
             padding: 8px 16px; font-family: var(--font-main); font-size: 0.85rem;
             font-weight: 600; letter-spacing: 0.3px;
           `;
-          banner.textContent = "⚠️ You are offline. Changes may not be saved.";
+          banner.textContent = "Warning: You are offline. Changes may not be saved.";
           document.body.prepend(banner);
         }
       } else {
@@ -1186,7 +1146,7 @@ function initPasswordValidation() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
 
         // Check for updates every 60 seconds
         setInterval(() => {
@@ -1267,7 +1227,7 @@ function initPasswordValidation() {
   //   if (isIOS && isSafari) {
   //     // ── iOS Safari: Show visual step-by-step guide ──────────
   //     if (pwaTitle) pwaTitle.textContent = 'Install Hisaab';
-  //     if (pwaIcon) pwaIcon.textContent = '📲';
+  //     if (pwaIcon) pwaIcon.textContent = '';
 
   //     // Replace the install button with a "How to Install" button
   //     if (pwaInstallBtn) {
@@ -1382,7 +1342,7 @@ function initPasswordValidation() {
       <div class="ios-guide-step">
         <div class="ios-step-num">1</div>
         <div class="ios-step-text">
-          Tap the <strong>Share</strong> button <span class="share-arrow">⬆️</span> at the bottom of Safari
+          Tap the <strong>Share</strong> button <span class="share-arrow">↑</span> at the bottom of Safari
           <div style="font-size:0.78rem; color:#999; margin-top:2px;">(the box with an arrow pointing up)</div>
         </div>
       </div>
@@ -1404,7 +1364,7 @@ function initPasswordValidation() {
       </div>
 
       <div style="margin-top:20px; background:#f0f7ff; border-radius:12px; padding:12px 14px; display:flex; gap:10px; align-items:flex-start;">
-        <span style="font-size:1.2rem;">💡</span>
+        <span style="font-size:1.2rem;"></span>
         <p style="margin:0; font-size:0.82rem; color:#444; line-height:1.5;">
           Once installed, Hisaab-Kitaab opens full-screen without the Safari toolbar — 
           just like a native app. No App Store needed!
@@ -1436,13 +1396,13 @@ function initPasswordValidation() {
     if (document.getElementById('hk-theme-switcher')) return;
 
     const themes = [
-      { key: 'light', name: 'Light', icon: '☀️', swatches: ['#FAF9F6', '#FFFFFF', '#6D28D9'] },
-      { key: 'dark', name: 'Dark', icon: '🌙', swatches: ['#09090B', '#18181B', '#7C3AED'] },
-      { key: 'beige', name: 'Beige Minimal', icon: '🤎', swatches: ['#F5F2EB', '#FAF8F5', '#8D6E63'] },
-      { key: 'matcha', name: 'Matcha Green', icon: '🍵', swatches: ['#EBF0EC', '#F4F7F5', '#4F7F61'] },
-      { key: 'lavender', name: 'Lavender Dream', icon: '💜', swatches: ['#F3F0F8', '#FAF9FC', '#8B5CF6'] },
-      { key: 'midnight-neon', name: 'Midnight Neon', icon: '🌌', swatches: ['#030712', '#0B0F19', '#00D2FF'] },
-      { key: 'weekly', name: 'Weekly Surprise', icon: '🔄', swatches: ['#7C3AED', '#8D6E63', '#4F7F61'], isSpecial: true }
+      { key: 'light', name: 'Light', icon: '', swatches: ['#FAF9F6', '#FFFFFF', '#6D28D9'] },
+      { key: 'dark', name: 'Dark', icon: '', swatches: ['#09090B', '#18181B', '#7C3AED'] },
+      { key: 'beige', name: 'Beige Minimal', icon: '', swatches: ['#F5F2EB', '#FAF8F5', '#8D6E63'] },
+      { key: 'matcha', name: 'Matcha Green', icon: '', swatches: ['#EBF0EC', '#F4F7F5', '#4F7F61'] },
+      { key: 'lavender', name: 'Lavender Dream', icon: '', swatches: ['#F3F0F8', '#FAF9FC', '#8B5CF6'] },
+      { key: 'midnight-neon', name: 'Midnight Neon', icon: '', swatches: ['#030712', '#0B0F19', '#00D2FF'] },
+      { key: 'weekly', name: 'Weekly Surprise', icon: '', swatches: ['#7C3AED', '#8D6E63', '#4F7F61'], isSpecial: true }
     ];
 
     let container = null;
@@ -1757,6 +1717,10 @@ window.MemberAutocomplete = MemberAutocomplete;
    ====================================== */
 window.addEventListener('error', function(event) {
   console.error('Unhandled JS Error:', event.error);
+  const dbg = document.createElement('div');
+  dbg.style.cssText = 'position:fixed;bottom:50%;left:0;right:0;background:orange;color:black;z-index:9999;padding:20px;white-space:pre-wrap;font-family:monospace;font-size:12px;';
+  dbg.textContent = `UNHANDLED ERROR:\nFile: ${event.filename}:${event.lineno}\n${event.error?.message || event.message}\n${event.error?.stack || ''}`;
+  document.body.appendChild(dbg);
   if (window.showToast) {
     window.showToast("An unexpected error occurred. Please refresh.", "error");
   }
@@ -1764,6 +1728,10 @@ window.addEventListener('error', function(event) {
 
 window.addEventListener('unhandledrejection', function(event) {
   console.error('Unhandled Promise Rejection:', event.reason);
+  const dbg = document.createElement('div');
+  dbg.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:purple;color:white;z-index:9999;padding:20px;white-space:pre-wrap;font-family:monospace;font-size:12px;';
+  dbg.textContent = `UNHANDLED REJECTION:\n${event.reason?.message || event.reason}\n${event.reason?.stack || ''}`;
+  document.body.appendChild(dbg);
   // Do not show a toast for intentional auth redirects or network fallbacks
   if (event.reason && (event.reason.isAuthRedirect || event.reason.isTimeout || event.reason.isOffline)) {
     return;

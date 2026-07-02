@@ -54,7 +54,7 @@ function renderPersonalChapterBanner() {
   banner.className = 'personal-chapter-banner';
   banner.style.gridColumn = '1 / -1';
   banner.innerHTML = `
-    <p>✨ Create your personal <strong>My Expenses</strong> chapter to track solo expenses, synced from your groups.</p>
+    <p> Create your personal <strong>My Expenses</strong> chapter to track solo expenses, synced from your groups.</p>
     <button class="btn-create-personal" onclick="createPersonalChapterNow()">Create Now</button>
   `;
   grid.parentElement.insertBefore(banner, grid);
@@ -131,8 +131,8 @@ function injectAddToPersonalButton(memberId, memberUserId, memberName, consumedA
   if (hasSynced) {
     return `
       <button class="btn-add-to-personal already-synced" disabled title="Already synced to My Expenses">
-        ✓ Synced to My Expenses
-        ${isDirty ? `<span class="sync-warning-icon" onclick="openSyncUpdateModal(event)" title="Your consumption changed. Click to update.">⚠️</span>` : ''}
+        Synced to My Expenses
+        ${isDirty ? `<span class="sync-warning-icon" onclick="openSyncUpdateModal(event)" title="Your consumption changed. Click to update.">!</span>` : ''}
       </button>
     `;
   }
@@ -140,7 +140,7 @@ function injectAddToPersonalButton(memberId, memberUserId, memberName, consumedA
   return `
     <button class="btn-add-to-personal"
       onclick="addToMyExpenses(${memberId}, ${memberUserId}, '${memberName.replace(/'/g, "\\'")}', ${consumedAmount})">
-      📥 Add to My Expenses
+       Add to My Expenses
     </button>
   `;
 }
@@ -166,7 +166,7 @@ window.addToMyExpenses = async function(memberId, memberUserId, memberName, cons
       const total = pendingReceivables.reduce((sum, s) => sum + parseFloat(s.amount), 0);
       const names = pendingReceivables.map(s => s.from).join(', ');
       const confirmed = confirm(
-        `⚠️ You have ₹${total.toFixed(2)} pending to receive from: ${names}\n\n` +
+        `Warning: You have ₹${total.toFixed(2)} pending to receive from: ${names}\n\n` +
         `Are you sure you want to add your consumption (₹${parseFloat(consumedAmount).toFixed(2)}) to My Expenses now?`
       );
       if (!confirmed) return;
@@ -267,7 +267,7 @@ window.confirmAddToPersonal = async function(memberId, consumedAmount) {
       }
     });
 
-    showToast('Added to My Expenses ✓', 'success');
+    showToast('Added to My Expenses', 'success');
     document.getElementById('sync-category-modal')?.remove();
 
     await checkSyncStatus();
@@ -300,7 +300,7 @@ window.openSyncUpdateModal = function(e) {
   modal.innerHTML = `
     <div class="modal-box" style="max-width:380px;">
       <div class="modal-header">
-        <h2 style="font-size:1.1rem;">⚠️ Consumption Changed</h2>
+        <h2 style="font-size:1.1rem;">Warning: Consumption Changed</h2>
         <button class="close-modal" onclick="document.getElementById('sync-update-modal').remove()">×</button>
       </div>
       <p style="color:#666; font-size:0.88rem; margin-bottom:6px;">
@@ -336,7 +336,7 @@ window.applySyncUpdate = async function() {
       body: { action: 'update' }
     });
 
-    showToast('My Expenses updated with latest amount ✓', 'success');
+    showToast('My Expenses updated with latest amount', 'success');
     document.getElementById('sync-update-modal')?.remove();
     syncStatusCache[cid] = await checkSyncStatus();
     window.openSummaryModal?.();

@@ -5,7 +5,7 @@
 // automatically at server startup via the /sw.js route — no build step needed.
 // If you forget to bump the number, the date suffix still forces a cache bust
 // on the first deploy of each new day.
-const CACHE_VERSION = "v16"; // ← Step 6: Full Phase 4 transition, cache complete assets
+const CACHE_VERSION = "v18"; // ← Step 6: Full Phase 4 transition, cache complete assets
 
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
@@ -15,7 +15,7 @@ const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
 // HTML pages are intentionally NOT pre-cached — they are served network-first
 // so users always get the latest version immediately after a deploy.
 const SHELL_ASSETS = [
-  "/offline.html",
+  "offline.html",
 ];
 
 // Additional assets to warm-cache opportunistically (failures don't block SW install)
@@ -23,61 +23,61 @@ const SHELL_ASSETS = [
 // always revalidate them on the next fetch — serving fresh files after every deploy.
 const WARM_CACHE_ASSETS = [
   // Design system (load order matters)
-  "/css/tokens.css",
-  "/css/reset.css",
-  "/css/global.css",
-  "/css/auth-pages.css",
-  "/css/pages/auth-flow.css",
-  "/css/layout/footer.css",
-  "/css/pages/landing.css",
+  "css/tokens.css",
+  "css/reset.css",
+  "css/global.css",
+  "css/auth-pages.css",
+  "css/pages/auth-flow.css",
+  "css/layout/footer.css",
+  "css/pages/landing.css",
 
   // Components styles
-  "/css/components/button.css",
-  "/css/components/card.css",
-  "/css/components/modal.css",
-  "/css/components/toast.css",
-  "/css/components/avatar.css",
+  "css/components/button.css",
+  "css/components/card.css",
+  "css/components/modal.css",
+  "css/components/toast.css",
+  "css/components/avatar.css",
 
   // Layout & Page styles
-  "/css/layout/navbar.css",
-  "/css/auth-pages.css",
-  "/css/pages/dashboard.css",
-  "/css/pages/chapter.css",
+  "css/layout/navbar.css",
+  "css/auth-pages.css",
+  "css/pages/dashboard.css",
+  "css/pages/chapter.css",
 
   // Icons
-  "/icons/sprite.svg",
+  "icons/sprite.svg",
 
   // Core JS Infrastructure
-  "/js/core/theme-loader.js",
-  "/js/core/session.js",
-  "/js/core/modal-manager.js",
-  "/js/core/csrf.js",
-  "/js/core/storage.js",
-  "/js/core/sanitize.js",
-  "/js/core/event-bus.js",
-  "/js/core/api-cache.js",
+  "js/core/theme-loader.js",
+  "js/core/session.js",
+  "js/core/modal-manager.js",
+  "js/core/csrf.js",
+  "js/core/storage.js",
+  "js/core/sanitize.js",
+  "js/core/event-bus.js",
+  "js/core/api-cache.js",
 
   // API & Utils JS
-  "/js/api/client.js",
-  "/js/api/error-handler.js",
+  "js/api/client.js",
+  "js/api/error-handler.js",
 
   // PWA & Shared JS
-  "/js/pwa/offline-queue.js",
-  "/js/pwa/install-manager.js",
-  "/js/main.js",
-  "/js/chapter.js",
-  "/js/pages/login-page.js",
-  "/js/pages/signup-page.js",
-  "/js/pages/dashboard-page.js",
-  "/js/pages/forgot-page.js",
-  "/js/pages/index-page.js",
+  "js/pwa/offline-queue.js",
+  "js/pwa/install-manager.js",
+  "js/main.js",
+  "js/chapter.js",
+  "js/pages/login-page.js",
+  "js/pages/signup-page.js",
+  "js/pages/dashboard-page.js",
+  "js/pages/forgot-page.js",
+  "js/pages/index-page.js",
 
   // Feature logic JS
-  "/js/feature-settlements.js",
-  "/js/feature-categories.js",
-  "/js/feature-personal-chapter.js",
-  "/js/feature-bulk-event.js",
-  "/js/feature-creator-label.js",
+  "js/feature-settlements.js",
+  "js/feature-categories.js",
+  "js/feature-personal-chapter.js",
+  "js/feature-bulk-event.js",
+  "js/feature-creator-label.js",
 ];
 
 // ── INSTALL: Force immediate activation, cache app shell ────────────
@@ -169,6 +169,15 @@ self.addEventListener("fetch", (e) => {
           const response = await fetch(e.request);
           if (response.ok) {
             cache.put(e.request, response.clone());
+            return response;
+          }
+          if (response.status === 304) {
+            const cached = await cache.match(e.request);
+            if (cached) return cached;
+            // SW cache is empty but server returned 304. Force a fresh fetch.
+            const freshResponse = await fetch(e.request, { cache: 'reload' });
+            if (freshResponse.ok) cache.put(e.request, freshResponse.clone());
+            return freshResponse;
           }
           return response;
         } catch (_) {
@@ -188,8 +197,18 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       caches.open(SHELL_CACHE).then((cache) => {
         return cache.match(e.request).then((cached) => {
-          return cached || fetch(e.request).then((response) => {
-            if (response.ok) cache.put(e.request, response.clone());
+          return cached || fetch(e.request).then(async (response) => {
+            if (response.ok) {
+              cache.put(e.request, response.clone());
+              return response;
+            }
+            if (response.status === 304) {
+              const cachedAgain = await cache.match(e.request);
+              if (cachedAgain) return cachedAgain;
+              const freshResponse = await fetch(e.request, { cache: 'reload' });
+              if (freshResponse.ok) cache.put(e.request, freshResponse.clone());
+              return freshResponse;
+            }
             return response;
           });
         });
@@ -203,8 +222,18 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       caches.open(SHELL_CACHE).then((cache) => {
         return cache.match(e.request).then((cached) => {
-          return cached || fetch(e.request).then((response) => {
-            if (response.ok) cache.put(e.request, response.clone());
+          return cached || fetch(e.request).then(async (response) => {
+            if (response.ok) {
+              cache.put(e.request, response.clone());
+              return response;
+            }
+            if (response.status === 304) {
+              const cachedAgain = await cache.match(e.request);
+              if (cachedAgain) return cachedAgain;
+              const freshResponse = await fetch(e.request, { cache: 'reload' });
+              if (freshResponse.ok) cache.put(e.request, freshResponse.clone());
+              return freshResponse;
+            }
             return response;
           });
         });

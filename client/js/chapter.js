@@ -253,7 +253,7 @@ function _openCreateEventModal() {
         <button type="submit" class="btn btn--primary" id="ev-submit">Create Event</button>
       </form>
     </div>
-  `, { type: 'bottom' });
+  `);
 
   overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
 
@@ -325,7 +325,7 @@ async function _loadExpenses(append = false) {
     const list = document.getElementById('expense-list');
     if (list) list.innerHTML = `
       <div class="empty-state" style="padding:48px 20px;">
-        <span class="empty-state__icon">⚠️</span>
+        <span class="empty-state__icon">!</span>
         <h3 class="empty-state__title">Failed to load expenses</h3>
         <p class="empty-state__subtitle">Check your connection and try again.</p>
         <div class="empty-state__action">
@@ -525,7 +525,7 @@ function _buildExpenseCard(ex) {
 
   const categoryColor = ex.category_color || '#C9C9C9';
   const categoryName = ex.category_name || 'Other';
-  const svgHtml = window.getCategoryIconSvg ? window.getCategoryIconSvg(categoryName) : '💰';
+  const svgHtml = window.getCategoryIconSvg ? window.getCategoryIconSvg(categoryName) : '';
 
   const name = escapeHTML(ex.description || 'Untitled');
   const payer = escapeHTML(ex.payer_name || 'Unknown');
@@ -672,7 +672,7 @@ function _renderHeroSettlements(settlements) {
   listEl.setAttribute('role', 'list');
 
   if (!settlements.length) {
-    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.5);font-size:var(--text-sm);">🎉 All settled up!</div>';
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.5);font-size:var(--text-sm);"> All settled up!</div>';
     return;
   }
 
@@ -687,7 +687,7 @@ function _renderHeroSettlements(settlements) {
         </div>
       </div>
       <div class="settle-row__amount" aria-label="Amount: ₹${s.amount}">
-        <span aria-hidden="true">💸</span>
+        <span aria-hidden="true"></span>
         ₹${s.amount}
       </div>
     </div>
@@ -855,7 +855,7 @@ async function _openExpenseModal(mode, expenseId) {
 
     const description = overlay.querySelector('#exp-desc').value.trim();
     const expenseDateVal = overlay.querySelector('#exp-date').value;
-    const expenseDate = expenseDateVal ? new Date(expenseDateVal).toISOString() : null;
+    const expenseDate = expenseDateVal || null;
     const payerInput = overlay.querySelector('input[name="payerMemberId"]:checked');
     const payerId = payerInput ? parseInt(payerInput.value) : _state.members[0]?.id;
     const splitIds = [...overlay.querySelectorAll('.split-row.is-selected')].map(r => parseInt(r.dataset.memberId));
@@ -1049,7 +1049,7 @@ window.openSummaryModal = async () => {
       </div>
       <div id="summary-list" style="max-height:55dvh;overflow-y:auto;"></div>
     </div>
-  `, { type: 'bottom' });
+  `);
 
   overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
 
@@ -1080,7 +1080,7 @@ function _renderSummary(overlay, data) {
       ? `<span style="color:var(--positive);font-size:var(--text-xs);font-weight:600;">↑ Gets back ₹${netDiff.toFixed(2)}</span>`
       : netDiff < -0.01
         ? `<span style="color:var(--negative);font-size:var(--text-xs);font-weight:600;">↓ Owes ₹${Math.abs(netDiff).toFixed(2)}</span>`
-        : `<span style="color:var(--text-muted);font-size:var(--text-xs);">✓ Settled</span>`;
+        : `<span style="color:var(--text-muted);font-size:var(--text-xs);">Settled</span>`;
     return `
       <div class="summary-row">
         <div class="summary-row__header">
@@ -1121,13 +1121,13 @@ window.openSettlementModal = async () => {
       </div>
       <div id="settle-list" style="display:none;"></div>
       <div id="settle-empty" style="display:none;text-align:center;padding:32px;">
-        <div style="font-size:2.5rem;margin-bottom:12px">🎉</div>
+        <div style="font-size:2.5rem;margin-bottom:12px"></div>
         <p style="font-weight:700;margin-bottom:4px">All Settled Up!</p>
         <p style="font-size:var(--text-sm);color:var(--color-text-muted)">No pending payments</p>
       </div>
       <div id="settle-history-section" style="margin-top:16px;"></div>
     </div>
-  `, { type: 'bottom' });
+  `);
 
   overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
 
@@ -1150,7 +1150,7 @@ window.openSettlementModal = async () => {
             <div class="settle-row__names" style="color:var(--color-text-primary)"><strong>${escapeHTML(s.from)}</strong> → <strong>${escapeHTML(s.to)}</strong></div>
           </div>
           <span style="font-weight:700;color:var(--color-brand);margin:0 12px;">₹${s.amount}</span>
-          <button class="btn-mark-settled" data-from="${escapeHTML(s.from)}" data-to="${escapeHTML(s.to)}" data-amount="${s.amount}" data-from-id="${s.fromId}" data-to-id="${s.toId}">✓ Mark</button>
+          <button class="btn-mark-settled" data-from="${escapeHTML(s.from)}" data-to="${escapeHTML(s.to)}" data-amount="${s.amount}" data-from-id="${s.fromId}" data-to-id="${s.toId}">Mark</button>
         </div>
       `).join('');
 
@@ -1185,7 +1185,7 @@ async function _loadSettlementHistory(overlay) {
     if (!section) return;
 
     section.innerHTML = `
-      <div style="font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--color-text-muted);margin-bottom:10px;">✅ Completed (${history.length})</div>
+      <div style="font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--color-text-muted);margin-bottom:10px;"> Completed (${history.length})</div>
       ${history.map(r => `
         <div class="settled-record">
           <div class="settled-record__info">
@@ -1267,7 +1267,7 @@ window._openMarkModal = (s) => {
         method: 'POST',
         body: { fromMemberId: fromMember.id, toMemberId: toMember.id, amount, note, eventId: _state.currentEventId },
       });
-      showToast('Settlement marked ✓', 'success');
+      showToast('Settlement marked', 'success');
       if (typeof window.haptic === 'function') window.haptic('success');
       ModalManager.close(overlay);
       await _loadExpenses();
@@ -1369,7 +1369,7 @@ window.openAddMemberModal = () => {
         <button type="submit" class="btn btn--primary" id="am-submit">Add Member</button>
       </form>
     </div>
-  `, { type: 'bottom' });
+  `);
 
   overlay.querySelector('.modal-close').addEventListener('click', () => ModalManager.close(overlay));
   overlay.querySelector('#add-member-form').addEventListener('submit', async (e) => {
@@ -1459,7 +1459,7 @@ _menuEl?.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('click', (e) => {
-  if (!_menuEl?.contains(e.target) && e.target !== _menuBtn) {
+  if (!_menuEl?.contains(e.target) && !_menuBtn?.contains(e.target)) {
     _menuEl?.classList.remove('is-open');
     _menuBtn?.setAttribute('aria-expanded', 'false');
   }

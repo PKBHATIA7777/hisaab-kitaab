@@ -191,7 +191,7 @@ function addCategoryBadgeToExpenseCard(card, expense) {
     font-size:0.68rem; font-weight:600;
     margin-top:3px;
   `;
-  const svgHtml = window.getCategoryIconSvg ? window.getCategoryIconSvg(expense.category_name) : '📦';
+  const svgHtml = window.getCategoryIconSvg ? window.getCategoryIconSvg(expense.category_name) : '';
   badge.innerHTML = `${svgHtml} <span>${expense.category_name}</span>`;
 
   const infoEl = card.querySelector('.expense-info p') || card.querySelector('.expense-info__meta');
@@ -226,13 +226,13 @@ function injectPersonalViewTabs() {
   tabs.className = 'personal-view-tabs';
   tabs.innerHTML = `
     <button class="personal-tab-btn active" data-mode="list" onclick="switchPersonalView('list', this)">
-      📋 All
+       All
     </button>
     <button class="personal-tab-btn" data-mode="monthly" onclick="switchPersonalView('monthly', this)">
-      📅 By Month
+       By Month
     </button>
     <button class="personal-tab-btn" data-mode="category" onclick="switchPersonalView('category', this)">
-      🏷️ By Category
+       By Category
     </button>
   `;
   expenseList.parentElement.insertBefore(tabs, expenseList);
@@ -280,7 +280,7 @@ function renderMonthlyView(container) {
   if (!personalMonthlyData || !personalMonthlyData.months || !personalMonthlyData.months.length) {
     container.innerHTML = `
       <div style="text-align:center; padding:40px; color:rgba(255,255,255,0.5);">
-        <div style="font-size:2.5rem; margin-bottom:10px;">📅</div>
+        <div style="font-size:2.5rem; margin-bottom:10px;"></div>
         <p>No expenses yet.</p>
       </div>
     `;
@@ -300,8 +300,8 @@ function renderMonthlyView(container) {
         <div class="expense-info">
           <h4>${ex.description || 'Expense'}</h4>
           <p>
-            ${window.getCategoryIconSvg ? window.getCategoryIconSvg(ex.category_name) : '📦'} ${ex.category_name || 'Other'}
-            ${ex.is_synced_from_chapter ? `<span class="synced-expense-tag">🔗 ${ex.source_chapter_name || 'Synced'}</span>` : ''}
+            ${window.getCategoryIconSvg ? window.getCategoryIconSvg(ex.category_name) : ''} ${ex.category_name || 'Other'}
+            ${ex.is_synced_from_chapter ? `<span class="synced-expense-tag"> ${ex.source_chapter_name || 'Synced'}</span>` : ''}
           </p>
         </div>
         <div style="text-align:right;">
@@ -332,7 +332,7 @@ function renderCategoryView(container) {
   if (!personalMonthlyData || !personalMonthlyData.categories || !personalMonthlyData.categories.length) {
     container.innerHTML = `
       <div style="text-align:center; padding:40px; color:rgba(255,255,255,0.5);">
-        <div style="font-size:2.5rem; margin-bottom:10px;">🏷️</div>
+        <div style="font-size:2.5rem; margin-bottom:10px;"></div>
         <p>No categorised expenses yet.</p>
       </div>
     `;
@@ -346,7 +346,7 @@ function renderCategoryView(container) {
     return `
       <div class="category-breakdown-row">
         <div class="category-dot" style="background:${cat.category_color};"></div>
-        <span class="category-label">${window.getCategoryIconSvg ? window.getCategoryIconSvg(cat.category_name) : '📦'} ${cat.category_name}</span>
+        <span class="category-label">${window.getCategoryIconSvg ? window.getCategoryIconSvg(cat.category_name) : ''} ${cat.category_name}</span>
         <span class="category-amount">₹${parseFloat(cat.total).toFixed(2)}</span>
         <span class="category-pct">${pct}%</span>
       </div>
@@ -421,8 +421,8 @@ async function loadAndRenderProfileCategories() {
       ${cat.is_system
         ? '<span class="category-system-badge">Built-in</span>'
         : `
-          <button class="btn-edit-category" onclick="openEditCategoryForm(${cat.id})" title="Edit">✏️</button>
-          <button class="btn-delete-category" onclick="deleteCategoryById(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">🗑️</button>
+          <button class="btn-edit-category" onclick="openEditCategoryForm(${cat.id})" title="Edit"></button>
+          <button class="btn-delete-category" onclick="deleteCategoryById(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')"></button>
         `
       }
     </div>
@@ -450,7 +450,7 @@ function renderCategoryForm(cat) {
 
   const isEdit = !!cat;
   const currentColor = cat?.color || '#888888';
-  const currentIcon = cat?.icon || '📦';
+  const currentIcon = cat?.icon || '';
 
   container.style.display = 'block';
   container.innerHTML = `
@@ -464,7 +464,7 @@ function renderCategoryForm(cat) {
 
       <label style="font-size:0.8rem; font-weight:600; color:#555; display:block; margin-bottom:4px;">Icon (emoji)</label>
       <input type="text" id="cat-icon-input" value="${currentIcon}"
-        placeholder="📦"
+        placeholder=""
         style="width:80px; margin-bottom:12px; padding:8px 12px; border-radius:8px; border:1.5px solid #eee; font-family:var(--font-main); font-size:1.1rem; text-align:center;">
 
       <label style="font-size:0.8rem; font-weight:600; color:#555; display:block; margin-bottom:6px;">Color</label>
@@ -506,7 +506,7 @@ window.closeCategoryForm = function() {
 
 window.saveCategoryForm = async function(editId) {
   const name = document.getElementById('cat-name-input')?.value?.trim();
-  const icon = document.getElementById('cat-icon-input')?.value?.trim() || '📦';
+  const icon = document.getElementById('cat-icon-input')?.value?.trim() || '';
   const color = document.getElementById('cat-color-value')?.value || '#888888';
 
   if (!name) { showToast('Category name is required', 'error'); return; }

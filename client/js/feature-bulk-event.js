@@ -43,7 +43,7 @@ function injectSelectModeButton() {
   btn.id = 'select-mode-btn';
   btn.type = 'button';
   btn.className = 'nav-dropdown__item'; // Match new class if present
-  btn.innerHTML = '<span>☑️</span> Select Expenses';
+  btn.innerHTML = '<span></span> Select Expenses';
   btn.onclick = () => {
     dropdown.classList.remove('active');
     dropdown.setAttribute('aria-expanded', 'false');
@@ -167,7 +167,7 @@ function toggleExpenseSelection(card, expenseId) {
   } else {
     selectedExpenseIds.add(id);
     card.classList.add('selected-card');
-    if (checkEl) { checkEl.textContent = '✓'; }
+    if (checkEl) { checkEl.textContent = ''; }
   }
 
   updateSelectionBar();
@@ -308,7 +308,7 @@ async function populateEventAssignOptions() {
   if (events.length > 0) {
     html += events.map(ev => `
       <div class="event-assign-option" data-event-id="${ev.id}" onclick="selectAssignEvent(this, ${ev.id})">
-        <div class="event-assign-icon">📅</div>
+        <div class="event-assign-icon"></div>
         <div>
           <div class="event-assign-name">${ev.name}</div>
         </div>
@@ -369,7 +369,7 @@ window.confirmBulkAssign = async function() {
       }
     });
 
-    showToast(`${ids.length} expense(s) assigned to event ✓`, 'success');
+    showToast(`${ids.length} expense(s) assigned to event`, 'success');
     document.getElementById('event-assign-sheet-modal')?.remove();
     exitSelectMode();
 

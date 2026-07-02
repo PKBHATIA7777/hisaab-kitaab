@@ -17,20 +17,17 @@
 
 .toast {
   position: relative;
-  background: var(--surface);
-  color: var(--text-primary);
-  padding: var(--s-3h) var(--s-5) calc(var(--s-3h) + 3px);
+  background: var(--surface-invert, #1a1a1a);
+  color: var(--text-on-dark, #fff);
+  padding: var(--s-3) var(--s-4);
   border-radius: var(--r-md);
   font-size: var(--text-sm);
   font-family: var(--font);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  border: 1px solid var(--surface-border-strong);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
   pointer-events: auto;
   overflow: hidden;
   animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -43,25 +40,13 @@
   animation: toastOut 0.2s cubic-bezier(0.7, 0, 0.84, 0) forwards;
 }
 
-.toast.success {
-  border-left: 3px solid var(--positive);
-}
-
-.toast.error {
-  border-left: 3px solid var(--negative);
-}
-
-.toast.info {
-  border-left: 3px solid var(--brand);
-}
-
 .toast-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .toast-icon svg {

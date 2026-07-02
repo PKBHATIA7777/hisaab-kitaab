@@ -36,7 +36,7 @@ function injectCreatorRow() {
       ${name}
       <span class="you-badge">You</span>
     </div>
-    <div class="creator-tick" id="creator-tick-btn" title="Click to toggle your membership">✓</div>
+    <div class="creator-tick" id="creator-tick-btn" title="Click to toggle your membership"></div>
   `;
 
   memberContainer.prepend(row);
@@ -62,7 +62,7 @@ function toggleCreatorMembership(e) {
   } else {
     row.dataset.creatorAdded = 'true';
     btn.classList.remove('removed');
-    btn.textContent = '✓';
+    btn.textContent = '';
     btn.title = 'Click to remove yourself';
     row.style.opacity = '1';
   }

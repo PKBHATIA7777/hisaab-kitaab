@@ -8,14 +8,14 @@
 
 // When chapter loads, start listening for settlement refreshes
 EventBus.on('chapter:loaded', () => {
-  // Inject "✓ Mark" buttons after hero settlements render
+  // Inject "Mark" buttons after hero settlements render
   EventBus.on('settlement:refresh', ({ settlements }) => {
     _injectMarkButtons(settlements);
   });
 });
 
 // ─────────────────────────────────────────────────────────────
-// INJECT "✓ Mark" BUTTONS INTO HERO LIST
+// INJECT "Mark" BUTTONS INTO HERO LIST
 // ─────────────────────────────────────────────────────────────
 function _injectMarkButtons(settlements) {
   const listEl = document.getElementById('hero-settlement-list');
@@ -30,7 +30,7 @@ function _injectMarkButtons(settlements) {
 
     const btn = document.createElement('button');
     btn.className = 'btn-mark-settled';
-    btn.textContent = '✓ Mark';
+    btn.textContent = 'Mark';
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       window._openMarkModal(s);
@@ -67,7 +67,7 @@ async function _injectHistorySection() {
     const toggle = document.createElement('div');
     toggle.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;cursor:pointer;';
     toggle.innerHTML = `
-      <span style="font-size:var(--text-xs);color:rgba(255,255,255,0.5);font-weight:700;">✅ Settled (${history.length})</span>
+      <span style="font-size:var(--text-xs);color:rgba(255,255,255,0.5);font-weight:700;"> Settled (${history.length})</span>
       <span style="font-size:0.6rem;color:rgba(255,255,255,0.4);">▼</span>
     `;
 
