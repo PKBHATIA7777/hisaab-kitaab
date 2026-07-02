@@ -5,10 +5,16 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255),
+  password_hash VARCHAR(255),
   real_name VARCHAR(100),
   username VARCHAR(50) UNIQUE,
-  created_at TIMESTAMP DEFAULT NOW()
+  provider VARCHAR(20) DEFAULT 'local',
+  google_id VARCHAR(255),
+  needs_password BOOLEAN DEFAULT FALSE,
+  jwt_generation INTEGER DEFAULT 0,
+  last_login_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- 2. chapters table

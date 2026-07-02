@@ -117,7 +117,11 @@ async function loginRequestOtp(req, res) {
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     const email = result.data;
     const user = await findUserByIdentifier(email);
-    if (!user) return res.status(404).json({ ok: false, message: "Account not found. Please sign up." });
+    if (!user) {
+      // Match timing of "email sent" path to prevent enumeration
+      await new Promise(r => setTimeout(r, 800 + Math.random() * 200));
+      return res.json({ ok: true, message: "If this account exists, a login code has been sent" });
+    }
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await db.query(
@@ -126,7 +130,7 @@ async function loginRequestOtp(req, res) {
       [email, code, expiresAt]
     );
     await sendOtpEmail(email, "Your Hisaab-Kitaab login code", `Your login code is ${code}. It will expire in 10 minutes.`);
-    return res.json({ ok: true, message: "Login OTP sent to your email" });
+    return res.json({ ok: true, message: "If this account exists, a login code has been sent" });
   } catch (err) {
     log.error({ err }, "loginRequestOtp error");
     return res.status(500).json({ ok: false, message: "Server error" });
@@ -227,8 +231,18 @@ async function registerRequestOtp(req, res) {
     const result = emailSchema.safeParse(req.body.email);
     if (!result.success) return res.status(400).json({ ok: false, message: result.error.issues[0].message });
     const email = result.data;
-    const { rows } = await db.query("SELECT id FROM users WHERE email = $1", [email]);
-    if (rows.length > 0) return res.status(400).json({ ok: false, message: "Email already registered" });
+    const { rows } = await db.query("SELECT id, provider, password_hash FROM users WHERE email = $1", [email]);
+    if (rows.length > 0) {
+      const existing = rows[0];
+      return res.status(409).json({
+        ok: false,
+        code: "EMAIL_EXISTS",
+        message: "This email already has an account",
+        email: email,
+        provider: existing.provider,
+        hasPassword: !!existing.password_hash,
+      });
+    }
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await db.query(
@@ -613,8 +627,8 @@ async function setPassword(req, res) {
     if (!newPassword || newPassword.length < 8) return res.status(400).json({ ok: false, message: "Password must be at least 8 characters long" });
     const user = await findUserById(payload.userId);
     if (!user) return res.status(404).json({ ok: false, message: "User not found" });
-    if (user.provider !== "local") return res.status(400).json({ ok: false, message: "Password not needed for this account" });
-    if (!user.needs_password && user.password_hash) return res.status(400).json({ ok: false, message: "Password is already set" });
+    // Allow ANY user to set a password — enables cross-method login flexibility
+    if (user.password_hash) return res.status(400).json({ ok: false, message: "Password is already set. Use forgot password to change it." });
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await db.query(`UPDATE users SET password_hash = $1, needs_password = FALSE, updated_at = NOW() WHERE id = $2`, [passwordHash, user.id]);
 

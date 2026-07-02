@@ -42,6 +42,23 @@ const els = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Handle redirect from signup page (email already registered)
+  const params = new URLSearchParams(window.location.search);
+  const prefillEmail = params.get('email');
+  const fromSignup = params.get('from') === 'signup';
+  if (prefillEmail) {
+    els.inputIdentifier.value = decodeURIComponent(prefillEmail);
+    if (fromSignup) {
+      showToast("Welcome back! This email already has an account. Choose how to log in.", "info");
+    }
+    // Auto-submit the identifier check after a short delay
+    setTimeout(() => {
+      const form = document.getElementById('form-identifier');
+      if (form) form.requestSubmit ? form.requestSubmit() : handleIdentifierSubmit({ preventDefault: () => {} });
+    }, 800);
+    return; // Skip the remember-me prefill logic below
+  }
+
   // AUTH-06 FIX: Only pre-fill email if user previously checked "Remember me"
   const rememberMe = localStorage.getItem('remember_me') === 'true';
   const lastUser = localStorage.getItem('last_user');
@@ -101,9 +118,13 @@ async function handleIdentifierSubmit(e) {
       }
       transitionToStep2();
     } else {
-      showToast("Account not found. Please create an account.", "error");
-      els.authCard.classList.add('shake-card');
-      setTimeout(() => els.authCard.classList.remove('shake-card'), 500);
+      const email = encodeURIComponent(identifier);
+      showToast("No account found — let's create one!", "info");
+      setTimeout(() => {
+        const url = `signup.html?email=${email}`;
+        if (typeof window.navigateTo === 'function') window.navigateTo(url);
+        else window.location.href = url;
+      }, 1200);
     }
   } catch (err) {
     showToast(err.message || "Failed to check account", "error");
@@ -122,25 +143,31 @@ function transitionToStep2() {
   requestAnimationFrame(() => {
     els.welcomeUser.textContent = `Hi, ${userContext.email.split('@')[0]}`;
 
-    if (userContext.provider === 'google' || !userContext.hasPassword) {
-      els.formPass.style.display = 'none';
-      els.otpSection.style.display = 'block';
-      els.otpReqState.style.display = 'block';
-      els.formOtp.style.display = 'none';
-      els.googleContainer.style.display = 'block';
-      // Show fallback message if Google button didn't render
-      setTimeout(() => {
-        const googleBtn = document.querySelector('.g_id_signin iframe');
-        if (!googleBtn) {
-          document.getElementById('google-blocked-msg').style.display = 'block';
-        }
-      }, 2000);
-      els.btnBackPass.style.display = 'none';
-    } else {
-      els.formPass.style.display = 'block';
-      els.otpSection.style.display = 'none';
-      els.googleContainer.style.display = 'none';
-    }
+    // ALWAYS show all three methods — password, OTP, Google
+    // but pick the smart default based on their signup method
+    const hasPassword = userContext.hasPassword;
+
+    // Password: show form if user has a password, otherwise show as collapsed option
+    els.formPass.style.display = hasPassword ? 'block' : 'none';
+
+    // OTP: always available
+    els.otpSection.style.display = hasPassword ? 'none' : 'block';
+    els.otpReqState.style.display = hasPassword ? 'none' : 'block';
+    els.formOtp.style.display = 'none';
+
+    // Google: always visible
+    els.googleContainer.style.display = 'block';
+    // Show fallback message if Google button didn't render
+    setTimeout(() => {
+      const googleBtn = document.querySelector('.g_id_signin iframe');
+      if (!googleBtn) {
+        document.getElementById('google-blocked-msg').style.display = 'block';
+      }
+    }, 2000);
+
+    // "Use Password instead" / "Use OTP instead" toggle — always visible
+    els.btnBackPass.style.display = hasPassword ? 'none' : 'block';
+    els.btnBackPass.textContent = hasPassword ? '' : 'Use Password instead';
 
     els.step1.classList.replace('step-active', 'step-hidden-left');
     els.step2.classList.replace('step-hidden-right', 'step-active');
@@ -148,7 +175,7 @@ function transitionToStep2() {
     // After content settles, release the fixed height
     requestAnimationFrame(() => {
       card.style.minHeight = '';
-      if (userContext.hasPassword && userContext.provider !== 'google') {
+      if (hasPassword) {
         setTimeout(() => document.getElementById('input-password')?.focus(), 50);
       }
     });
@@ -329,6 +356,15 @@ async function handlePasswordSubmit(e) {
     });
     loginSuccess(data);
   } catch (err) {
+    const msg = err.message || "";
+    if (msg.includes("Google/OTP")) {
+      // Auto-switch to OTP section
+      showToast("This account doesn't have a password. Use OTP or Google to log in.", "info");
+      els.formPass.style.display = 'none';
+      els.otpSection.style.display = 'block';
+      els.otpReqState.style.display = 'block';
+      return;
+    }
     showToast("Incorrect password. Try OTP login if forgotten.", "error");
     els.authCard.classList.add('shake-card');
     setTimeout(() => els.authCard.classList.remove('shake-card'), 500);

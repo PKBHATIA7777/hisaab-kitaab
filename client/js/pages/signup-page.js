@@ -39,6 +39,13 @@ const els = {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.initPasswordToggles) initPasswordToggles();
+  // Pre-fill email from query param (redirected from login)
+  const params = new URLSearchParams(window.location.search);
+  const prefillEmail = params.get('email');
+  if (prefillEmail) {
+    els.inputEmail.value = decodeURIComponent(prefillEmail);
+    showToast("Enter your email to get started", "info");
+  }
   els.inputEmail.focus();
 
   // Show fallback message if Google button didn't render (e.g., Brave Shields)
@@ -96,6 +103,17 @@ async function handleEmailSubmit(e) {
 
   } catch (err) {
     const msg = err.message || "Failed to send code";
+    // If email already registered → seamless redirect to login
+    if (err.data?.code === "EMAIL_EXISTS") {
+      const emailParam = encodeURIComponent(err.data.email || signupEmail || email);
+      showToast("You already have an account! Redirecting to login...", "info");
+      setTimeout(() => {
+        const url = `login.html?email=${emailParam}&from=signup`;
+        if (typeof window.navigateTo === 'function') window.navigateTo(url);
+        else window.location.href = url;
+      }, 1200);
+      return;
+    }
     if (err.status === 503 || err.retryable) {
       showToast(msg + " Please try again.", "error");
     } else if (err.isTimeout) {

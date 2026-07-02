@@ -278,7 +278,19 @@ app.use(["/api/auth/register/complete", "/api/v1/auth/register/complete"], authL
 app.use(["/api/auth/forgot/request-otp", "/api/v1/auth/forgot/request-otp"], authLimiter);
 app.use(["/api/auth/forgot/reset", "/api/v1/auth/forgot/reset"], authLimiter);
 app.use(["/api/auth/google", "/api/v1/auth/google"], authLimiter);
-// NOTE: /api/auth/me, /api/auth/logout, /api/auth/check-identifier deliberately excluded
+// NOTE: /api/auth/me, /api/auth/logout deliberately excluded
+
+// CHECK-IDENTIFIER LIMITER: Prevents account enumeration via automated scanning
+const identifierLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // More generous than auth (users may typo emails)
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+  message: { ok: false, message: "Too many attempts. Please wait before trying again." },
+  keyGenerator: (req) => req.ip || "unknown"
+});
+app.use(["/api/auth/check-identifier", "/api/v1/auth/check-identifier"], identifierLimiter);
 
 // WRITE LIMITER: Runs AFTER requireAuth middleware — req.user is cryptographically verified
 const writeLimiter = rateLimit({

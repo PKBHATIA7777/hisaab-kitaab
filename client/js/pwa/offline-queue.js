@@ -36,7 +36,16 @@ const OfflineQueue = (() => {
         idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       };
       const req = store.add(item);
-      req.onsuccess = () => resolve(item);
+      req.onsuccess = async () => {
+        // Register Background Sync if available
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            await reg.sync.register('sync-expenses');
+          } catch (_) { /* Sync not supported — online event fallback handles it */ }
+        }
+        resolve(item);
+      };
       req.onerror = (e) => reject(e.target.error);
     });
   }

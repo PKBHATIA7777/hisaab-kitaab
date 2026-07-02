@@ -26,6 +26,10 @@ const WARM_CACHE_ASSETS = [
   "/css/tokens.css",
   "/css/reset.css",
   "/css/global.css",
+  "/css/auth-pages.css",
+  "/css/pages/auth-flow.css",
+  "/css/layout/footer.css",
+  "/css/pages/landing.css",
 
   // Components styles
   "/css/components/button.css",
@@ -47,6 +51,11 @@ const WARM_CACHE_ASSETS = [
   "/js/core/theme-loader.js",
   "/js/core/session.js",
   "/js/core/modal-manager.js",
+  "/js/core/csrf.js",
+  "/js/core/storage.js",
+  "/js/core/sanitize.js",
+  "/js/core/event-bus.js",
+  "/js/core/api-cache.js",
 
   // API & Utils JS
   "/js/api/client.js",
@@ -54,8 +63,14 @@ const WARM_CACHE_ASSETS = [
 
   // PWA & Shared JS
   "/js/pwa/offline-queue.js",
+  "/js/pwa/install-manager.js",
   "/js/main.js",
   "/js/chapter.js",
+  "/js/pages/login-page.js",
+  "/js/pages/signup-page.js",
+  "/js/pages/dashboard-page.js",
+  "/js/pages/forgot-page.js",
+  "/js/pages/index-page.js",
 
   // Feature logic JS
   "/js/feature-settlements.js",
@@ -213,3 +228,44 @@ self.addEventListener("message", (e) => {
     e.ports[0]?.postMessage({ type: "PONG", version: CACHE_VERSION });
   }
 });
+
+// ── BACKGROUND SYNC — Flush offline queue even if app is closed ──
+self.addEventListener("sync", (e) => {
+  if (e.tag === "sync-expenses") {
+    e.waitUntil(flushOfflineQueue());
+  }
+});
+
+async function flushOfflineQueue() {
+  return new Promise((resolve) => {
+    const req = indexedDB.open("HisaabKitaab_OfflineSync", 1);
+    req.onsuccess = async (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("pending_requests")) return resolve();
+      const tx = db.transaction("pending_requests", "readonly");
+      const store = tx.objectStore("pending_requests");
+      const getReq = store.getAll();
+      
+      getReq.onsuccess = async () => {
+        const items = getReq.result;
+        for (const item of items) {
+          try {
+            const res = await fetch(item.url, {
+              method: item.method,
+              headers: item.headers,
+              body: item.body ? JSON.stringify(item.body) : undefined
+            });
+            if (res.ok || res.status >= 400) {
+              const delTx = db.transaction("pending_requests", "readwrite");
+              delTx.objectStore("pending_requests").delete(item.id);
+            }
+          } catch (err) {
+            // Keep in queue if network still fails
+          }
+        }
+        resolve();
+      };
+    };
+    req.onerror = () => resolve(); // fail silently in SW
+  });
+}

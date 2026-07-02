@@ -246,6 +246,16 @@ const CONFIG = {
     // ── END CACHE ─────────────────────────────────────────────────
 
     const makeRequest = async (attempt = 0) => {
+      // Proactive session refresh — if session expires in <5 days, refresh silently
+      // This prevents the jarring "session expired" redirect on active users
+      if (attempt === 0 && !isAuthPage() && window.SessionManager) {
+        const expiry = window.SessionManager.getExpiry();
+        const fiveDays = 5 * 24 * 60 * 60 * 1000;
+        if (expiry && (expiry - Date.now()) < fiveDays && (expiry - Date.now()) > 0) {
+          await window.SessionManager.attemptRefresh();
+        }
+      }
+
       const csrfToken = window.CSRFManager ? window.CSRFManager.get() : null;
 
       const headers = {
@@ -1176,7 +1186,7 @@ function initPasswordValidation() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 
         // Check for updates every 60 seconds
         setInterval(() => {
