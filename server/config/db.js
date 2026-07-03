@@ -29,6 +29,7 @@ const isCloudDb =
   connectionString &&
   (connectionString.includes("render") ||
     connectionString.includes("neon") ||
+    connectionString.includes("supabase") ||
     connectionString.includes("aws"));
 
 const sslConfig = { rejectUnauthorized: false }; // Required for most cloud DBs
