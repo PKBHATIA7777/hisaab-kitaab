@@ -5,7 +5,7 @@
 // automatically at server startup via the /sw.js route — no build step needed.
 // If you forget to bump the number, the date suffix still forces a cache bust
 // on the first deploy of each new day.
-const CACHE_VERSION = "v18"; // ← Step 6: Full Phase 4 transition, cache complete assets
+const CACHE_VERSION = "v19"; // ← Step 7: Supabase migration + cache bust
 
 const SHELL_CACHE = `hk-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `hk-data-${CACHE_VERSION}`;
