@@ -8,3 +8,7 @@ server/.env
 # OS / editor
 .DS_Store
 .vscode/
+
+server/neon_dump.sql
+server/neon_dump_clean.sql
+
