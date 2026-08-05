@@ -22,14 +22,7 @@ async function markSettlement(req, res) {
     const { chapterId } = req.params;
     const userId = req.user.userId;
 
-    // Verify chapter access
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized or chapter not found" });
-    }
+    // Access is already verified by chapterAccessMiddleware
 
     const result = markSchema.safeParse(req.body);
     if (!result.success) {
@@ -47,14 +40,29 @@ async function markSettlement(req, res) {
       return res.status(400).json({ ok: false, message: "Invalid member IDs for this chapter" });
     }
 
+    const isCollab = req.chapter.is_collaborative;
+    const confirmationStatus = isCollab ? 'pending_confirmation' : 'auto_confirmed';
+
     // Insert the settlement record
     const { rows } = await db.query(
       `INSERT INTO settlement_records
-         (chapter_id, event_id, from_member_id, to_member_id, amount, marked_by, note, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'settled')
+         (chapter_id, event_id, from_member_id, to_member_id, amount, marked_by, note, status, confirmation_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'settled', $8)
        RETURNING *`,
-      [chapterId, eventId || null, fromMemberId, toMemberId, amount, userId, note || ""]
+      [chapterId, eventId || null, fromMemberId, toMemberId, amount, userId, note || "", confirmationStatus]
     );
+
+    if (isCollab) {
+      // Find the user_id of the receiver to send a notification
+      const { rows: receiverRows } = await db.query("SELECT user_id FROM chapter_members WHERE id = $1", [toMemberId]);
+      if (receiverRows.length > 0 && receiverRows[0].user_id) {
+        await db.query(
+          `INSERT INTO notifications (user_id, type, title, body, chapter_id, related_entity_id)
+           VALUES ($1, 'settlement_marked', 'Payment Sent', 'Someone marked a payment to you as settled. Please confirm receipt.', $2, $3)`,
+          [receiverRows[0].user_id, chapterId, rows[0].id]
+        );
+      }
+    }
 
     res.json({ ok: true, message: "Settlement marked as completed", record: rows[0] });
   } catch (err) {
@@ -73,14 +81,7 @@ async function getSettlementHistory(req, res) {
     const { eventId } = req.query;
     const userId = req.user.userId;
 
-    // Verify chapter access
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized" });
-    }
+    // Access is already verified by chapterAccessMiddleware
 
     let queryText = `
       SELECT
@@ -125,14 +126,7 @@ async function undoSettlement(req, res) {
     const { chapterId, recordId } = req.params;
     const userId = req.user.userId;
 
-    // Verify chapter access
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized" });
-    }
+    // Access is already verified by chapterAccessMiddleware
 
     const { rowCount } = await db.query(
       "DELETE FROM settlement_records WHERE id = $1 AND chapter_id = $2",
@@ -157,7 +151,7 @@ async function undoSettlement(req, res) {
 async function getNetSettlements(rawSettlements, chapterId, eventId) {
   // Fetch all settlement records for this chapter/event
   let query = `
-    SELECT from_member_id, to_member_id, SUM(amount) as settled_amount
+    SELECT from_member_id, to_member_id, confirmation_status, SUM(amount) as amount
     FROM settlement_records
     WHERE chapter_id = $1 AND status = 'settled'
   `;
@@ -166,36 +160,141 @@ async function getNetSettlements(rawSettlements, chapterId, eventId) {
     query += ` AND event_id = $2`;
     params.push(eventId);
   }
-  query += ` GROUP BY from_member_id, to_member_id`;
+  query += ` GROUP BY from_member_id, to_member_id, confirmation_status`;
 
   const { rows: settled } = await db.query(query, params);
 
-  // Build a map: "fromId-toId" => settledAmount
-  const settledMap = {};
+  const confirmedMap = {};
+  const pendingMap = {};
+
   settled.forEach(s => {
     const key = `${s.from_member_id}-${s.to_member_id}`;
-    settledMap[key] = parseFloat(s.settled_amount);
+    const amount = parseFloat(s.amount);
+    if (s.confirmation_status === 'confirmed' || s.confirmation_status === 'auto_confirmed') {
+      confirmedMap[key] = (confirmedMap[key] || 0) + amount;
+    } else if (s.confirmation_status === 'pending_confirmation') {
+      pendingMap[key] = (pendingMap[key] || 0) + amount;
+    }
   });
 
   // Subtract settled amounts from raw settlements
   const pending = [];
   rawSettlements.forEach(s => {
     const key = `${s.fromId}-${s.toId}`;
-    const alreadySettled = settledMap[key] || 0;
+    const alreadySettled = confirmedMap[key] || 0;
+    const pendingConfirmation = pendingMap[key] || 0;
+    
     const remaining = parseFloat(s.amount) - alreadySettled;
 
     if (remaining > 0.01) {
-      pending.push({ ...s, amount: remaining.toFixed(2) });
+      pending.push({ 
+        ...s, 
+        amount: remaining.toFixed(2),
+        pendingConfirmationAmount: pendingConfirmation.toFixed(2)
+      });
     }
-    // If remaining <= 0.01, it's fully settled — skip it from pending
   });
 
   return pending;
+}
+
+// ─────────────────────────────────────────────────────────────
+// NEW: Confirm Settlement (Receiver or Admin)
+// POST /api/chapters/:chapterId/settlements/:recordId/confirm
+// ─────────────────────────────────────────────────────────────
+async function confirmSettlement(req, res) {
+  try {
+    const { chapterId, recordId } = req.params;
+    const userId = req.user.userId;
+    const member = req.chapterMember; // Hydrated by middleware
+
+    const { rows: recordRows } = await db.query(
+      `SELECT sr.id, sr.to_member_id, sr.confirmation_status 
+       FROM settlement_records sr
+       WHERE sr.id = $1 AND sr.chapter_id = $2`,
+      [recordId, chapterId]
+    );
+
+    if (recordRows.length === 0) {
+      return res.status(404).json({ ok: false, message: "Settlement record not found" });
+    }
+
+    const record = recordRows[0];
+
+    // Authorization: Must be the receiver or an admin
+    if (record.to_member_id !== member.id && member.role !== 'admin') {
+      return res.status(403).json({ ok: false, message: "Only the receiver or an admin can confirm this settlement" });
+    }
+
+    if (record.confirmation_status === 'confirmed') {
+      return res.status(400).json({ ok: false, message: "Settlement is already confirmed" });
+    }
+
+    await db.query(
+      "UPDATE settlement_records SET confirmation_status = 'confirmed', confirmed_by = $1, confirmed_at = NOW() WHERE id = $2",
+      [userId, recordId]
+    );
+
+    res.json({ ok: true, message: "Settlement confirmed successfully" });
+  } catch (err) {
+    log.error({ err }, "confirmSettlement error");
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// NEW: Dispute Settlement
+// POST /api/chapters/:chapterId/settlements/:recordId/dispute
+// ─────────────────────────────────────────────────────────────
+async function disputeSettlement(req, res) {
+  try {
+    const { chapterId, recordId } = req.params;
+    const userId = req.user.userId;
+    const member = req.chapterMember; // Hydrated by middleware
+
+    const { rows: recordRows } = await db.query(
+      `SELECT sr.id, sr.to_member_id, sr.confirmation_status 
+       FROM settlement_records sr
+       WHERE sr.id = $1 AND sr.chapter_id = $2`,
+      [recordId, chapterId]
+    );
+
+    if (recordRows.length === 0) {
+      return res.status(404).json({ ok: false, message: "Settlement record not found" });
+    }
+
+    const record = recordRows[0];
+
+    // Authorization: Must be the receiver or an admin
+    if (record.to_member_id !== member.id && member.role !== 'admin') {
+      return res.status(403).json({ ok: false, message: "Only the receiver or an admin can dispute this settlement" });
+    }
+
+    if (record.confirmation_status === 'confirmed' || record.confirmation_status === 'auto_confirmed') {
+      return res.status(400).json({ ok: false, message: "Settlement is already confirmed and cannot be disputed" });
+    }
+
+    if (record.confirmation_status === 'disputed') {
+      return res.status(400).json({ ok: false, message: "Settlement is already disputed" });
+    }
+
+    await db.query(
+      "UPDATE settlement_records SET confirmation_status = 'disputed', confirmed_by = $1, confirmed_at = NOW() WHERE id = $2",
+      [userId, recordId]
+    );
+
+    res.json({ ok: true, message: "Settlement disputed successfully" });
+  } catch (err) {
+    log.error({ err }, "disputeSettlement error");
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
 }
 
 module.exports = {
   markSettlement,
   getSettlementHistory,
   undoSettlement,
+  confirmSettlement,
+  disputeSettlement,
   getNetSettlements,
 };

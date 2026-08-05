@@ -21,13 +21,18 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS chapters (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
+  description VARCHAR(200) DEFAULT '',
   created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
   is_personal BOOLEAN DEFAULT FALSE,
   is_archived BOOLEAN DEFAULT FALSE,
+  is_collaborative BOOLEAN DEFAULT FALSE,
+  data_updated_at TIMESTAMP DEFAULT NOW(),
   last_opened_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_chapters_created_by ON chapters(created_by);
+CREATE INDEX IF NOT EXISTS idx_chapters_collaborative ON chapters(is_collaborative) WHERE is_collaborative = TRUE;
+CREATE INDEX IF NOT EXISTS idx_chapters_data_updated ON chapters(created_by, data_updated_at DESC);
 
 -- 3. friends table
 CREATE TABLE IF NOT EXISTS friends (
@@ -52,12 +57,22 @@ CREATE TABLE IF NOT EXISTS chapter_members (
   member_name VARCHAR(100) NOT NULL,
   user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   friend_id INTEGER REFERENCES friends(id) ON DELETE SET NULL,
+  role VARCHAR(20) DEFAULT 'member',           -- 'admin' | 'member'
+  status VARCHAR(20) DEFAULT 'active',         -- 'active' | 'invited' | 'left' | 'removed'
+  invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  invited_email VARCHAR(255),
+  joined_at TIMESTAMP,
+  left_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_chapter_members_user_id ON chapter_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_chapter_members_friend_id ON chapter_members(friend_id);
 CREATE INDEX IF NOT EXISTS idx_chapter_members_user_chapter ON chapter_members(user_id, chapter_id);
 CREATE INDEX IF NOT EXISTS idx_chapter_members_chapter_id ON chapter_members(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_members_status ON chapter_members(chapter_id, status);
+CREATE INDEX IF NOT EXISTS idx_chapter_members_role ON chapter_members(chapter_id, role);
+CREATE INDEX IF NOT EXISTS idx_chapter_members_email ON chapter_members(invited_email) WHERE invited_email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_chapter_members_active ON chapter_members(chapter_id) WHERE status = 'active';
 
 -- 5. events table
 CREATE TABLE IF NOT EXISTS events (
@@ -93,11 +108,13 @@ CREATE TABLE IF NOT EXISTS expenses (
   description VARCHAR(100),
   expense_date TIMESTAMP DEFAULT NOW(),
   category_id INTEGER REFERENCES expense_categories(id) ON DELETE SET NULL,
+  added_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   source_chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
   source_member_id INTEGER REFERENCES chapter_members(id) ON DELETE SET NULL,
   is_synced_from_chapter BOOLEAN DEFAULT FALSE,
   sync_consumed_snapshot DECIMAL(12, 2),
   sync_dismissed BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_expenses_chapter_id ON expenses(chapter_id);
@@ -140,6 +157,9 @@ CREATE TABLE IF NOT EXISTS settlement_records (
   marked_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   note VARCHAR(200),
   status VARCHAR(20) DEFAULT 'settled',
+  confirmation_status VARCHAR(20) DEFAULT 'auto_confirmed',
+  confirmed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  confirmed_at TIMESTAMP,
   marked_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW()
 );
@@ -148,6 +168,43 @@ CREATE INDEX IF NOT EXISTS idx_settlement_records_event ON settlement_records(ev
 CREATE INDEX IF NOT EXISTS idx_settlement_records_from ON settlement_records(from_member_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_records_to ON settlement_records(to_member_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_records_chapter_status ON settlement_records(chapter_id, status);
+CREATE INDEX IF NOT EXISTS idx_settlements_confirmation ON settlement_records(chapter_id, confirmation_status);
+
+-- 10a. chapter_invitations table
+CREATE TABLE IF NOT EXISTS chapter_invitations (
+  id SERIAL PRIMARY KEY,
+  chapter_id INTEGER NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+  invited_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invited_email VARCHAR(255) NOT NULL,
+  invite_token VARCHAR(128) NOT NULL UNIQUE,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP NOT NULL,
+  responded_at TIMESTAMP,
+  CONSTRAINT unique_chapter_email_invite UNIQUE (chapter_id, invited_email)
+);
+CREATE INDEX IF NOT EXISTS idx_invitations_token ON chapter_invitations(invite_token);
+CREATE INDEX IF NOT EXISTS idx_invitations_email ON chapter_invitations(invited_email);
+CREATE INDEX IF NOT EXISTS idx_invitations_chapter ON chapter_invitations(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_pending ON chapter_invitations(invited_email) WHERE status = 'pending';
+
+-- 10b. notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  body TEXT,
+  chapter_id INTEGER REFERENCES chapters(id) ON DELETE CASCADE,
+  related_entity_id INTEGER,
+  action_url VARCHAR(500),
+  metadata JSONB DEFAULT '{}',
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_chapter ON notifications(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id) WHERE is_read = FALSE;
 
 -- 11. device_sessions table
 CREATE TABLE IF NOT EXISTS device_sessions (
@@ -181,3 +238,25 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+
+-- 13. Trigger: Auto-bump chapter data_updated_at on child table changes
+-- Used by the heartbeat polling endpoint for real-time sync detection.
+CREATE OR REPLACE FUNCTION update_chapter_data_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE chapters
+  SET data_updated_at = NOW()
+  WHERE id = COALESCE(NEW.chapter_id, OLD.chapter_id);
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_expenses_update_chapter ON expenses;
+CREATE TRIGGER trg_expenses_update_chapter
+AFTER INSERT OR UPDATE OR DELETE ON expenses
+FOR EACH ROW EXECUTE FUNCTION update_chapter_data_timestamp();
+
+DROP TRIGGER IF EXISTS trg_settlements_update_chapter ON settlement_records;
+CREATE TRIGGER trg_settlements_update_chapter
+AFTER INSERT OR UPDATE OR DELETE ON settlement_records
+FOR EACH ROW EXECUTE FUNCTION update_chapter_data_timestamp();

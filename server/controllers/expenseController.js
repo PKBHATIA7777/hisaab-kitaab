@@ -40,13 +40,9 @@ async function addExpense(req, res) {
     const description = xss(result.data.description || "");
     const userId = req.user.userId;
 
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized or Chapter not found" });
-    }
+    // Access is verified by chapterAccessMiddleware
+    const chapter = req.chapter;
+    const chapterMember = req.chapterMember;
 
     const totalCents = Math.round(amount * 100);
     const finalSplits = [];
@@ -69,16 +65,31 @@ async function addExpense(req, res) {
       splits.forEach(s => finalSplits.push(s));
     }
 
+    const allMemberIds = new Set([payerMemberId]);
+    finalSplits.forEach(s => allMemberIds.add(s.memberId));
+    const memberIdArray = Array.from(allMemberIds);
+
     const client = await db.pool.connect();
     await client.query("BEGIN");
 
     try {
-      // ✅ MODIFIED: Added category_id and expenseDate to INSERT
+      // ✅ NEW: Verify all member IDs belong strictly to this chapter
+      const { rows: memberCheck } = await client.query(
+        `SELECT id FROM chapter_members WHERE id = ANY($1) AND chapter_id = $2`,
+        [memberIdArray, chapterId]
+      );
+      if (memberCheck.length !== memberIdArray.length) {
+        await client.query("ROLLBACK");
+        client.release();
+        return res.status(400).json({ ok: false, message: "One or more members do not belong to this chapter" });
+      }
+
+      // ✅ MODIFIED: Added category_id, expenseDate, and added_by_user_id to INSERT
       const { rows: expenseRows } = await client.query(
-        `INSERT INTO expenses (chapter_id, event_id, payer_member_id, amount, description, expense_date, category_id)
-         VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamp, NOW()), $7)
+        `INSERT INTO expenses (chapter_id, event_id, payer_member_id, amount, description, expense_date, category_id, added_by_user_id)
+         VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamp, NOW()), $7, $8)
          RETURNING id, created_at`,
-        [chapterId, eventId || null, payerMemberId, amount, description, expenseDate || null, categoryId || null]
+        [chapterId, eventId || null, payerMemberId, amount, description, expenseDate || null, categoryId || null, userId]
       );
       const expenseId = expenseRows[0].id;
 
@@ -114,11 +125,7 @@ async function getChapterExpenses(req, res) {
     const { eventId } = req.query;
     const userId = req.user.userId;
 
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    // Access is verified by chapterAccessMiddleware
 
     let queryText = `
        SELECT e.id, e.amount, e.description, e.expense_date, e.event_id,
@@ -184,12 +191,24 @@ async function deleteExpense(req, res) {
     const userId = req.user.userId;
 
     const { rows } = await db.query(
-      `SELECT e.id FROM expenses e
+      `SELECT e.id, c.is_collaborative, c.created_by, e.added_by_user_id, cm.role AS member_role 
+       FROM expenses e
        JOIN chapters c ON e.chapter_id = c.id
-       WHERE e.id = $1 AND c.created_by = $2`,
+       LEFT JOIN chapter_members cm ON cm.chapter_id = c.id AND cm.user_id = $2 AND cm.status = 'active'
+       WHERE e.id = $1`,
       [id, userId]
     );
-    if (rows.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized or not found" });
+    if (rows.length === 0) return res.status(404).json({ ok: false, message: "Not found" });
+    
+    const exp = rows[0];
+    if (exp.is_collaborative) {
+      if (!exp.member_role) return res.status(403).json({ ok: false, message: "Unauthorized" });
+      if (exp.member_role !== 'admin' && exp.added_by_user_id !== userId) {
+        return res.status(403).json({ ok: false, message: "Only admin or the creator can delete this expense" });
+      }
+    } else {
+      if (exp.created_by !== userId) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    }
 
     await db.query("DELETE FROM expenses WHERE id = $1", [id]);
     res.json({ ok: true, message: "Expense deleted" });
@@ -208,11 +227,7 @@ async function getExpenseSummary(req, res) {
     const { eventId } = req.query;
     const userId = req.user.userId;
 
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    // Access is verified by chapterAccessMiddleware
 
     const queryText = `
       WITH spent_cte AS (
@@ -235,7 +250,7 @@ async function getExpenseSummary(req, res) {
       FROM chapter_members cm
       LEFT JOIN spent_cte s ON cm.id = s.payer_member_id
       LEFT JOIN used_cte u ON cm.id = u.member_id
-      WHERE cm.chapter_id = $1
+      WHERE cm.chapter_id = $1 AND cm.status = 'active'
       ORDER BY total_spent DESC, total_used DESC
     `;
 
@@ -258,12 +273,21 @@ async function getExpenseDetails(req, res) {
     const userId = req.user.userId;
 
     const { rows: expenseRows } = await db.query(
-      `SELECT e.* FROM expenses e
+      `SELECT e.*, c.is_collaborative, c.created_by, cm.role AS member_role 
+       FROM expenses e
        JOIN chapters c ON e.chapter_id = c.id
-       WHERE e.id = $1 AND c.created_by = $2`,
+       LEFT JOIN chapter_members cm ON cm.chapter_id = c.id AND cm.user_id = $2 AND cm.status = 'active'
+       WHERE e.id = $1`,
       [id, userId]
     );
     if (expenseRows.length === 0) return res.status(404).json({ ok: false, message: "Not found" });
+    
+    const exp = expenseRows[0];
+    if (exp.is_collaborative) {
+      if (!exp.member_role) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    } else {
+      if (exp.created_by !== userId) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    }
 
     const { rows: splitRows } = await db.query(
       "SELECT member_id FROM expense_splits WHERE expense_id = $1",
@@ -293,12 +317,24 @@ async function updateExpense(req, res) {
     const userId = req.user.userId;
 
     const { rows: check } = await db.query(
-      `SELECT e.id, e.chapter_id FROM expenses e
+      `SELECT e.id, e.chapter_id, c.is_collaborative, c.created_by, e.added_by_user_id, cm.role AS member_role 
+       FROM expenses e
        JOIN chapters c ON e.chapter_id = c.id
-       WHERE e.id = $1 AND c.created_by = $2`,
+       LEFT JOIN chapter_members cm ON cm.chapter_id = c.id AND cm.user_id = $2 AND cm.status = 'active'
+       WHERE e.id = $1`,
       [id, userId]
     );
-    if (check.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    if (check.length === 0) return res.status(404).json({ ok: false, message: "Not found" });
+    
+    const exp = check[0];
+    if (exp.is_collaborative) {
+      if (!exp.member_role) return res.status(403).json({ ok: false, message: "Unauthorized" });
+      if (exp.member_role !== 'admin' && exp.added_by_user_id !== userId) {
+        return res.status(403).json({ ok: false, message: "Only admin or the creator can edit this expense" });
+      }
+    } else {
+      if (exp.created_by !== userId) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    }
 
     const totalCents = Math.round(amount * 100);
     const finalSplits = [];
@@ -321,10 +357,25 @@ async function updateExpense(req, res) {
       splits.forEach(s => finalSplits.push(s));
     }
 
+    const allMemberIds = new Set([payerMemberId]);
+    finalSplits.forEach(s => allMemberIds.add(s.memberId));
+    const memberIdArray = Array.from(allMemberIds);
+
     const client = await db.pool.connect();
     await client.query("BEGIN");
 
     try {
+      // ✅ NEW: Verify all member IDs belong strictly to this chapter
+      const { rows: memberCheck } = await client.query(
+        `SELECT id FROM chapter_members WHERE id = ANY($1) AND chapter_id = $2`,
+        [memberIdArray, chapterId]
+      );
+      if (memberCheck.length !== memberIdArray.length) {
+        await client.query("ROLLBACK");
+        client.release();
+        return res.status(400).json({ ok: false, message: "One or more members do not belong to this chapter" });
+      }
+
       // ✅ MODIFIED: Added category_id and expense_date to UPDATE
       await client.query(
         `UPDATE expenses
@@ -413,11 +464,7 @@ async function getChapterSettlements(req, res) {
     const { eventId } = req.query;
     const userId = req.user.userId;
 
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    // Access is verified by chapterAccessMiddleware
 
     const queryText = `
       WITH spent_cte AS (
@@ -479,14 +526,7 @@ async function bulkAssignEvent(req, res) {
       return res.status(400).json({ ok: false, message: "chapterId is required" });
     }
 
-    // Verify chapter ownership
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized" });
-    }
+    // Access is verified by chapterAccessMiddleware
 
     // If eventId provided, verify it belongs to this chapter
     if (eventId) {

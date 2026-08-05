@@ -16,6 +16,7 @@ const createChapterSchema = z.object({
       friendId: z.number().int().nullish() // Optional ID if picking from friends list
     })
   ).min(0), // CHANGE 1: Changed from .min(1) to .min(0) to allow solo chapters
+  isCollaborative: z.boolean().optional().default(false),
 });
 
 const addMemberSchema = z.object({
@@ -77,9 +78,10 @@ async function createChapter(req, res) {
 
     try {
       // 4. Insert Chapter
+      const isCollab = result.data.isCollaborative;
       const { rows: chapterRows } = await client.query(
-        `INSERT INTO chapters (name, description, created_by) VALUES ($1, $2, $3) RETURNING *`,
-        [name, description, userId]
+        `INSERT INTO chapters (name, description, created_by, is_collaborative) VALUES ($1, $2, $3, $4) RETURNING *`,
+        [name, description, userId, isCollab]
       );
       const chapter = chapterRows[0];
 
@@ -87,7 +89,7 @@ async function createChapter(req, res) {
       const creatorExcluded = req.body.creatorExcluded === true || req.body.creatorExcluded === 'true';
       if (!creatorExcluded) {
         await client.query(
-          `INSERT INTO chapter_members (chapter_id, member_name, user_id) VALUES ($1, $2, $3)`,
+          `INSERT INTO chapter_members (chapter_id, member_name, user_id, role, status, joined_at) VALUES ($1, $2, $3, 'admin', 'active', NOW())`,
           [chapter.id, creatorName, userId]
         );
       }
@@ -129,9 +131,7 @@ async function addMember(req, res) {
     const memberName = xss(result.data.memberName);
     const friendId = result.data.friendId || null;
 
-    // Verify Ownership
-    const { rows: chap } = await db.query("SELECT id FROM chapters WHERE id = $1 AND created_by = $2", [id, userId]);
-    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized or Chapter not found" });
+    // Access is verified by chapterAccessMiddleware
 
     // Check duplicate name in this chapter
     const { rows: dup } = await db.query(
@@ -161,18 +161,34 @@ async function deleteMember(req, res) {
     const { id, memberId } = req.params; // id=chapterId, memberId=memberId
     const userId = req.user.userId;
 
-    // Verify Ownership of Chapter
-    const { rows: chap } = await db.query("SELECT id FROM chapters WHERE id = $1 AND created_by = $2", [id, userId]);
-    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    // Access is verified by chapterAccessMiddleware
 
-    // Prevent deleting the Admin (the one with user_id matching creator)
-    const { rows: member } = await db.query("SELECT user_id FROM chapter_members WHERE id = $1", [memberId]);
-    if (member.length > 0 && member[0].user_id === userId) {
+    // Prevent deleting the Admin
+    const { rows: member } = await db.query("SELECT role FROM chapter_members WHERE id = $1", [memberId]);
+    if (member.length > 0 && member[0].role === 'admin') {
       return res.status(400).json({ ok: false, message: "Cannot remove the chapter admin" });
     }
 
-    // Delete
-    await db.query("DELETE FROM chapter_members WHERE id = $1 AND chapter_id = $2", [memberId, id]);
+    // SECURITY FIX: Backend validation for involvement in expenses
+    const { rows: involved } = await db.query(
+      `SELECT 1
+       FROM expenses e
+       WHERE e.chapter_id = $1 AND (
+         e.payer_member_id = $2
+         OR EXISTS (SELECT 1 FROM expense_splits es WHERE es.expense_id = e.id AND es.member_id = $2)
+       ) LIMIT 1`,
+      [id, memberId]
+    );
+
+    if (involved.length > 0) {
+      return res.status(400).json({ ok: false, message: "Cannot remove a member who is involved in expenses. They must be removed from all expenses first." });
+    }
+
+    // Soft Delete: Set status to 'removed' instead of hard deleting
+    await db.query(
+      "UPDATE chapter_members SET status = 'removed', left_at = NOW() WHERE id = $1 AND chapter_id = $2", 
+      [memberId, id]
+    );
 
     res.json({ ok: true, message: "Member removed" });
   } catch (err) {
@@ -189,12 +205,7 @@ async function getMemberDeletability(req, res) {
     const { id } = req.params; // chapterId
     const userId = req.user.userId;
 
-    // Verify ownership
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [id, userId]
-    );
-    if (chap.length === 0) return res.status(403).json({ ok: false, message: "Unauthorized" });
+    // Access is verified by chapterAccessMiddleware
 
     // Find members who appear in ANY expense (as payer OR split participant)
     const { rows } = await db.query(
@@ -218,13 +229,152 @@ async function getMemberDeletability(req, res) {
 }
 
 // =========================================
+// NEW: Upgrade Chapter to Collaborative
+// =========================================
+async function upgradeToCollaborative(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    
+    // Access is verified by chapterAccessMiddleware (must be admin)
+    if (req.chapter.is_collaborative) {
+      return res.status(400).json({ ok: false, message: "Chapter is already collaborative" });
+    }
+
+    const client = await db.pool.connect();
+    await client.query("BEGIN");
+    try {
+      // SECURITY FIX: Ensure the creator has an active admin row mapped to their user_id
+      const { rows: userRows } = await client.query("SELECT real_name FROM users WHERE id = $1", [userId]);
+      const creatorName = userRows[0]?.real_name || "Admin";
+
+      // Check if they already have a mapped row
+      const { rows: existingMapping } = await client.query(
+        "SELECT id FROM chapter_members WHERE chapter_id = $1 AND user_id = $2 AND status = 'active'",
+        [id, userId]
+      );
+
+      if (existingMapping.length === 0) {
+        // They don't have a mapped row. Let's try to find a ghost row we can commandeer
+        const { rows: ghostRows } = await client.query(
+          `SELECT id FROM chapter_members 
+           WHERE chapter_id = $1 AND user_id IS NULL AND status = 'active'
+           ORDER BY id ASC LIMIT 1`,
+          [id]
+        );
+
+        if (ghostRows.length > 0) {
+          // Commandeer the ghost row
+          await client.query(
+            "UPDATE chapter_members SET user_id = $1, role = 'admin' WHERE id = $2",
+            [userId, ghostRows[0].id]
+          );
+        } else {
+          // No suitable ghost row. Insert a brand new one.
+          await client.query(
+            `INSERT INTO chapter_members (chapter_id, user_id, member_name, role, status, joined_at)
+             VALUES ($1, $2, $3, 'admin', 'active', NOW())`,
+            [id, userId, creatorName]
+          );
+        }
+      } else {
+        // Ensure their existing row is admin
+        await client.query(
+          "UPDATE chapter_members SET role = 'admin' WHERE id = $1",
+          [existingMapping[0].id]
+        );
+      }
+
+      await client.query("UPDATE chapters SET is_collaborative = TRUE WHERE id = $1", [id]);
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+    
+    res.json({ ok: true, message: "Chapter upgraded to collaborative mode successfully!" });
+  } catch (err) {
+    log.error({ err }, "upgradeToCollaborative error");
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// =========================================
+// NEW: Leave Chapter
+// =========================================
+async function leaveChapter(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const chapterMember = req.chapterMember; // From middleware
+
+    if (!req.chapter.is_collaborative) {
+      return res.status(400).json({ ok: false, message: "Cannot leave a non-collaborative chapter" });
+    }
+
+    if (!chapterMember || chapterMember.status !== 'active') {
+      return res.status(400).json({ ok: false, message: "You are not an active member of this chapter" });
+    }
+
+    // If they are the only admin, block them from leaving (they must delete chapter or transfer)
+    if (chapterMember.role === 'admin') {
+      const { rows: admins } = await db.query(
+        "SELECT id FROM chapter_members WHERE chapter_id = $1 AND role = 'admin' AND status = 'active'",
+        [id]
+      );
+      if (admins.length <= 1) {
+        return res.status(400).json({ ok: false, message: "You are the only admin. You cannot leave the chapter without transferring ownership or deleting it." });
+      }
+    }
+
+    // SECURITY FIX: Enforce zero balance before allowing user to leave
+    const { rows: balanceRows } = await db.query(
+      `WITH spent AS (
+         SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE chapter_id = $1 AND payer_member_id = $2
+       ),
+       used AS (
+         SELECT COALESCE(SUM(es.amount_owed), 0) as total FROM expense_splits es JOIN expenses e ON es.expense_id = e.id WHERE e.chapter_id = $1 AND es.member_id = $2
+       ),
+       paid_out AS (
+         SELECT COALESCE(SUM(amount), 0) as total FROM settlement_records WHERE chapter_id = $1 AND from_member_id = $2 AND (confirmation_status = 'confirmed' OR confirmation_status = 'auto_confirmed')
+       ),
+       received AS (
+         SELECT COALESCE(SUM(amount), 0) as total FROM settlement_records WHERE chapter_id = $1 AND to_member_id = $2 AND (confirmation_status = 'confirmed' OR confirmation_status = 'auto_confirmed')
+       )
+       SELECT 
+         (spent.total - used.total + paid_out.total - received.total) AS net_balance
+       FROM spent, used, paid_out, received`,
+      [id, chapterMember.id]
+    );
+
+    const netBalance = parseFloat(balanceRows[0].net_balance || 0);
+
+    if (Math.abs(netBalance) >= 0.01) {
+      return res.status(400).json({ ok: false, message: "You cannot leave this chapter because you have an outstanding balance. Please settle all debts before leaving." });
+    }
+
+    await db.query(
+      "UPDATE chapter_members SET status = 'left', left_at = NOW() WHERE id = $1",
+      [chapterMember.id]
+    );
+
+    res.json({ ok: true, message: "You have left the chapter" });
+  } catch (err) {
+    log.error({ err }, "leaveChapter error");
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+}
+
+// =========================================
 // 4. Get All Chapters for Dashboard (Optimized)
 // =========================================
 async function getMyChapters(req, res) {
   try {
     const showArchived = req.query.archived === "true";
     const { rows } = await db.query(
-      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, c.is_personal, COUNT(cm.id) as member_count,
+      `SELECT c.id, c.name, c.description, c.created_at, c.last_opened_at, c.is_archived, c.is_personal, c.is_collaborative, COUNT(cm.id) FILTER (WHERE cm.status = 'active') as member_count,
          COALESCE((
            SELECT SUM(e.amount)
            FROM chapter_members ucm
@@ -236,9 +386,25 @@ async function getMyChapters(req, res) {
            JOIN expense_splits es ON es.member_id = ucm.id
            JOIN expenses e ON es.expense_id = e.id
            WHERE ucm.chapter_id = c.id AND ucm.user_id = $1 AND e.chapter_id = c.id
+         ), 0) + COALESCE((
+           SELECT SUM(sr.amount)
+           FROM chapter_members ucm
+           JOIN settlement_records sr ON sr.from_member_id = ucm.id
+           WHERE ucm.chapter_id = c.id AND ucm.user_id = $1 AND (sr.confirmation_status = 'confirmed' OR sr.confirmation_status = 'auto_confirmed')
+         ), 0) - COALESCE((
+           SELECT SUM(sr.amount)
+           FROM chapter_members ucm
+           JOIN settlement_records sr ON sr.to_member_id = ucm.id
+           WHERE ucm.chapter_id = c.id AND ucm.user_id = $1 AND (sr.confirmation_status = 'confirmed' OR sr.confirmation_status = 'auto_confirmed')
          ), 0) as user_net_balance
        FROM chapters c LEFT JOIN chapter_members cm ON c.id = cm.chapter_id
-       WHERE c.created_by = $1
+       WHERE (
+           (c.created_by = $1 AND c.is_collaborative = FALSE) 
+           OR EXISTS (
+             SELECT 1 FROM chapter_members acc 
+             WHERE acc.chapter_id = c.id AND acc.user_id = $1 AND acc.status = 'active'
+           )
+         )
          AND ($2 OR c.is_archived = FALSE)
        GROUP BY c.id ORDER BY c.created_at DESC`,
       [req.user.userId, showArchived]
@@ -260,8 +426,8 @@ async function toggleArchiveChapter(req, res) {
     const { is_archived } = req.body; // boolean
 
     const { rowCount } = await db.query(
-      `UPDATE chapters SET is_archived = $1 WHERE id = $2 AND created_by = $3`,
-      [!!is_archived, id, userId]
+      `UPDATE chapters SET is_archived = $1 WHERE id = $2`,
+      [!!is_archived, id]
     );
 
     if (rowCount === 0) return res.status(404).json({ ok: false, message: "Chapter not found" });
@@ -283,8 +449,9 @@ async function toggleArchiveChapter(req, res) {
 async function getChapterDetails(req, res) {
   try {
     const { id } = req.params;
-    const userId = req.user.userId;
-    const { rows: chapterRows } = await db.query(`SELECT * FROM chapters WHERE id = $1 AND created_by = $2`, [id, userId]);
+    
+    // Access is verified by chapterAccessMiddleware
+    const { rows: chapterRows } = await db.query(`SELECT * FROM chapters WHERE id = $1`, [id]);
     if (chapterRows.length === 0) return res.status(404).json({ ok: false, message: "Chapter not found" });
 
     await db.query(
@@ -293,7 +460,7 @@ async function getChapterDetails(req, res) {
     );
 
     // Fetch members with user_id so frontend knows who is Admin
-    const { rows: memberRows } = await db.query(`SELECT * FROM chapter_members WHERE chapter_id = $1 ORDER BY id ASC`, [id]);
+    const { rows: memberRows } = await db.query(`SELECT * FROM chapter_members WHERE chapter_id = $1 AND status != 'removed' ORDER BY id ASC`, [id]);
     
     res.json({ ok: true, chapter: chapterRows[0], members: memberRows });
   } catch (err) { 
@@ -320,8 +487,8 @@ async function updateChapter(req, res) {
     const sanitizedDescription = xss(description || "");
 
     const { rowCount } = await db.query(
-      `UPDATE chapters SET name = $1, description = $2 WHERE id = $3 AND created_by = $4`,
-      [sanitizedName, sanitizedDescription, id, userId]
+      `UPDATE chapters SET name = $1, description = $2 WHERE id = $3`,
+      [sanitizedName, sanitizedDescription, id]
     );
 
     if (rowCount === 0) {
@@ -347,22 +514,10 @@ async function deleteChapter(req, res) {
     await client.query("BEGIN");
     
     try {
-      // 1. Check ownership
-      const { rows } = await client.query(
-        "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-        [id, userId]
-      );
-      if (rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({ ok: false, message: "Chapter not found" });
-      }
-
+      // Access is verified by chapterAccessMiddleware
+      
       // Block deletion of personal chapter
-      const { rows: chapInfo } = await client.query(
-        "SELECT is_personal FROM chapters WHERE id = $1",
-        [id]
-      );
-      if (chapInfo[0]?.is_personal) {
+      if (req.chapter.is_personal) {
         await client.query("ROLLBACK");
         return res.status(403).json({
           ok: false,
@@ -406,20 +561,7 @@ async function getChapterHeartbeat(req, res) {
     const { id } = req.params;
     const userId = req.user.userId;
     
-    // Verify user has access to this chapter
-    // Note: Future collaborative features will need to check member access, not just creator
-    const { rows } = await db.query(
-      `SELECT c.data_updated_at, c.name
-       FROM chapters c
-       LEFT JOIN chapter_members cm ON c.id = cm.chapter_id AND cm.user_id = $2
-       WHERE c.id = $1 AND (c.created_by = $2 OR cm.id IS NOT NULL)
-       LIMIT 1`,
-      [id, userId]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ ok: false, message: "Chapter not found or no access" });
-    }
+    // Access is verified by chapterAccessMiddleware
     
     // Set cache header programmatically (short cache for polling)
     res.setHeader('Cache-Control', 'max-age=2, must-revalidate');
@@ -427,7 +569,7 @@ async function getChapterHeartbeat(req, res) {
     res.json({ 
       ok: true, 
       chapterId: id,
-      dataUpdatedAt: rows[0].data_updated_at,
+      dataUpdatedAt: req.chapter.data_updated_at || new Date(),
       // Cache this response very briefly — polling clients check every few seconds
       // The low max-age means fresh data arrives quickly
     });
@@ -448,6 +590,8 @@ module.exports = {
   addMember,
   deleteMember,
   getMemberDeletability,
-   getChapterHeartbeat,
-  toggleArchiveChapter
+  getChapterHeartbeat,
+  toggleArchiveChapter,
+  upgradeToCollaborative,
+  leaveChapter
 };

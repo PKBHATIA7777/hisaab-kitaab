@@ -103,7 +103,10 @@ async function addToPersonalFromChapter(req, res) {
 
     // Verify source chapter access
     const { rows: chap } = await db.query(
-      "SELECT id, name FROM chapters WHERE id = $1 AND created_by = $2",
+      `SELECT c.id, c.name 
+       FROM chapters c
+       LEFT JOIN chapter_members cm ON cm.chapter_id = c.id AND cm.user_id = $2 AND cm.status = 'active'
+       WHERE c.id = $1 AND (c.created_by = $2 OR cm.id IS NOT NULL)`,
       [sourceChapterId, userId]
     );
     if (chap.length === 0) {

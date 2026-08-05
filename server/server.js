@@ -39,6 +39,8 @@ const friendRoutes = require("./routes/friendRoutes");
 
 // ── NEW ROUTES (Features 4) ───────────────────────────────────
 const categoryRoutes = require("./routes/categoryRoutes");
+const inviteRoutes = require("./routes/inviteRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
@@ -389,6 +391,8 @@ app.use("/api/v1/chapters", chapterRoutes);
 app.use("/api/v1/expenses", expenseRoutes);
 app.use("/api/v1/friends", friendRoutes);
 app.use("/api/v1/categories", categoryRoutes);
+app.use("/api/v1/invites", inviteRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 // Backward-compat alias (to be removed later)
 app.use("/api/auth", authRoutes);
@@ -396,6 +400,8 @@ app.use("/api/chapters", chapterRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/invites", inviteRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ── WARM UP EMAIL CONNECTION ON STARTUP ──────────────────────
 // Import the warmUp function and call it after server starts

@@ -72,4 +72,51 @@ async function sendOtpEmail(to, subject, text) {
   }
 }
 
-module.exports = { sendOtpEmail, warmUpEmailConnection };
+// ── INVITATION EMAIL ──────────────────────────────────────────
+async function sendInviteEmail(to, chapterName, inviterName, inviteLink) {
+  if (!process.env.RESEND_API_KEY) {
+    if (process.env.NODE_ENV !== "production") {
+      log.info({ to, chapterName, inviteLink }, "Development Invite Logger");
+    }
+    return;
+  }
+
+  const resend = getResendClient();
+  const fromAddress = "noreply@parthenterprises.org.in";
+  const fromName = "Hisaab-Kitaab";
+  const subject = `${inviterName} invited you to join "${chapterName}"`;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: `${fromName} <${fromAddress}>`,
+      to,
+      subject,
+      text: `You have been invited to join the chapter ${chapterName} by ${inviterName}. Click here to accept: ${inviteLink}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #eee; border-radius: 8px;">
+          <h2 style="color: #d000ff; margin-bottom: 16px;">Hisaab-Kitaab</h2>
+          <p style="color: #333; font-size: 16px;">Hi there,</p>
+          <p style="color: #333; font-size: 16px;">
+            <strong>${inviterName}</strong> has invited you to collaborate on the chapter <strong>"${chapterName}"</strong>.
+          </p>
+          <div style="margin: 32px 0; text-align: center;">
+            <a href="${inviteLink}" style="background-color: #d000ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+              View Invitation
+            </a>
+          </div>
+          <p style="color: #888; font-size: 12px;">
+            This invitation will expire in 15 days. If you don't have an account, you'll be able to create one before joining.
+          </p>
+        </div>
+      `,
+    });
+
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    log.info({ to, emailId: data?.id }, "Invite email sent successfully");
+  } catch (err) {
+    log.error({ err, to }, "Invite email failed");
+    throw new Error(`Invite delivery failed: ${err.message}`);
+  }
+}
+
+module.exports = { sendOtpEmail, sendInviteEmail, warmUpEmailConnection };

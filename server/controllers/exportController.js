@@ -20,14 +20,7 @@ async function exportChapter(req, res) {
     const { eventId } = req.query;
     const userId = req.user.userId;
 
-    const { rows: chapterRows } = await db.query(
-      "SELECT * FROM chapters WHERE id = $1 AND created_by = $2",
-      [id, userId]
-    );
-    if (chapterRows.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized or Chapter not found" });
-    }
-    const chapter = chapterRows[0];
+    const chapter = req.chapter; // Access verified by chapterAccessMiddleware
 
     let reportTitle = chapter.name;
     let filenamePrefix = chapter.name;

@@ -21,14 +21,8 @@ async function createEvent(req, res) {
 
     const name = xss(result.data.name);
 
-    // Verify Chapter Ownership/Access
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized or Chapter not found" });
-    }
+    // Access is already verified by chapterAccessMiddleware
+    // req.chapter and req.chapterMember are available if needed
 
     const { rows } = await db.query(
       `INSERT INTO events (chapter_id, name) VALUES ($1, $2) RETURNING *`,
@@ -48,14 +42,7 @@ async function getChapterEvents(req, res) {
     const { chapterId } = req.params;
     const userId = req.user.userId;
 
-    // Verify Access
-    const { rows: chap } = await db.query(
-      "SELECT id FROM chapters WHERE id = $1 AND created_by = $2",
-      [chapterId, userId]
-    );
-    if (chap.length === 0) {
-      return res.status(403).json({ ok: false, message: "Unauthorized" });
-    }
+    // Access is already verified by chapterAccessMiddleware
 
     const { rows } = await db.query(
       `SELECT * FROM events WHERE chapter_id = $1 AND status = 'active' ORDER BY created_at DESC`,
