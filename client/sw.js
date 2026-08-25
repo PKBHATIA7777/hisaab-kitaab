@@ -279,12 +279,14 @@ async function flushOfflineQueue() {
         const items = getReq.result;
         for (const item of items) {
           try {
-            const res = await fetch(item.url, {
-              method: item.method,
-              headers: item.headers,
-              body: item.body ? JSON.stringify(item.body) : undefined
+            const res = await fetch(item.url || ('/api' + item.path), {
+              method: item.method || 'POST',
+              headers: item.headers || { 'Content-Type': 'application/json' },
+              body: item.body ? JSON.stringify(item.body) : undefined,
+              credentials: 'include'
             });
-            if (res.ok || res.status >= 400) {
+            // Delete on success or non-retryable client errors (but NOT 401 — session may recover)
+            if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 401)) {
               const delTx = db.transaction("pending_requests", "readwrite");
               delTx.objectStore("pending_requests").delete(item.id);
             }

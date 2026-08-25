@@ -11,7 +11,7 @@ const markSchema = z.object({
   amount: z.number().positive(),
   note: z.string().max(200).optional().or(z.literal("")),
   eventId: z.number().int().nullish(),
-});
+}).refine(data => data.fromMemberId !== data.toMemberId, { message: "Cannot settle with yourself" });
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/chapters/:chapterId/settlements/mark
@@ -56,11 +56,21 @@ async function markSettlement(req, res) {
       // Find the user_id of the receiver to send a notification
       const { rows: receiverRows } = await db.query("SELECT user_id FROM chapter_members WHERE id = $1", [toMemberId]);
       if (receiverRows.length > 0 && receiverRows[0].user_id) {
-        await db.query(
-          `INSERT INTO notifications (user_id, type, title, body, chapter_id, related_entity_id)
-           VALUES ($1, 'settlement_marked', 'Payment Sent', 'Someone marked a payment to you as settled. Please confirm receipt.', $2, $3)`,
-          [receiverRows[0].user_id, chapterId, rows[0].id]
+        // Prevent duplicate spam (1 min window)
+        const { rowCount: recentCount } = await db.query(
+          `SELECT 1 FROM notifications 
+           WHERE user_id = $1 AND type = 'settlement_marked' AND chapter_id = $2 
+           AND created_at > NOW() - INTERVAL '1 minute'`,
+          [receiverRows[0].user_id, chapterId]
         );
+        
+        if (recentCount === 0) {
+          await db.query(
+            `INSERT INTO notifications (user_id, type, title, body, chapter_id, related_entity_id)
+             VALUES ($1, 'settlement_marked', 'Payment Sent', 'Someone marked a payment to you as settled. Please confirm receipt.', $2, $3)`,
+            [receiverRows[0].user_id, chapterId, rows[0].id]
+          );
+        }
       }
     }
 
@@ -82,6 +92,9 @@ async function getSettlementHistory(req, res) {
     const userId = req.user.userId;
 
     // Access is already verified by chapterAccessMiddleware
+
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
     let queryText = `
       SELECT
@@ -107,10 +120,30 @@ async function getSettlementHistory(req, res) {
       params.push(eventId);
     }
 
-    queryText += ` ORDER BY sr.marked_at DESC`;
+    queryText += ` ORDER BY sr.marked_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
 
     const { rows } = await db.query(queryText, params);
-    res.json({ ok: true, history: rows });
+
+    let countQuery = `SELECT COUNT(*) FROM settlement_records WHERE chapter_id = $1 AND status = 'settled'`;
+    const countParams = [chapterId];
+    if (eventId) {
+      countQuery += ` AND event_id = $2`;
+      countParams.push(eventId);
+    }
+    const { rows: countRows } = await db.query(countQuery, countParams);
+    const totalCount = parseInt(countRows[0].count, 10);
+
+    res.json({
+      ok: true,
+      history: rows,
+      pagination: {
+        limit,
+        offset,
+        total: totalCount,
+        hasMore: offset + limit < totalCount
+      }
+    });
   } catch (err) {
     log.error({ err }, "getSettlementHistory error");
     res.status(500).json({ ok: false, message: "Server error" });
@@ -169,11 +202,11 @@ async function getNetSettlements(rawSettlements, chapterId, eventId) {
 
   settled.forEach(s => {
     const key = `${s.from_member_id}-${s.to_member_id}`;
-    const amount = parseFloat(s.amount);
+    const amountCents = Math.round(parseFloat(s.amount) * 100);
     if (s.confirmation_status === 'confirmed' || s.confirmation_status === 'auto_confirmed') {
-      confirmedMap[key] = (confirmedMap[key] || 0) + amount;
+      confirmedMap[key] = (confirmedMap[key] || 0) + amountCents;
     } else if (s.confirmation_status === 'pending_confirmation') {
-      pendingMap[key] = (pendingMap[key] || 0) + amount;
+      pendingMap[key] = (pendingMap[key] || 0) + amountCents;
     }
   });
 
@@ -181,16 +214,17 @@ async function getNetSettlements(rawSettlements, chapterId, eventId) {
   const pending = [];
   rawSettlements.forEach(s => {
     const key = `${s.fromId}-${s.toId}`;
-    const alreadySettled = confirmedMap[key] || 0;
-    const pendingConfirmation = pendingMap[key] || 0;
+    const alreadySettledCents = confirmedMap[key] || 0;
+    const pendingConfirmationCents = pendingMap[key] || 0;
     
-    const remaining = parseFloat(s.amount) - alreadySettled;
+    const amountCents = Math.round(parseFloat(s.amount) * 100);
+    const remainingCents = amountCents - alreadySettledCents;
 
-    if (remaining > 0.01) {
+    if (remainingCents > 1) { // more than 1 cent
       pending.push({ 
         ...s, 
-        amount: remaining.toFixed(2),
-        pendingConfirmationAmount: pendingConfirmation.toFixed(2)
+        amount: (remainingCents / 100).toFixed(2),
+        pendingConfirmationAmount: (pendingConfirmationCents / 100).toFixed(2)
       });
     }
   });

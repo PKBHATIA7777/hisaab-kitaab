@@ -50,7 +50,7 @@ function handleApiError(err, context = '') {
   const type = classifyError(err);
   const message = getUserMessage(err);
   
-  if (context && process.env.NODE_ENV !== 'production') {
+  if (context && window.APP_CONFIG?.isLocal) {
     console.error(`[${context}]`, err);
   }
   

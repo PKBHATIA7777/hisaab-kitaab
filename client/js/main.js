@@ -116,36 +116,6 @@ const CONFIG = {
     }
   };
 
-  // ── SPA ROUTER ──────────────────────────────────────────────
-  window.addEventListener('click', async (e) => {
-    const link = e.target.closest('a');
-    if (!link) return;
-    
-    const url = new URL(link.href, window.location.href);
-    if (url.origin !== window.location.origin) return;
-    if (link.hasAttribute('download') || link.target === '_blank') return;
-    if (url.pathname.startsWith('/api')) return;
-    if (url.pathname === window.location.pathname && url.search === window.location.search) {
-      e.preventDefault();
-      return;
-    }
-
-    e.preventDefault();
-    await window.navigateTo(url.href);
-  });
-
-  window.addEventListener('popstate', async (e) => {
-    await window.navigateTo(window.location.href, true);
-  });
-
-  window.navigateTo = async function(url, isPopState = false) {
-    if (isPopState) {
-      window.location.reload();
-    } else {
-      window.location.href = url;
-    }
-  };
-
   window.debounce = function(func, wait) {
     let timeout;
     return function(...args) {
@@ -182,7 +152,9 @@ const CONFIG = {
         // After revalidation, emit an event so listening components can re-render.
         (async () => {
           try {
-            const fresh = await window.apiFetch(path, { ...options, _noCache: true });
+            const revalOptions = { ...options, _noCache: true };
+            delete revalOptions.signal;
+            const fresh = await window.apiFetch(path, revalOptions);
             if (fresh) {
               await cache.set(path, fresh);
               // Notify any subscriber that wants to react to fresh data
@@ -428,7 +400,7 @@ const CONFIG = {
     if (wakeUpPromise) return wakeUpPromise;
 
     wakeUpPromise = (async () => {
-      const maxAttempts = 6;
+      const maxAttempts = 4;
       const delayBetween = 10000; // 10 seconds between attempts
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -436,23 +408,18 @@ const CONFIG = {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 12000);
           
-          const res = await fetch(CONFIG.API_BASE + '/auth/me', {
+          // Use /health to avoid auth rate limiter
+          const res = await fetch(CONFIG.API_BASE + '/health', {
             method: 'GET',
             credentials: 'include',
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
 
-          // Any response (even 401) means server is awake
+          // Any response (even 503) means server is awake
           if (res.status !== 0) {
             serverIsAwake = true;
             console.log(`Server awake after ${attempt} attempt(s)`);
-            
-            // Capture CSRF from response header
-            const csrfHeader = res.headers.get('X-CSRF-Token');
-            if (csrfHeader) {
-              window.CSRFManager && window.CSRFManager.capture(res.headers);
-            }
             return true;
           }
         } catch (err) {
@@ -854,7 +821,7 @@ function initPasswordValidation() {
 
     toast.innerHTML = `
       ${iconHtml}
-      <span style="flex:1;">${message}</span>
+      <span style="flex:1;">${window.escapeHTML ? window.escapeHTML(message) : message}</span>
       ${actionHtml}
       <div class="toast-progress"></div>
     `;
@@ -888,17 +855,16 @@ function initPasswordValidation() {
     toast.addEventListener('touchmove', (e) => {
       if (!isDragging) return;
       currentX = e.touches[0].clientX - startX;
-      if (currentX > 0) {
-        toast.style.transform = `translateX(${currentX}px)`;
-        toast.style.opacity = 1 - (currentX / 200);
-      }
+      toast.style.transform = `translateX(${currentX}px)`;
+      toast.style.opacity = 1 - (Math.abs(currentX) / 200);
     }, { passive: true });
 
     toast.addEventListener('touchend', () => {
       isDragging = false;
       toast.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
-      if (currentX > 80) {
-        toast.style.transform = `translateX(120%)`;
+      if (Math.abs(currentX) > 80) {
+        const direction = currentX > 0 ? '120%' : '-120%';
+        toast.style.transform = `translateX(${direction})`;
         toast.style.opacity = 0;
         if (typeof window.haptic === 'function') window.haptic('light');
         setTimeout(() => {
@@ -1288,7 +1254,7 @@ function initPasswordValidation() {
       bottom: 0;
       left: 0;
       width: 100%;
-      background: #fff;
+      background: var(--bg-elevated);
       border-radius: 20px 20px 0 0;
       padding: 24px 20px 40px;
       z-index: 99999;
@@ -1312,20 +1278,20 @@ function initPasswordValidation() {
           align-items: center;
           gap: 14px;
           padding: 12px 0;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 1px solid var(--bg-glass-border);
         }
         .ios-guide-step:last-of-type { border-bottom: none; }
         .ios-step-num {
           width: 28px; height: 28px;
-          background: #007AFF;
+          background: var(--color-brand);
           color: #fff;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
           font-size: 0.85rem; font-weight: 700;
           flex-shrink: 0;
         }
-        .ios-step-text { font-size: 0.92rem; color: #333; line-height: 1.4; }
-        .ios-step-text strong { color: #000; }
+        .ios-step-text { font-size: 0.92rem; color: var(--color-text-primary); line-height: 1.4; }
+        .ios-step-text strong { color: var(--color-text-primary); }
         .share-arrow {
           display: inline-block;
           font-size: 1.1rem;
@@ -1334,16 +1300,16 @@ function initPasswordValidation() {
       </style>
       
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h3 style="margin:0; font-size:1.1rem; color:#000;">Add to Home Screen</h3>
+        <h3 style="margin:0; font-size:1.1rem; color:var(--color-text-primary);">Add to Home Screen</h3>
         <button onclick="document.getElementById('ios-install-guide').remove()"
-          style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666; padding:4px;">×</button>
+          style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--color-text-secondary); padding:4px;">×</button>
       </div>
 
       <div class="ios-guide-step">
         <div class="ios-step-num">1</div>
         <div class="ios-step-text">
           Tap the <strong>Share</strong> button <span class="share-arrow">↑</span> at the bottom of Safari
-          <div style="font-size:0.78rem; color:#999; margin-top:2px;">(the box with an arrow pointing up)</div>
+          <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:2px;">(the box with an arrow pointing up)</div>
         </div>
       </div>
 
@@ -1351,7 +1317,7 @@ function initPasswordValidation() {
         <div class="ios-step-num">2</div>
         <div class="ios-step-text">
           Scroll down in the share menu and tap <strong>"Add to Home Screen"</strong>
-          <div style="font-size:0.78rem; color:#999; margin-top:2px;">It looks like a plus (+) icon in a square</div>
+          <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:2px;">It looks like a plus (+) icon in a square</div>
         </div>
       </div>
 
@@ -1359,20 +1325,20 @@ function initPasswordValidation() {
         <div class="ios-step-num">3</div>
         <div class="ios-step-text">
           Tap <strong>"Add"</strong> in the top right corner
-          <div style="font-size:0.78rem; color:#999; margin-top:2px;">Hisaab-Kitaab will appear on your home screen!</div>
+          <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:2px;">Hisaab-Kitaab will appear on your home screen!</div>
         </div>
       </div>
 
-      <div style="margin-top:20px; background:#f0f7ff; border-radius:12px; padding:12px 14px; display:flex; gap:10px; align-items:flex-start;">
+      <div style="margin-top:20px; background:var(--bg-elevated-2); border-radius:12px; padding:12px 14px; display:flex; gap:10px; align-items:flex-start;">
         <span style="font-size:1.2rem;"></span>
-        <p style="margin:0; font-size:0.82rem; color:#444; line-height:1.5;">
+        <p style="margin:0; font-size:0.82rem; color:var(--color-text-secondary); line-height:1.5;">
           Once installed, Hisaab-Kitaab opens full-screen without the Safari toolbar — 
           just like a native app. No App Store needed!
         </p>
       </div>
 
       <!-- Visual arrow pointing to bottom of screen where Share button lives -->
-      <div style="text-align:center; margin-top:16px; color:#007AFF; font-size:0.85rem; font-weight:600;">
+      <div style="text-align:center; margin-top:16px; color:var(--color-brand); font-size:0.85rem; font-weight:600;">
         <div style="font-size:2rem; animation: bounceDown 1s ease-in-out infinite;">↓</div>
         Share button is at the bottom of your screen
       </div>
@@ -1712,31 +1678,4 @@ class MemberAutocomplete {
 }
 
 window.MemberAutocomplete = MemberAutocomplete;
-/* ======================================
-   GLOBAL EXCEPTION HANDLING
-   ====================================== */
-window.addEventListener('error', function(event) {
-  console.error('Unhandled JS Error:', event.error);
-  const dbg = document.createElement('div');
-  dbg.style.cssText = 'position:fixed;bottom:50%;left:0;right:0;background:orange;color:black;z-index:9999;padding:20px;white-space:pre-wrap;font-family:monospace;font-size:12px;';
-  dbg.textContent = `UNHANDLED ERROR:\nFile: ${event.filename}:${event.lineno}\n${event.error?.message || event.message}\n${event.error?.stack || ''}`;
-  document.body.appendChild(dbg);
-  if (window.showToast) {
-    window.showToast("An unexpected error occurred. Please refresh.", "error");
-  }
-});
 
-window.addEventListener('unhandledrejection', function(event) {
-  console.error('Unhandled Promise Rejection:', event.reason);
-  const dbg = document.createElement('div');
-  dbg.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:purple;color:white;z-index:9999;padding:20px;white-space:pre-wrap;font-family:monospace;font-size:12px;';
-  dbg.textContent = `UNHANDLED REJECTION:\n${event.reason?.message || event.reason}\n${event.reason?.stack || ''}`;
-  document.body.appendChild(dbg);
-  // Do not show a toast for intentional auth redirects or network fallbacks
-  if (event.reason && (event.reason.isAuthRedirect || event.reason.isTimeout || event.reason.isOffline)) {
-    return;
-  }
-  if (window.showToast) {
-    window.showToast("An unexpected error occurred. Please try again.", "error");
-  }
-});

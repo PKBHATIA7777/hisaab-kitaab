@@ -44,15 +44,31 @@ async function getFriends(req, res) {
 
   // QUERY A: Advanced (With Balances)
   const settlementQuery = `
-      WITH friend_balances AS (
+      WITH user_friends AS (
+        SELECT id FROM friends WHERE user_id = $1
+      ),
+      spent_cte AS (
+        SELECT e.payer_member_id as member_id, SUM(e.amount) as total_spent
+        FROM expenses e
+        JOIN chapter_members cm ON e.payer_member_id = cm.id
+        WHERE cm.friend_id IN (SELECT id FROM user_friends)
+        GROUP BY e.payer_member_id
+      ),
+      used_cte AS (
+        SELECT es.member_id, SUM(es.amount_owed) as total_used
+        FROM expense_splits es
+        JOIN chapter_members cm ON es.member_id = cm.id
+        WHERE cm.friend_id IN (SELECT id FROM user_friends)
+        GROUP BY es.member_id
+      ),
+      friend_balances AS (
         SELECT 
           cm.friend_id,
-          SUM(
-            COALESCE((SELECT SUM(amount) FROM expenses WHERE payer_member_id = cm.id), 0) - 
-            COALESCE((SELECT SUM(amount_owed) FROM expense_splits WHERE member_id = cm.id), 0)
-          ) as net_amount
+          SUM(COALESCE(s.total_spent, 0) - COALESCE(u.total_used, 0)) as net_amount
         FROM chapter_members cm
-        WHERE cm.friend_id IS NOT NULL
+        LEFT JOIN spent_cte s ON cm.id = s.member_id
+        LEFT JOIN used_cte u ON cm.id = u.member_id
+        WHERE cm.friend_id IN (SELECT id FROM user_friends)
         GROUP BY cm.friend_id
       )
       SELECT 

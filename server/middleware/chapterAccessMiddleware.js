@@ -22,7 +22,7 @@ function getNestedValue(obj, path) {
 function requireChapterAccess({ role = 'member', paramName = 'params.id' } = {}) {
   return async (req, res, next) => {
     try {
-      const userId = req.user?.userId;
+      const userId = Number(req.user?.userId);
       if (!userId) {
         return res.status(401).json({ ok: false, message: "Authentication required" });
       }
@@ -70,8 +70,7 @@ function requireChapterAccess({ role = 'member', paramName = 'params.id' } = {})
       } else {
         // NON-COLLABORATIVE CHAPTER (Legacy / Solo)
         // Strictly fallback to the creator ownership model to guarantee zero backward compat issues.
-        // Even if they have a chapter_members row, the ultimate truth is created_by.
-        if (chapterData.created_by !== parseInt(userId, 10)) {
+        if (chapterData.created_by !== userId) {
           return res.status(403).json({ ok: false, message: "You do not have access to this chapter" });
         }
       }

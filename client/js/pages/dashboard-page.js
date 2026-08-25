@@ -77,22 +77,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     ProfileModal.init(authData.user);
     renderNavProfile(authData.user);
 
-    await ChaptersGrid.load();
+    const loadedChapters = await ChaptersGrid.load();
 
     // Show onboarding for first-time users with no chapters
-    const chaptersData = await apiFetch('/chapters').catch(e => { console.error('Failed to load chapters for onboarding', e); return null; });
-    _showOnboardingIfNeeded(chaptersData?.chapters?.length ?? 0);
+    _showOnboardingIfNeeded(loadedChapters?.length ?? 0);
+
+    // Initialize Invites Banner
+    if (typeof InvitesBanner !== 'undefined') {
+      await InvitesBanner.init();
+    }
+    
+    // Initialize Notification Center
+    if (typeof NotificationCenter !== 'undefined') {
+      NotificationCenter.init();
+    }
 
   } catch (err) {
     console.error('Error during dashboard initialization:', err);
     const grid = document.getElementById('chapters-grid');
     if (grid) grid.innerHTML = '';
     
-    // DEBUG: show the exact error on screen
-    const dbg = document.createElement('div');
-    dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;z-index:9999;padding:20px;white-space:pre-wrap;font-family:monospace;font-size:12px;';
-    dbg.textContent = `DASHBOARD INIT ERROR:\n${err.message}\n${err.stack}`;
-    document.body.appendChild(dbg);
+
 
     if (err.isAuthRedirect) return; // Navigation already triggered
     if (err.status === 401 || err.status === 403) {
@@ -117,10 +122,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const menuBtn = e.target.closest('.chapter-card__menu');
     if (!menuBtn) return;
     e.stopPropagation();
-    const { chapterId, chapterName, chapterDesc, isArchived, isPersonal } = menuBtn.dataset;
+    const { chapterId, chapterName, chapterDesc, isArchived, isPersonal, isCollaborative } = menuBtn.dataset;
     ChapterCardMenu.open(menuBtn, {
       id: chapterId, name: chapterName, description: chapterDesc,
       is_archived: isArchived === 'true', is_personal: isPersonal === 'true',
+      is_collaborative: isCollaborative === 'true'
     });
   });
 

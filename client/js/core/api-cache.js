@@ -158,15 +158,26 @@ const ApiCache = (() => {
     const keys = await idbKeys();
     const keysToDelete = new Set();
 
-    for (const rule of INVALIDATION_MAP) {
-      if (mutationPath.startsWith(rule.mutationPrefix)) {
-        rule.clearPrefixes.forEach(prefix => {
-          for (const key of keys) {
-            if (key.startsWith(prefix)) {
-              keysToDelete.add(key);
+    const chapterMatch = mutationPath.match(/^\/chapters\/(\d+)/);
+    
+    if (chapterMatch) {
+      const id = chapterMatch[1];
+      for (const key of keys) {
+        if (key === '/chapters' || key.startsWith(`/chapters/${id}`) || key.startsWith(`/expenses/chapter/${id}`)) {
+          keysToDelete.add(key);
+        }
+      }
+    } else {
+      for (const rule of INVALIDATION_MAP) {
+        if (mutationPath.startsWith(rule.mutationPrefix)) {
+          rule.clearPrefixes.forEach(prefix => {
+            for (const key of keys) {
+              if (key.startsWith(prefix)) {
+                keysToDelete.add(key);
+              }
             }
-          }
-        });
+          });
+        }
       }
     }
 
@@ -203,11 +214,12 @@ const ApiCache = (() => {
     await idbClear();
   }
 
-  async function invalidateExact(path) {
-    await idbDelete(path);
-  }
-
-  return { get, set, invalidate, clear, invalidateExact };
+  return { get, set, invalidate, clear };
 })();
 
 window.ApiCache = ApiCache;
+
+// P2.12: Clear cache on page load to enforce in-memory behavior and prevent stale financial data across sessions
+if (window.ApiCache) {
+  window.ApiCache.clear().catch(e => console.warn('ApiCache clear failed:', e));
+}

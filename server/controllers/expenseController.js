@@ -487,7 +487,7 @@ async function getChapterSettlements(req, res) {
       FROM chapter_members cm
       LEFT JOIN spent_cte s ON cm.id = s.payer_member_id
       LEFT JOIN used_cte u ON cm.id = u.member_id
-      WHERE cm.chapter_id = $1
+      WHERE cm.chapter_id = $1 AND cm.status = 'active'
     `;
 
     const { rows } = await db.query(queryText, [chapterId, eventId || null]);

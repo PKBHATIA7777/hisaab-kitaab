@@ -51,7 +51,7 @@ router.get("/", chapterController.getMyChapters);
 // Place before /:id/export to avoid conflicts
 router.post("/:chapterId/settlements/mark", requireChapterAccess({ role: 'member', paramName: 'params.chapterId' }), markSettlement);
 router.get("/:chapterId/settlements/history", requireChapterAccess({ role: 'member', paramName: 'params.chapterId' }), getSettlementHistory);
-router.delete("/:chapterId/settlements/history/:recordId", requireChapterAccess({ role: 'admin', paramName: 'params.chapterId' }), undoSettlement);
+router.delete("/:chapterId/settlements/history/:recordId", requireChapterAccess({ role: 'member', paramName: 'params.chapterId' }), undoSettlement);
 router.post("/:chapterId/settlements/:recordId/confirm", requireChapterAccess({ role: 'member', paramName: 'params.chapterId' }), confirmSettlement);
 router.post("/:chapterId/settlements/:recordId/dispute", requireChapterAccess({ role: 'member', paramName: 'params.chapterId' }), disputeSettlement);
 
@@ -85,9 +85,6 @@ router.delete("/:id/leave", requireChapterAccess({ role: 'member' }), chapterCon
 
 // Beacon-based delete (for beforeunload scenarios)
 router.post("/:id/beacon-delete", requireChapterAccess({ role: 'admin' }), async (req, res) => {
-  // Reuse the existing deleteChapter logic via direct call
-  req.method = "DELETE";
-  req.params.id = req.params.id;
   return chapterController.deleteChapter(req, res);
 });
 

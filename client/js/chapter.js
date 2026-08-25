@@ -91,6 +91,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await _loadExpenses();
 
+    if (typeof NotificationCenter !== 'undefined') {
+      NotificationCenter.init();
+    }
+
     EventBus.emit('chapter:loaded', {
       chapter: _state.chapter,
       members: _state.members,
@@ -168,7 +172,11 @@ function _renderChapterInfo() {
   }
 
   // Show admin controls
-  if (_state.currentUser.id === ch.created_by) {
+  const isAdmin = ch.is_collaborative
+    ? _state.members.find(m => m.user_id === _state.currentUser.id)?.role === 'admin'
+    : _state.currentUser.id === ch.created_by;
+
+  if (isAdmin) {
     document.getElementById('member-panel-admin')?.style.setProperty('display', 'block');
   }
 
@@ -426,10 +434,18 @@ function _openContextMenu(e, ex) {
 
   const menu = document.createElement('div');
   menu.className = 'context-menu';
+  const menuHeight = 130; // 3 items (~40px each) + divider
+  const menuWidth = 180;
+  const safeX = Math.min(x, window.innerWidth - menuWidth);
+  const safeY = (y + menuHeight > window.innerHeight - 20)
+    ? Math.max(10, y - menuHeight)   // flip upward if near bottom
+    : y;
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'Expense actions');
   menu.style.cssText = `
     position: absolute;
-    left: ${Math.min(x, window.innerWidth - 180)}px;
-    top: ${Math.min(y, window.innerHeight - 150)}px;
+    left: ${safeX}px;
+    top: ${safeY}px;
     background: var(--bg-elevated);
     border: 1px solid var(--bg-glass-border);
     border-radius: var(--r-md);
@@ -440,20 +456,29 @@ function _openContextMenu(e, ex) {
   `;
 
   menu.innerHTML = `
-    <button class="context-menu-item" id="ctx-edit" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-on-dark-2);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
+    <button class="context-menu-item" id="ctx-edit" role="menuitem" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-on-dark-2);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
       <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;"><use href="icons/sprite.svg#edit-2"></use></svg>
       Edit Details
     </button>
-    <button class="context-menu-item" id="ctx-duplicate" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-on-dark-2);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
+    <button class="context-menu-item" id="ctx-duplicate" role="menuitem" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-on-dark-2);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
       <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;"><use href="icons/sprite.svg#copy"></use></svg>
       Duplicate
     </button>
-    <div style="height:1px;background:var(--bg-glass-border);margin:2px 0;"></div>
-    <button class="context-menu-item" id="ctx-delete" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--negative);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
+    <div role="separator" style="height:1px;background:var(--bg-glass-border);margin:2px 0;"></div>
+    <button class="context-menu-item" id="ctx-delete" role="menuitem" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;color:var(--negative);font-family:var(--font);font-size:var(--text-xs);font-weight:600;cursor:pointer;text-align:left;">
       <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;"><use href="icons/sprite.svg#trash-2"></use></svg>
       Delete
     </button>
   `;
+
+  // Keyboard navigation for menu items
+  menu.addEventListener('keydown', (e) => {
+    const items = [...menu.querySelectorAll('[role="menuitem"]')];
+    const idx = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length]?.focus(); }
+    else if (e.key === 'Escape') { overlay.remove(); }
+  });
 
   overlay.appendChild(menu);
   document.body.appendChild(overlay);
@@ -536,11 +561,22 @@ function _buildExpenseCard(ex) {
   card.setAttribute('role', 'listitem');
   card.setAttribute('aria-label', `${name}, paid by ${payer}, ${amount}`);
 
+  let metaHtml = `<strong>${payer}</strong> · ${when}`;
+  if (window.currentChapter && window.currentChapter.is_collaborative) {
+    let addedByName = 'Someone';
+    if (ex.added_by_user_id) {
+      const addedMember = window.currentMembers?.find(m => m.user_id === ex.added_by_user_id);
+      if (addedMember) addedByName = addedMember.member_name;
+      else if (ex.added_by_user_id === window.currentChapter.created_by) addedByName = 'Admin';
+    }
+    metaHtml += ` <span style="color:var(--text-muted); opacity:0.7; font-size:0.75rem;"><br>Added by ${escapeHTML(addedByName)}</span>`;
+  }
+
   card.innerHTML = `
     <div class="expense-icon" style="background: ${categoryColor}1a; color: ${categoryColor};">${svgHtml}</div>
     <div class="expense-info">
       <div class="expense-info__name">${name}</div>
-      <div class="expense-info__meta"><strong>${payer}</strong> · ${when}</div>
+      <div class="expense-info__meta">${metaHtml}</div>
     </div>
     <div class="expense-right">
       <div class="expense-amount">${amount}</div>
@@ -1144,7 +1180,7 @@ window.openSettlementModal = async () => {
       const list = overlay.querySelector('#settle-list');
       list.style.display = '';
       list.innerHTML = data.settlements.map(s => `
-        <div class="settle-row" style="padding:12px 0;border-bottom:1px solid #f0f0f0;">
+        <div class="settle-row" style="padding:12px 0;border-bottom:1px solid var(--bg-glass-border);">
           <div class="settle-row__info">
             <div class="avatar avatar--sm" style="background:${_getAvatarColor(s.from)}">${escapeHTML(_getInitials(s.from))}</div>
             <div class="settle-row__names" style="color:var(--color-text-primary)"><strong>${escapeHTML(s.from)}</strong> → <strong>${escapeHTML(s.to)}</strong></div>
@@ -1227,7 +1263,7 @@ window._openMarkModal = (s) => {
       </button>
     </div>
     <div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:16px;">
-      <div style="background:#f5f5f7;border-radius:var(--radius-md);padding:16px;text-align:center;">
+      <div style="background:var(--bg-elevated-2);border-radius:var(--radius-md);padding:16px;text-align:center;">
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:4px;">
           <strong>${escapeHTML(s.from)}</strong> pays <strong>${escapeHTML(s.to)}</strong>
         </div>
@@ -1235,7 +1271,7 @@ window._openMarkModal = (s) => {
       </div>
       <div class="form-group" style="margin:0">
         <label class="form-label">Amount</label>
-        <div style="display:flex;align-items:center;gap:8px;border:1.5px solid #eee;border-radius:var(--radius-md);padding:10px 14px;">
+        <div style="display:flex;align-items:center;gap:8px;border:1.5px solid var(--bg-glass-border);border-radius:var(--radius-md);padding:10px 14px;">
           <span style="color:var(--color-text-muted)">₹</span>
           <input type="number" id="mark-amount" step="0.01" min="0.01"
             value="${parseFloat(s.amount).toFixed(2)}"
@@ -1308,27 +1344,89 @@ async function _renderMembers() {
     involvedIds = data.involvedMemberIds || [];
   } catch (_) { involvedIds = _state.members.map(m => m.id); }
 
-  const isAdmin = _state.currentUser.id === _state.chapter.created_by;
+  const isAdmin = _state.chapter.is_collaborative 
+    ? _state.members.find(m => m.user_id === _state.currentUser.id)?.role === 'admin'
+    : _state.currentUser.id === _state.chapter.created_by;
+
   list.innerHTML = '';
 
   for (const m of _state.members) {
     const isCreator = m.user_id === _state.chapter.created_by;
+    const isThisAdmin = _state.chapter.is_collaborative ? (m.role === 'admin') : isCreator;
     const isInvolved = involvedIds.includes(m.id);
-    const canDelete = isAdmin && !isCreator && !isInvolved;
+    const isYou = m.user_id === _state.currentUser.id;
+    
+    // Deletion logic (legacy or collaborative admin)
+    const canDelete = isAdmin && !isThisAdmin && !isInvolved && m.status !== 'left' && m.status !== 'removed';
+    
+    let badgeHtml = '';
+    if (_state.chapter.is_collaborative) {
+      if (m.status === 'left' || m.status === 'removed') badgeHtml = '<span class="badge" style="background:#444;">Left</span>';
+      else if (isThisAdmin) badgeHtml = '<span class="badge badge--brand">Admin</span>';
+      else if (m.user_id) badgeHtml = '<span class="badge" style="background:rgba(34,197,94,0.15); color:#4ade80;">Active</span>';
+      else badgeHtml = '<span class="badge" style="background:rgba(255,255,255,0.1); color:#ccc;">Not on app</span>';
+    } else {
+      if (isCreator) badgeHtml = '<span class="admin-badge">Admin</span>';
+    }
 
     const row = document.createElement('div');
     row.className = 'member-panel-row';
     row.setAttribute('role', 'listitem');
+    if (m.status === 'left' || m.status === 'removed') {
+      row.style.opacity = '0.5';
+    }
+
     row.innerHTML = `
       <div class="avatar avatar--sm" style="background:${_getAvatarColor(m.member_name)}">${escapeHTML(_getInitials(m.member_name))}</div>
       <div class="member-panel-row__name">
-        ${escapeHTML(m.member_name)}
-        ${isCreator ? '<span class="admin-badge">Admin</span>' : ''}
-        ${m.user_id === _state.currentUser.id ? '<span class="you-badge">you</span>' : ''}
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${escapeHTML(m.member_name)}
+          ${isYou ? '<span class="you-badge">you</span>' : ''}
+        </div>
+        <div style="margin-top:4px;">${badgeHtml}</div>
       </div>
       ${canDelete ? `<button class="remove-member-btn" data-member-id="${m.id}" aria-label="Remove ${escapeHTML(m.member_name)}">×</button>` : ''}
     `;
     list.appendChild(row);
+  }
+
+  // Update footer actions for Admin
+  const footer = document.getElementById('member-panel-admin');
+  if (footer && isAdmin) {
+    if (_state.chapter.is_collaborative) {
+      footer.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+          <button class="btn-add-member" style="background:var(--brand);" onclick="openInviteModal()">Send Invite (Email)</button>
+          <button class="btn btn--ghost" style="width:100%; font-size:var(--text-sm);" onclick="openAddMemberModal()">Add Name-Only Member</button>
+        </div>
+      `;
+    } else {
+      footer.innerHTML = `<button class="btn-add-member" onclick="openAddMemberModal()">+ Add Member</button>`;
+    }
+  }
+
+  // Inject "Leave Chapter" button for current user at the bottom if collaborative
+  if (_state.chapter.is_collaborative) {
+    const youMember = _state.members.find(m => m.user_id === _state.currentUser.id);
+    if (youMember && youMember.status === 'active') {
+      const leaveRow = document.createElement('div');
+      leaveRow.style.cssText = 'padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px; text-align: center;';
+      leaveRow.innerHTML = `<button class="btn btn--danger" id="btn-leave-chapter" style="width:100%;">Leave Chapter</button>`;
+      list.appendChild(leaveRow);
+
+      leaveRow.querySelector('#btn-leave-chapter').addEventListener('click', async () => {
+        const confirmed = await _confirmDialog('Leave Chapter?', 'You can only leave if all your balances are settled.');
+        if (!confirmed) return;
+        try {
+          // If admin, we need to pass a new admin id. Let's do a simple prompt for now, or just let the API reject it.
+          await apiFetch(`/chapters/${_chapterId}/leave`, { method: 'DELETE' });
+          showToast('You left the chapter', 'success');
+          setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+        } catch (err) {
+          showToast(err.message || 'Cannot leave chapter', 'error');
+        }
+      });
+    }
   }
 
   list.addEventListener('click', async (e) => {

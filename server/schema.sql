@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS chapters (
 CREATE INDEX IF NOT EXISTS idx_chapters_created_by ON chapters(created_by);
 CREATE INDEX IF NOT EXISTS idx_chapters_collaborative ON chapters(is_collaborative) WHERE is_collaborative = TRUE;
 CREATE INDEX IF NOT EXISTS idx_chapters_data_updated ON chapters(created_by, data_updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_personal_per_user ON chapters(created_by) WHERE is_personal = TRUE;
 
 -- 3. friends table
 CREATE TABLE IF NOT EXISTS friends (
@@ -121,6 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_expenses_chapter_id ON expenses(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_event_id ON expenses(event_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_chapter_date ON expenses(chapter_id, expense_date DESC);
 CREATE INDEX IF NOT EXISTS idx_expenses_chapter_created ON expenses(chapter_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_expenses_sync ON expenses(source_chapter_id, source_member_id) WHERE is_synced_from_chapter = TRUE;
 
 -- 8. expense_splits table
 CREATE TABLE IF NOT EXISTS expense_splits (

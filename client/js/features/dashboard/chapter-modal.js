@@ -24,6 +24,15 @@ const ChapterModal = (() => {
               placeholder="Short description" value="${data.description ? escapeHTML(data.description) : ''}">
           </div>
           ${!isEdit ? `
+          <div class="form-group" style="display:flex; align-items:center; gap:var(--s-2); background: rgba(138,43,226,0.05); padding: var(--s-3); border-radius: var(--r-md); border: 1px solid rgba(138,43,226,0.2);">
+            <input type="checkbox" id="ch-collab" style="width:18px;height:18px;accent-color:#a855f7;cursor:pointer;">
+            <label class="form-label" for="ch-collab" style="margin:0;cursor:pointer;">
+              Make this a <strong>Shared Chapter</strong> <br>
+              <span style="font-weight:normal;font-size:0.85rem;color:var(--text-muted);">(Allows other users to join and add expenses)</span>
+            </label>
+          </div>
+          ` : ''}
+          ${!isEdit ? `
           <div class="form-group">
             <label class="form-label">Members <span class="form-label__optional">(you are added automatically)</span></label>
             <div id="ch-members-list" style="display:flex;flex-direction:column;gap:var(--s-2);margin-bottom:var(--s-2);"></div>
@@ -64,9 +73,10 @@ const ChapterModal = (() => {
           showToast('Chapter updated', 'success');
           if (typeof window.haptic === 'function') window.haptic('success');
         } else {
+          const isCollaborative = overlay.querySelector('#ch-collab').checked;
           const memberInputs = overlay.querySelectorAll('.ch-member-input');
           const members = [...memberInputs].map(i => ({ name: i.value.trim() })).filter(m => m.name);
-          await apiFetch('/chapters', { method: 'POST', body: { name, description, members } });
+          await apiFetch('/chapters', { method: 'POST', body: { name, description, members, isCollaborative } });
           showToast('Chapter created!', 'success');
           if (typeof window.haptic === 'function') window.haptic('success');
         }

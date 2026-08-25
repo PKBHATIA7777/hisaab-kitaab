@@ -38,6 +38,7 @@ const ChaptersGrid = (() => {
     const time = window.timeAgo(chapter.created_at);
     const isPersonal = chapter.is_personal;
     const isArchived = chapter.is_archived;
+    const isCollaborative = chapter.is_collaborative;
 
     // Get net balance from precalculated user_net_balance field
     const balNum = parseFloat(chapter.user_net_balance || 0);
@@ -62,7 +63,8 @@ const ChaptersGrid = (() => {
     card.innerHTML = `
       <div class="chapter-card__header">
         <div class="chapter-card__avatar" style="background:${color}">${initials}</div>
-        ${isPersonal ? '<span class="badge badge--brand" style="margin-left:auto; margin-right:8px;">My Expenses</span>' : ''}
+        ${isPersonal ? '<span class="badge badge--brand" style="margin-left:auto; margin-right:8px;">Personal</span>' : ''}
+        ${isCollaborative ? '<span class="badge" style="background: rgba(138,43,226,0.15); color: #c48cff; border: 1px solid rgba(138,43,226,0.3); margin-left:auto; margin-right:8px;">Shared</span>' : ''}
         <button class="chapter-card__menu-btn chapter-card__menu"
                 aria-label="More options for ${escapeHTML(chapter.name)}"
                 aria-haspopup="true" aria-expanded="false"
@@ -70,7 +72,8 @@ const ChaptersGrid = (() => {
                 data-chapter-name="${escapeHTML(chapter.name)}"
                 data-chapter-desc="${escapeHTML(chapter.description || '')}"
                 data-is-archived="${chapter.is_archived}"
-                data-is-personal="${isPersonal}">
+                data-is-personal="${isPersonal}"
+                data-is-collaborative="${isCollaborative}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
         </button>
       </div>
@@ -257,6 +260,7 @@ const ChaptersGrid = (() => {
       const data = await apiFetch(url);
       _chapters = data.chapters || [];
       render();
+      return _chapters;
     } catch (err) {
       const { message } = handleApiError(err, 'ChaptersGrid.load');
       showToast(message, 'error', {

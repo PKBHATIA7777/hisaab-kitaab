@@ -57,26 +57,11 @@ async function exportChapter(req, res) {
       FROM chapter_members cm
       LEFT JOIN spent_cte s ON cm.id = s.payer_member_id
       LEFT JOIN used_cte u ON cm.id = u.member_id
-      WHERE cm.chapter_id = $1
+      WHERE cm.chapter_id = $1 AND cm.status = 'active'
       ORDER BY total_spent DESC
     `;
     const summaryParams = eventId ? [id, eventId] : [id];
-    const { rows: summaryRows } = await db.query(summaryQuery, summaryParams);
-
-    const memberBalances = summaryRows.map(row => ({
-      id: row.id,
-      name: row.member_name,
-      balance: parseFloat(row.total_spent) - parseFloat(row.total_used),
-      paid: parseFloat(row.total_spent),
-      consumed: parseFloat(row.total_used)
-    }));
-
-    const rawSettlements = calculateSettlements(memberBalances);
-
-    // ✅ NEW Feature 1: Get pending settlements (minus already settled)
-    const pendingSettlements = await getNetSettlements(rawSettlements, id, eventId || null);
-
-    // ✅ NEW Feature 1: Get completed settlements
+    
     let settledQuery = `
       SELECT
         sr.amount, sr.note, sr.marked_at,
@@ -93,11 +78,7 @@ async function exportChapter(req, res) {
       settledParams.push(eventId);
     }
     settledQuery += ` ORDER BY sr.marked_at DESC`;
-    const { rows: completedSettlements } = await db.query(settledQuery, settledParams);
 
-    const totalChapterSpend = memberBalances.reduce((sum, m) => sum + m.paid, 0);
-
-    // Expenses
     const expenseQuery = `
       SELECT e.id, e.description, e.amount, e.expense_date, cm.member_name as payer_name
       FROM expenses e
@@ -106,9 +87,7 @@ async function exportChapter(req, res) {
       ORDER BY e.expense_date DESC
     `;
     const expenseParams = eventId ? [id, eventId] : [id];
-    const { rows: expenses } = await db.query(expenseQuery, expenseParams);
 
-    // Splits
     const splitsQuery = `
       SELECT es.expense_id, cm.member_name
       FROM expense_splits es
@@ -117,7 +96,34 @@ async function exportChapter(req, res) {
       WHERE e.chapter_id = $1 ${eventId ? "AND e.event_id = $2" : ""}
     `;
     const splitsParams = eventId ? [id, eventId] : [id];
-    const { rows: allSplits } = await db.query(splitsQuery, splitsParams);
+
+    // ✅ Run all independent read queries in parallel
+    const [
+      { rows: summaryRows },
+      { rows: completedSettlements },
+      { rows: expenses },
+      { rows: allSplits }
+    ] = await Promise.all([
+      db.query(summaryQuery, summaryParams),
+      db.query(settledQuery, settledParams),
+      db.query(expenseQuery, expenseParams),
+      db.query(splitsQuery, splitsParams)
+    ]);
+
+    const memberBalances = summaryRows.map(row => ({
+      id: row.id,
+      name: row.member_name,
+      balance: parseFloat(row.total_spent) - parseFloat(row.total_used),
+      paid: parseFloat(row.total_spent),
+      consumed: parseFloat(row.total_used)
+    }));
+
+    const rawSettlements = calculateSettlements(memberBalances);
+
+    // Get pending settlements (minus already settled)
+    const pendingSettlements = await getNetSettlements(rawSettlements, id, eventId || null);
+
+    const totalChapterSpend = memberBalances.reduce((sum, m) => sum + m.paid, 0);
 
     const splitsMap = {};
     allSplits.forEach(s => {

@@ -15,6 +15,7 @@ const ChapterCardMenu = (() => {
     menu.className = 'card-menu is-open';
     menu.innerHTML = `
       <button class="card-menu__item" data-action="edit"> Edit</button>
+      ${!chapter.is_personal && !chapter.is_collaborative ? `<button class="card-menu__item" data-action="upgrade"> Upgrade to Shared</button>` : ''}
       ${!chapter.is_personal ? `<button class="card-menu__item" data-action="archive">${chapter.is_archived ? ' Restore' : ' Mark Settled'}</button>` : ''}
       ${!chapter.is_personal ? `<button class="card-menu__item card-menu__item--danger" data-action="delete"> Delete</button>` : ''}
     `;
@@ -40,6 +41,14 @@ const ChapterCardMenu = (() => {
           if (typeof window.haptic === 'function') window.haptic('success');
           ChaptersGrid.load();
         } catch (err) { showToast(err.message || 'Failed', 'error'); }
+      } else if (action === 'upgrade') {
+        if (!confirm(`Upgrade "${chapter.name}" to a Shared Chapter?\n\nYou will become the Admin and can invite other users to join and add expenses collaboratively.`)) return;
+        try {
+          await apiFetch(`/chapters/${chapter.id}/upgrade`, { method: 'PATCH' });
+          showToast('Chapter upgraded! You can now invite members inside.', 'success', { duration: 5000 });
+          if (typeof window.haptic === 'function') window.haptic('success');
+          ChaptersGrid.load();
+        } catch (err) { showToast(err.message || 'Failed to upgrade', 'error'); }
       } else if (action === 'delete') {
         if (!confirm(`Delete "${chapter.name}"? This cannot be undone.`)) return;
         try {

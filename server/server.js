@@ -159,6 +159,7 @@ app.use(helmet({
   },
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 }));
 
 // ── CSP VIOLATION REPORTING ENDPOINT ─────────────────────────
